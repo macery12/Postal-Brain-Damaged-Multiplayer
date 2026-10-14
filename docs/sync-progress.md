@@ -1,6 +1,6 @@
 # Multiplayer synchronization progress
 
-Updated October 13, 2026. Current development baseline: **PBDMP 0.7.0 / protocol 7**. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
+Updated October 14, 2026. Current development baseline: **PBDMP 0.8.0 / protocol 7**. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
 
 **Current milestone coverage: 81% (17 / 21 points).** This is an equally weighted planning checklist for base-campaign co-op, not a stability rating, campaign completion claim, or percentage of two-PC testing completed.
 
@@ -14,6 +14,11 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
+| Host a Steam lobby | | | ✅ | P1 creates the session through Steam. |
+| Join a Steam friend | | | ✅ | Friends can join the host through the multiplayer menu. |
+| Steam invitations | | | ✅ | Native Steam overlay invitations and accepted invites connect to the lobby. |
+| Steam relay transport | | | ✅ | Steam networking carries the same host-authoritative session state. |
+| Steam player cards | | | ✅ | Multiplayer UI displays connected player names and avatars. |
 | Host by IP/port | | | ✅ | P1 creates the two-player session. |
 | Join by IP/port | | | ✅ | P2 connects directly to the host by IP and port. |
 | Game/mod compatibility checks | | | ✅ | Both players must use matching game and exact mod builds. |
@@ -21,13 +26,15 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Peer timeout | | | ✅ | Lost connections end waiting instead of leaving the session stuck. |
 | P2 disconnect | | | ✅ | P1 continues playing. |
 | P1 departure | | | ✅ | Ends the session and returns P2 to the main menu. |
-| Main-menu multiplayer controls | | | ✅ | Native-themed Host/Join/status/Disconnect dialog. |
+| Main-menu multiplayer controls | | | ✅ | Native-themed lobby, player cards, Steam/Direct IP controls and session status. |
 | Pause-menu multiplayer controls | | | ✅ | Native-themed entry and F8 shortcut. |
 | Start campaign level | | | ✅ | P1 starts; P2 follows. Built-in campaign only. |
 | Restart current level | | | ✅ | P1 restarts both players' level. |
 | Next-level travel | | | ✅ | P2 follows P1's campaign transition. |
 | Return to main menu | | | ✅ | P1 controls shared campaign travel. |
 | Difficulty selection | | | ✅ | P1 selects the session difficulty. |
+| P2 level-complete screen | | | ✅ | P1's accepted finish opens the native end-level UI for both players. |
+| Level-complete statistics | | | ✅ | P2 displays host counts and the exact completion time; travel remains host-controlled. |
 | Block independent P2 travel | | | ✅ | P2 cannot start, load or restart a level independently. |
 | Shared host pause | | | ✅ | P1 freezes/resumes gameplay for both players. |
 | P2 menu during gameplay | | | ✅ | P2 can open a menu without pausing P1. |
@@ -91,6 +98,8 @@ Coverage is for registered base-campaign weapon paths. P1 resolves shared combat
 | Projectile reflection | | | ✅ | P1 owns resulting projectile/combat state. |
 | Native impact effects | | | ✅ | Remote effects are harmless presentation. |
 | Native explosion effects | | | ✅ | P1 owns gameplay results. |
+| P2 explosive-barrel hits | | | ✅ | P2 requests hit damage; P1 executes the barrel and linked mission consequences. |
+| Special explosion replay | | | ✅ | Explicit IL2CPP nullable rotation avoids a native-wrapper disconnect. |
 | Positional firing sounds | | | ✅ | Native audio; full acoustic parity needs playtesting. |
 | Positional impact sounds | | | ✅ | Native audio at the replicated impact. |
 | Positional explosion sounds | | | ✅ | Native audio at the replicated explosion. |
@@ -124,7 +133,8 @@ Coverage is for registered base-campaign weapon paths. P1 resolves shared combat
 | Enemy shields | | | ✅ | Shared protection state belongs to P1. |
 | Enemy status effects | | | ✅ | Shared native status state follows P1. |
 | Enemy death type/timing | | | ✅ | P1 commits deaths and kills. |
-| Blood effects | | | ✅ | Native presentation is relayed. |
+| Blood impact particles | | | ✅ | Native flesh/armor bursts reach P2, including for P2 attacks. |
+| Blood decals | | | ✅ | Native NPC hit presentation projects the corresponding blood decals. |
 | Gib presentation | | | ✅ | Selected native death effects; harmless physics stays local. |
 | Ragdoll presentation | | | ✅ | Shared death presentation; harmless settling can differ. |
 | Actor particle effects | | | ✅ | Supported native cosmetic particle state. |
@@ -171,7 +181,10 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Urine stream/audio cleanup | | | ✅ | Clears effects on stream end, pause and disconnect. |
 | Electrical-box urine activation | | | ✅ | P1 or P2 can trigger the native fuse-box action. |
 | Electrical-box explosion | | | ✅ | Shared result/presentation; P1 owns gameplay. |
-| First-mission garage opening | | | ✅ | Fixed OBJECTIVES/BreakableWall destruction on P2; direct native renderer and controller-passage regression. |
+| Hot-sauce urine activating electrical boxes | | | ✅ | Native powered-urine collision routes fuse activation to P1. |
+| Fire urine igniting explosive barrels | | | ✅ | P1 applies flame damage and executes native explosion/listener consequences. |
+| Fire urine burning supported objects | | | ✅ | P1 owns burn damage and persistent burned state; powerup duration stays personal. |
+| First-mission garage opening | | | ✅ | Retains the authored wall around the cutout; checks static geometry, opening collision and late join. |
 | First-mission garage collision | | | ✅ | Actual solid wall collision disappears; both native player controllers traverse the same opening, including after rejoin. |
 | First-mission urine tutorial trigger | | | ✅ | Completion/disable state follows P1. |
 | Urine-activated shootable buttons | | | ✅ | Native target interactions route through P1. |
@@ -207,6 +220,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Initial weapon copy | | | ✅ | One-time copy of P1's owned weapons. |
 | Initial ammo copy | | | ✅ | One-time copy of P1's remaining ammunition. |
 | Preserve P2's normal non-ammo items | | | ✅ | Join loadout does not copy health, armor, keys or powerups. |
+| Restore completed level results | | | ✅ | A completed host map restores its results when the guest is ready. |
 | Restore current actors | | | ✅ | Includes spawned/dead state and actor parts. |
 | Restore enemy health/status | | | ✅ | Current host combat state is received before release. |
 | Restore doors/locks | | | ✅ | Current door state, rather than replaying old interactions. |
@@ -231,7 +245,10 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Multi-condition switches | | | ✅ | Host evaluates native state/listener conditions; scalars and bounded Boolean condition pages restore on join. |
 | Mission object activation | | | ✅ | Referenced object visibility/activation follows P1. Personal UI, actors and pickups are excluded. |
 | Mission collider state | | | ✅ | Referenced collision/nav-obstacle enable state follows P1. |
-| Required wall destruction | | | ✅ | Dedicated breakable adapter removes solid geometry without replaying gameplay explosions. |
+| Required wall destruction | | | ✅ | P1 commits destruction; P2 does not replay gameplay explosions. |
+| Broken-wall replacement meshes | | | ✅ | Keeps the authored permanent geometry around the hole; loose debris stays cosmetic. |
+| Broken-wall opening collision | | | ✅ | Native controller passage and remaining static surfaces match P1. |
+| Prison barrel-to-pipe opening | | | ✅ | P2 fire damage activates the authored barrel and opens the actual Pipe_hole on both peers. |
 | Mission moving-object pose | | | ✅ | Referenced mover transforms follow P1. |
 | Mission rotating-object pose | | | ✅ | Referenced rotater transforms follow P1. |
 | Mission scaling-object pose | | | ✅ | Referenced transform scale follows P1. |
@@ -263,7 +280,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Moving elevator platforms | | ✅ | | Referenced platform poses and elevator state are replicated; every natural ride/attachment scenario still needs acceptance. |
 | TNT/destructible gates | | ✅ | | WireWallGate uses requester-owned item validation and host state/destruction; natural gate sequences need acceptance. |
 | Cat-paw machinery | | ✅ | | Referenced movers/rotators/switches are covered; specialised trap damage and full natural puzzle flow need validation. |
-| Shootable barrels | ✅ | | | Scenery/destructible synchronization remains future work. |
+| Shootable explosive barrels | | | ✅ | P1 owns shooting/fire damage, native explosion and linked mission results; decorative breakables remain separate. |
 | Breakable props | ✅ | | | Scenery/destructible synchronization remains future work. |
 | Shared checkpoint capture | ✅ | | | Current session snapshots do not provide persistent checkpoints. |
 | Shared checkpoint restoration | ✅ | | | Needs complete shared world restoration. |
@@ -302,7 +319,7 @@ These are agreed design choices and do not reduce the progress score. Picking so
 
 The four partial milestones are remote player model, remote player animations, general scripted world triggers and complete active-session restoration. The two planned milestones are shared checkpoints/world restoration and persistent multiplayer saves. Detail rows above explain each milestone's implemented parts and gaps. The historical urine milestone increased the baseline from 16 / 20 (80%) to 17 / 21 (81%).
 
-Intentionally local systems are excluded. Survival, custom maps, DLC-specific content, matchmaking, relays and dedicated servers are outside this score.
+Intentionally local systems are excluded. Survival, custom maps, DLC-specific content, public matchmaking and dedicated servers are outside this score.
 
 ## Combat and actor coverage
 
@@ -312,11 +329,12 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Mission pass verification
 
-- Both peers need the matching 0.7.0 / protocol 7 DLL pair.
-- Neighborhood's actual `OBJECTIVES/BreakableWall` failed before the adapter and passes after it: renderer/collider removal, matching native controller passage, either-player activation and rejoin without historical effects. Repeat with `Test-Travel.ps1 -GameDir $GameDir -Mission`.
+- Both peers need the matching 0.8.0 / protocol 7 DLL pair.
+- Neighborhood's actual `OBJECTIVES/BreakableWall` failed before the adapter and passes after it: renderer/collider removal, matching native controller passage, either-player activation and rejoin without historical effects. Repeat with `Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood`.
 - Prison walk-in exits and Wallmarkt's interactable bed ending enforce partner gathering, readiness cancellation and one committed finish. Automatic endings wait for independent respawn. Use `-MissionExits -Level LEVEL_AD_Prison` or `LEVEL_AD_Wallmarkt`.
+- Native `-WorldRegression` checks P2 hit particles, powered urine, host-owned barrel damage, actual Prison pipe geometry and the formerly crashing explosion replay. Use `-Level LEVEL_AD_Prison` or `LEVEL_AD_Neighborhood`.
 - Prison's extended state fixture verifies current door/mover/mission scalar state, authoritative P2 encounter activation and group progression. Use `-State -Level LEVEL_AD_Prison`.
-- Fifteen network scenarios include 12,288 ordered mission-state frames through bounded queues with a delayed consumer. Native snapshots retain frames for retry and use TCP receive backpressure.
+- Nineteen network scenarios include 12,288 ordered mission-state frames through bounded queues with a delayed consumer. Native snapshots retain frames for retry and use TCP receive backpressure.
 - The controlled 60 FPS check measures about 3.7 ms p95 world work, 150 ms p95 sweeps and 16.7 ms p95 frame time. An earlier input run encountered a shared host pause while awaiting samples; the check passed on rerun. This does not establish every intermittent focus/pause issue's cause.
 - All 15 maps were inspected with the expanded catalogue. A long sequential run hit a native NPC initialization error entering VIP; the remaining maps passed in a fresh process. Discovery/bounded serialization is not natural campaign completion.
 - Shared-combat regressions and representative Prison/Forest/ComicCon machinery catalogue/state checks passed. Use the [verification commands](verification.md#running-checks) to repeat the relevant fixtures; private run folders are not distributed.

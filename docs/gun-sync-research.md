@@ -1,6 +1,6 @@
 # Visual gun synchronization, version 0.2
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Scope confirmed October 11, 2026: replicate equipped weapon, aim and visible firing effects. Damage, projectiles, enemies and world state stay local.
 

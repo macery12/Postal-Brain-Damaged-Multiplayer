@@ -7,7 +7,7 @@ namespace PBDMP.Plugin;
 
 public sealed partial class MultiplayerBehaviour
 {
-    private sealed record MissionBreakFixture(string Key,string Path,bool Destroyed,bool Blocking,bool Visible);
+    private sealed record MissionBreakFixture(string Key,string Path,bool Destroyed,bool Blocking,bool Visible,string[] StaticParts);
     private BreakableObject[] _missionBreaks=Array.Empty<BreakableObject>();
     private static bool MissionTest=>Environment.GetEnvironmentVariable("PBDMP_MISSION_TEST")=="1";
     private void BeginMissionWallFixture()
@@ -24,7 +24,10 @@ public sealed partial class MultiplayerBehaviour
         var whole=b._breaker._wholeObject;
         return new(WorldCatalogue.TransformKey(b.transform),MissionPath(b.transform),b._destroyed,
             whole.GetComponentsInChildren<Collider>(true).Any(c=>c.enabled && c.gameObject.activeInHierarchy && !c.isTrigger),
-            whole.GetComponentsInChildren<Renderer>(true).Any(r=>r.enabled && r.gameObject.activeInHierarchy));
+            whole.GetComponentsInChildren<Renderer>(true).Any(r=>r.enabled && r.gameObject.activeInHierarchy),
+            b._breaker._parts==null?Array.Empty<string>():b._breaker._parts.GetComponentsInChildren<Component>(true)
+                .Where(c=>c.gameObject.activeInHierarchy && (c.TryCast<Renderer>()?.enabled??c.TryCast<Collider>()?.enabled??false) && c.GetComponentInParent<Rigidbody>()==null)
+                .Select(c=>MissionPath(c.transform)+"|"+c.GetIl2CppType().Name+"|"+c.gameObject.activeInHierarchy+"|"+(c.TryCast<Renderer>()?.enabled??c.TryCast<Collider>()!.enabled)).OrderBy(v=>v).ToArray());
     }
     private static string MissionPath(Transform t)
     {var names=new List<string>();for(var p=t;p!=null;p=p.parent) names.Add(p.name);names.Reverse();return string.Join("/",names);}
@@ -46,8 +49,8 @@ public sealed partial class MultiplayerBehaviour
             TravelCheck(local.TryGetValue(expected.Key,out var target),"destroyed mission geometry exists on P2: "+expected.Path);
             var actual=MissionBreakState(target!);
             File.AppendAllText(Marker("mission-wall-comparison.jsonl"),JsonSerializer.Serialize(new{expected,actual})+"\n");
-            TravelCheck(actual.Destroyed==expected.Destroyed && actual.Blocking==expected.Blocking && actual.Visible==expected.Visible,
-                "actual fuse-destroyed wall state/collision/visibility matches P1: "+expected.Path);
+            TravelCheck(actual.Destroyed==expected.Destroyed && actual.Blocking==expected.Blocking && actual.Visible==expected.Visible && actual.StaticParts.SequenceEqual(expected.StaticParts),
+                "wall opening and remaining static wall geometry match P1: "+expected.Path);
         }
         CheckMissionWallPassage();
     }

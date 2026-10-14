@@ -210,7 +210,7 @@ internal sealed partial class SharedWorld
     }
     private void ApplyImpact(WorldFrame frame)
     {
-        if((frame.Flags&2)!=0) {PlayExplosion(frame);return;}
+        if((frame.Flags&6)!=0) {PlayExplosion(frame);return;}
         if(!_projectilePrefabs.TryGetValue(frame.Key,out var prefab)) return;
         var position=Unity(frame.Position); prefab.GetComponent<ProjectileAudioComponent>()?._onImpact?.PlayOneShot(position);
         if(_trailVisuals.TryGetValue(frame.Entity,out var trail)) {trail.Move(position,Quaternion.identity);trail.Tick(0.025f);}

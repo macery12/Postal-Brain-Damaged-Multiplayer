@@ -13,7 +13,7 @@ internal sealed partial class WorldCatalogue
     internal readonly Dictionary<IntPtr,FMODEvent> UrineAudioAssets=new();
     internal readonly Dictionary<string,Component[]> UrineSurfaces=new();
     private static readonly HashSet<string> UrineTypes=new(StringComparer.Ordinal)
-        {"FuseBox","ButtonShootable","MetalButton","Toilet","PissListener","PissFiller","PissTank","PissFillListenerMovingObject","PissFillListenerScalingObject"};
+        {"ExplosiveBarrel","BurnableObject","FuseBox","ButtonShootable","MetalButton","Toilet","PissListener","PissFiller","PissTank","PissFillListenerMovingObject","PissFillListenerScalingObject"};
     private void BuildUrineTargets()
     {
         var all=Object.FindObjectsOfType<MonoBehaviour>(true).Where(c=>c.gameObject.scene.IsValid()).ToArray();

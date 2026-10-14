@@ -27,7 +27,7 @@ await Test("world codec bounds, strict values and per-event preservation", () =>
 });
 await Test("reliable world events, role guards and array ownership over TCP", async () =>
 {
-    var port=FreePort(); using var host=new LanSession("world"); using var client=new LanSession("world");
+    var port=FreePort(); using var host=new CoopSession("world"); using var client=new CoopSession("world");
     host.StartHost(port,IPAddress.Loopback); client.StartJoin(IPAddress.Loopback,port);
     await Until(()=>host.Snapshot.Connected && client.Snapshot.Connected);
     var values=new[]{2f};
@@ -49,7 +49,7 @@ await Test("reliable world events, role guards and array ownership over TCP", as
 });
 await Test("large mission snapshots survive bounded transport backpressure", async () =>
 {
-    var port=FreePort();using var host=new LanSession("bulk");using var client=new LanSession("bulk");
+    var port=FreePort();using var host=new CoopSession("bulk");using var client=new CoopSession("bulk");
     host.StartHost(port,IPAddress.Loopback);client.StartJoin(IPAddress.Loopback,port);
     await Until(()=>host.Snapshot.Connected && client.Snapshot.Connected);
     const int total=12288;ulong next=1;var received=new List<WorldFrame>();var clock=System.Diagnostics.Stopwatch.StartNew();var blocked=false;
@@ -62,7 +62,7 @@ await Test("large mission snapshots survive bounded transport backpressure", asy
             next++;
         }
         // Model a main thread busy building the scene before it can consume its snapshot.
-        if(clock.Elapsed.TotalMilliseconds>=600) received.AddRange(client.DrainWorld(LanSession.MaxWorldQueue));
+        if(clock.Elapsed.TotalMilliseconds>=600) received.AddRange(client.DrainWorld(CoopSession.MaxWorldQueue));
         await Task.Delay(1);
     }
     Check(blocked && received.Select(f=>f.Sequence).SequenceEqual(Enumerable.Range(1,total).Select(i=>(ulong)i)));
@@ -119,7 +119,7 @@ await Test("travel generations, join loadouts, stale readiness and malformed sta
 });
 await Test("host-only travel, client-only ready and reconnect generations over TCP", async () =>
 {
-    var port = FreePort(); using var host = new LanSession("travel"); using var client = new LanSession("travel");
+    var port = FreePort(); using var host = new CoopSession("travel"); using var client = new CoopSession("travel");
     host.StartHost(port, IPAddress.Loopback); client.StartJoin(IPAddress.Loopback, port);
     Throws(() => client.PublishTravel(new(1, TravelAction.Menu, "",0,true,false,true,false)));
     Throws(() => host.PublishReady(new(1,true)));
@@ -131,12 +131,12 @@ await Test("host-only travel, client-only ready and reconnect generations over T
     host.PublishTravel(state with { Epoch = 11, Action = TravelAction.Restart });
     await Until(() => client.Snapshot.Travel?.Epoch == 11);
     client.Dispose(); await Until(() => !host.Snapshot.Connected && host.Snapshot.Ready == null);
-    using var next = new LanSession("travel"); next.StartJoin(IPAddress.Loopback,port);
+    using var next = new CoopSession("travel"); next.StartJoin(IPAddress.Loopback,port);
     await Until(() => next.Snapshot.Travel?.Epoch == 11 && host.Snapshot.Ready == null);
 });
 await Test("wire authority violation releases slot; host loading-failure reason reaches client", async () =>
 {
-    var port = FreePort(); using var host = new LanSession("authority"); host.StartHost(port,IPAddress.Loopback);
+    var port = FreePort(); using var host = new CoopSession("authority"); host.StartHost(port,IPAddress.Loopback);
     using (var forged = new TcpClient())
     {
         await forged.ConnectAsync(IPAddress.Loopback,port);
@@ -148,7 +148,7 @@ await Test("wire authority violation releases slot; host loading-failure reason 
         await Until(()=>!host.Snapshot.Connected);
         Check(host.Snapshot.Status.Contains("unauthorized"));
     }
-    using var client = new LanSession("authority"); client.StartJoin(IPAddress.Loopback,port);
+    using var client = new CoopSession("authority"); client.StartJoin(IPAddress.Loopback,port);
     await Until(()=>client.Snapshot.Connected && host.Snapshot.Connected);
     host.DropPeer("Campaign loading timed out.");
     await Until(()=>!client.Snapshot.Connected && !host.Snapshot.Connected);
@@ -156,7 +156,7 @@ await Test("wire authority violation releases slot; host loading-failure reason 
 });
 await Test("invalid ports and duplicate start rejected", () =>
 {
-    using var session = new LanSession("test");
+    using var session = new CoopSession("test");
     Throws(() => session.StartHost(0));
     session.StartHost(FreePort(), IPAddress.Loopback);
     Throws(() => session.StartJoin(IPAddress.Loopback, FreePort()));
@@ -165,8 +165,8 @@ await Test("invalid ports and duplicate start rejected", () =>
 await Test("bidirectional poses, level change, full host, leave, rejoin, host stop", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("test-game");
-    using var client = new LanSession("test-game");
+    using var host = new CoopSession("test-game");
+    using var client = new CoopSession("test-game");
     var p1 = new PlayerPose("level-1", true, 1, 2, 3, 90, 1.8f);
     var p2 = new PlayerPose("level-1", true, 4, 5, 6, 180, 1.3f);
     host.Publish(p1); client.Publish(p2);
@@ -180,7 +180,7 @@ await Test("bidirectional poses, level change, full host, leave, rejoin, host st
     await Until(() => host.Snapshot.RemotePose?.Weapon == "pistol" && host.Snapshot.RemotePose.ShotSequence == 43);
     for (var attempt = 0; attempt < 5; attempt++)
     {
-        using var extra = new LanSession("test-game");
+        using var extra = new CoopSession("test-game");
         extra.StartJoin(IPAddress.Loopback, port);
         try { await Until(() => extra.Snapshot.Status.Contains("full")); }
         catch { throw new Exception("Full-host rejection failed: " + extra.Snapshot.Status); }
@@ -192,7 +192,7 @@ await Test("bidirectional poses, level change, full host, leave, rejoin, host st
     await Until(() => host.Snapshot.RemotePose?.Ready == false);
     client.Dispose();
     await Until(() => !host.Snapshot.Connected && host.Snapshot.RemotePose == null);
-    using var rejoin = new LanSession("test-game");
+    using var rejoin = new CoopSession("test-game");
     rejoin.StartJoin(IPAddress.Loopback, port);
     await Until(() => rejoin.Snapshot.Connected && host.Snapshot.Connected);
     host.Dispose();
@@ -201,12 +201,12 @@ await Test("bidirectional poses, level change, full host, leave, rejoin, host st
 await Test("game and protocol version mismatches rejected", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("game-a");
+    using var host = new CoopSession("game-a");
     host.StartHost(port, IPAddress.Loopback);
-    using var wrongGame = new LanSession("game-b");
+    using var wrongGame = new CoopSession("game-b");
     wrongGame.StartJoin(IPAddress.Loopback, port);
     await Until(() => wrongGame.Snapshot.Status.Contains("Game or PBDMP build mismatch"));
-    using var wrongVersion = new LanSession("game-a", 1); // Previous 0.1 wire format.
+    using var wrongVersion = new CoopSession("game-a", 1); // Previous 0.1 wire format.
     wrongVersion.StartJoin(IPAddress.Loopback, port);
     await Until(() => wrongVersion.Snapshot.Status.Contains("protocol version mismatch"));
     Check(!host.Snapshot.Connected);
@@ -214,18 +214,18 @@ await Test("game and protocol version mismatches rejected", async () =>
 await Test("occupied host port and refused join report errors", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("test");
+    using var host = new CoopSession("test");
     host.StartHost(port, IPAddress.Loopback);
-    using var duplicate = new LanSession("test");
+    using var duplicate = new CoopSession("test");
     Throws(() => duplicate.StartHost(port, IPAddress.Loopback));
-    using var client = new LanSession("test");
+    using var client = new CoopSession("test");
     client.StartJoin(IPAddress.Loopback, FreePort());
     await Until(() => client.Snapshot.Status.StartsWith("Join failed:"));
 });
 await Test("malformed peer dropped and host admits a valid replacement", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("test");
+    using var host = new CoopSession("test");
     host.StartHost(port, IPAddress.Loopback);
     using (var bad = new TcpClient())
     {
@@ -235,14 +235,14 @@ await Test("malformed peer dropped and host admits a valid replacement", async (
         await bad.GetStream().WriteAsync(new byte[] { 0, 0, 0, 0 });
         await Until(() => !host.Snapshot.Connected);
     }
-    using var client = new LanSession("test");
+    using var client = new CoopSession("test");
     client.StartJoin(IPAddress.Loopback, port);
     await Until(() => client.Snapshot.Connected && host.Snapshot.Connected);
 });
 await Test("silent peer times out and releases host slot", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("test");
+    using var host = new CoopSession("test");
     host.StartHost(port, IPAddress.Loopback);
     using var silent = new TcpClient();
     await silent.ConnectAsync(IPAddress.Loopback, port);
@@ -254,7 +254,7 @@ await Test("silent peer times out and releases host slot", async () =>
 await Test("cancellation during handshake and idempotent disposal", async () =>
 {
     var port = FreePort();
-    using var host = new LanSession("test");
+    using var host = new CoopSession("test");
     host.StartHost(port, IPAddress.Loopback);
     using var pending = new TcpClient();
     await pending.ConnectAsync(IPAddress.Loopback, port);
@@ -262,6 +262,99 @@ await Test("cancellation during handshake and idempotent disposal", async () =>
     await Task.Delay(100);
     Check(host.Snapshot.Role == SessionRole.Offline && !host.Snapshot.Connected);
     Throws(() => host.StartHost(port));
+});
+await Test("handshake, poses, ordered world events, full host, stated drop reason and rejoin over a message carrier", async () =>
+{
+    using var listener = new LoopbackListener();
+    using var host = new CoopSession("carrier"); using var client = new CoopSession("carrier");
+    var p1 = new PlayerPose("level-1", true, 1, 2, 3, 90, 1.8f);
+    var p2 = new PlayerPose("level-1", true, 4, 5, 6, 180, 1.3f);
+    host.Publish(p1); client.Publish(p2);
+    host.StartHost(listener, "Hosting carrier; waiting for P2");
+    Check(host.Snapshot.Role == SessionRole.Host && host.Snapshot.Status == "Hosting carrier; waiting for P2");
+    Throws(() => host.StartHost(new LoopbackListener(), "again"));
+    client.StartJoin(listener.ConnectAsync, "Connecting through carrier", 5);
+    await Until(() => host.Snapshot.RemotePose == p2 && client.Snapshot.RemotePose == p1);
+    for (ulong i=1;i<=120;i++) host.PublishWorld(new(WorldKind.Impact,1,i,Values:new[]{2f}));
+    client.PublishWorld(new(WorldKind.Fire,1,1,Actor:2));
+    var received=new List<WorldFrame>(); var requests=new List<WorldFrame>();
+    await Until(()=>{received.AddRange(client.DrainWorld()); requests.AddRange(host.DrainWorld()); return received.Count==120 && requests.Count==1;});
+    Check(received.Select(f=>f.Sequence).SequenceEqual(Enumerable.Range(1,120).Select(i=>(ulong)i)));
+    using (var extra = new CoopSession("carrier"))
+    {
+        extra.StartJoin(listener.ConnectAsync, "Connecting through carrier", 5);
+        await Until(() => extra.Snapshot.Status.Contains("full"));
+        Check(host.Snapshot.Connected && client.Snapshot.Connected);
+    }
+    for (var attempt = 0; attempt < 10; attempt++)
+    {
+        using var dropped = attempt == 0 ? client : new CoopSession("carrier");
+        if (attempt > 0) dropped.StartJoin(listener.ConnectAsync, "Connecting through carrier", 5);
+        await Until(() => dropped.Snapshot.Connected && host.Snapshot.Connected);
+        host.DropPeer("Campaign loading timed out.");
+        await Until(() => !dropped.Snapshot.Connected && !host.Snapshot.Connected);
+        // The peer's own send can fail on the closed carrier before it reads the reason.
+        if (!dropped.Snapshot.Status.Contains("Campaign loading timed out")) throw new Exception("Drop reason lost: " + dropped.Snapshot.Status);
+    }
+    using var rejoin = new CoopSession("carrier");
+    rejoin.StartJoin(listener.ConnectAsync, "Connecting through carrier", 5);
+    await Until(() => rejoin.Snapshot.Connected && host.Snapshot.Connected);
+    host.Dispose();
+    await Until(() => !rejoin.Snapshot.Connected);
+});
+await Test("large snapshots survive a bounded message carrier", async () =>
+{
+    // Each refusal by the full carrier costs the sender one timer tick, so capacity sets the throughput here.
+    using var listener = new LoopbackListener(64);
+    using var host=new CoopSession("bulk");using var client=new CoopSession("bulk");
+    host.StartHost(listener,"Hosting");client.StartJoin(listener.ConnectAsync,"Connecting",5);
+    await Until(()=>host.Snapshot.Connected && client.Snapshot.Connected);
+    const int total=12288;ulong next=1;var received=new List<WorldFrame>();var clock=System.Diagnostics.Stopwatch.StartNew();var blocked=false;
+    while(next<=total || received.Count<total)
+    {
+        Check(clock.Elapsed.TotalSeconds<20 && host.Snapshot.Connected && client.Snapshot.Connected);
+        while(next<=total)
+        {
+            if(!host.PublishWorld(new(WorldKind.MissionState,1,next,Key:"mission",Flags:128,Values:new[]{(float)next}))) {blocked=true;break;}
+            next++;
+        }
+        if(clock.Elapsed.TotalMilliseconds>=600) received.AddRange(client.DrainWorld(CoopSession.MaxWorldQueue));
+        await Task.Delay(1);
+    }
+    Check(blocked && received.Select(f=>f.Sequence).SequenceEqual(Enumerable.Range(1,total).Select(i=>(ulong)i)));
+});
+await Test("build mismatch, refused dial and slow dial report errors over a message carrier", async () =>
+{
+    using var listener = new LoopbackListener();
+    using var host = new CoopSession("game-a");
+    host.StartHost(listener, "Hosting");
+    using var wrongGame = new CoopSession("game-b");
+    wrongGame.StartJoin(listener.ConnectAsync, "Connecting", 5);
+    await Until(() => wrongGame.Snapshot.Status.Contains("Game or PBDMP build mismatch"));
+    using var refused = new CoopSession("game-a");
+    refused.StartJoin(_ => Task.FromException<IPeerConnection>(new IOException("Host is not reachable.")), "Connecting", 5);
+    await Until(() => refused.Snapshot.Status == "Join failed: Host is not reachable.");
+    using var slow = new CoopSession("game-a");
+    slow.StartJoin(async stop => { await Task.Delay(Timeout.Infinite, stop); throw new IOException(); }, "Connecting", 1);
+    await Until(() => slow.Snapshot.Status == "Join failed: Connection timed out");
+    Check(!host.Snapshot.Connected);
+});
+await Test("message stream reassembles split and coalesced frames", async () =>
+{
+    var (near, far) = LoopbackPipe.Pair(64);
+    using var stream = new MessageStream(near);
+    var first = new Packet(MessageKind.Pose, Pose: new PlayerPose("level", true, 1, 2, 3, 4, 1.8f, "weapon"));
+    var second = new Packet(MessageKind.Reject, Text: "reason");
+    using var wire = new MemoryStream();
+    await Protocol.WriteAsync(wire, first, CancellationToken.None);
+    await Protocol.WriteAsync(wire, second, CancellationToken.None);
+    var bytes = wire.ToArray();
+    // One byte, an empty message, then everything else including the whole second frame.
+    Check(far.TrySend(bytes.AsSpan(0, 1)) && far.TrySend(ReadOnlySpan<byte>.Empty) && far.TrySend(bytes.AsSpan(1)));
+    Check(await Protocol.ReadAsync(stream, CancellationToken.None) == first);
+    Check(await Protocol.ReadAsync(stream, CancellationToken.None) == second);
+    far.Dispose();
+    await ThrowsAsync(() => Protocol.ReadAsync(stream, CancellationToken.None));
 });
 Console.WriteLine($"PASS: {passed} network acceptance scenarios.");
 
@@ -304,4 +397,48 @@ sealed class FragmentStream : MemoryStream
     public FragmentStream(byte[] bytes) : base(bytes) { }
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
         => base.ReadAsync(buffer[..Math.Min(buffer.Length, 1)], token);
+}
+// In-process stand-in for a relayed message link: bounded, ordered, and closed for both ends at once.
+sealed class LoopbackPipe : IMessagePipe
+{
+    private sealed class Link { public volatile bool Closed; }
+    private readonly System.Collections.Concurrent.ConcurrentQueue<byte[]> _inbound, _outbound;
+    private readonly Link _link;
+    private readonly int _capacity;
+    private LoopbackPipe(System.Collections.Concurrent.ConcurrentQueue<byte[]> inbound,
+        System.Collections.Concurrent.ConcurrentQueue<byte[]> outbound, Link link, int capacity)
+    { _inbound = inbound; _outbound = outbound; _link = link; _capacity = capacity; }
+    public static (LoopbackPipe Near, LoopbackPipe Far) Pair(int capacity)
+    {
+        var a = new System.Collections.Concurrent.ConcurrentQueue<byte[]>(); var b = new System.Collections.Concurrent.ConcurrentQueue<byte[]>();
+        var link = new Link();
+        return (new(a, b, link, capacity), new(b, a, link, capacity));
+    }
+    public bool TrySend(ReadOnlySpan<byte> message)
+    {
+        if (_link.Closed) throw new IOException("Carrier closed.");
+        if (_outbound.Count >= _capacity) return false;
+        _outbound.Enqueue(message.ToArray()); return true;
+    }
+    public void Receive(List<byte[]> into)
+    {
+        var closed = _link.Closed;
+        while (_inbound.TryDequeue(out var message)) into.Add(message);
+        if (closed && into.Count == 0) throw new IOException("Carrier closed.");
+    }
+    public void Dispose() => _link.Closed = true;
+}
+sealed class LoopbackListener : IPeerListener
+{
+    private readonly System.Threading.Channels.Channel<IPeerConnection> _incoming = System.Threading.Channels.Channel.CreateUnbounded<IPeerConnection>();
+    private readonly int _capacity;
+    public LoopbackListener(int capacity = 64) => _capacity = capacity;
+    public Task<IPeerConnection> ConnectAsync(CancellationToken stop)
+    {
+        var (near, far) = LoopbackPipe.Pair(_capacity);
+        if (!_incoming.Writer.TryWrite(new MessagePeerConnection(far))) throw new IOException("Host is not listening.");
+        return Task.FromResult<IPeerConnection>(new MessagePeerConnection(near));
+    }
+    public async Task<IPeerConnection> AcceptAsync(CancellationToken stop) => await _incoming.Reader.ReadAsync(stop);
+    public void Dispose() => _incoming.Writer.TryComplete();
 }

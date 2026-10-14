@@ -15,6 +15,8 @@ internal sealed partial class WorldCatalogue
     internal readonly Dictionary<string, Transform> DoorMotion = new();
     internal readonly Dictionary<string, Transform> EncounterMotion = new();
     internal readonly Dictionary<IntPtr,string> PointerKeys = new();
+    /// <summary>Readable identity behind each hashed key, for diffing two peers' catalogues.</summary>
+    internal readonly Dictionary<string,string> Identities = new();
     internal readonly Dictionary<string, NpcId> NpcAssets = new();
     internal readonly Dictionary<string, EntityId> Assets = new();
     internal readonly HashSet<string> DoorKeys = new();
@@ -135,6 +137,22 @@ internal sealed partial class WorldCatalogue
         Manifest=Hash(string.Join("\n",Components.Keys.OrderBy(k=>k,StringComparer.Ordinal)) + "\n" +
             string.Join("\n",DoorMotion.Keys.Concat(EncounterMotion.Keys).OrderBy(k=>k,StringComparer.Ordinal)));
         Plugin.Logger.LogInfo($"World catalogue {Manifest}: {Components.Count} authored components, {DoorKeys.Count} door/gate components, {DoorMotion.Count} motion transforms.");
+        WriteListing();
+    }
+    /// <summary>Peers only exchange the manifest hash; this file is what two players diff after a mismatch.</summary>
+    internal static string ListingPath(string scene) => Path.Combine(BepInEx.Paths.BepInExRootPath, "PBDMP", "catalogue-" + scene + ".tsv");
+    private void WriteListing()
+    {
+        try
+        {
+            var lines=new List<string>{$"manifest\t{Manifest}\t{Components.Count}\t{MissionKeys.Count}\t{DoorMotion.Count}\t{EncounterMotion.Count}"};
+            lines.AddRange(Components.OrderBy(p=>Identities[p.Key],StringComparer.Ordinal).Select(p=>$"component\t{Identities[p.Key]}\tmission={MissionKeys.Contains(p.Key)}"));
+            lines.AddRange(DoorMotion.Values.Concat(EncounterMotion.Values).Select(t=>"motion\t"+PathOf(t)).Distinct().OrderBy(l=>l,StringComparer.Ordinal));
+            var path=ListingPath(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllLines(path,lines);
+        }
+        catch(Exception error) {Plugin.Logger.LogWarning("World catalogue listing not written: "+error.Message);}
     }
     private void AddEncounterTarget(Component component)
     {
@@ -150,11 +168,16 @@ internal sealed partial class WorldCatalogue
     {
         // Shared scene controllers can reference menu art. UI animation/input is
         // local; synchronizing those transforms would fight each peer's menus.
-        if(transform.TryCast<RectTransform>()!=null || transform.GetComponentInParent<Canvas>()!=null) return false;
-        if(transform.GetComponentInParent<Pickup>()!=null || transform.GetComponentInParent<Npc>()!=null || transform.GetComponentInParent<Player>()!=null) return false;
-        var breaker=transform.GetComponentInParent<Hyperstrange.PBD.Contraptions.Breaker>();
+        if(transform.TryCast<RectTransform>()!=null || InParent<Canvas>(transform)!=null) return false;
+        if(InParent<Pickup>(transform)!=null || InParent<Npc>(transform)!=null || InParent<Player>(transform)!=null) return false;
+        var breaker=InParent<Hyperstrange.PBD.Contraptions.Breaker>(transform);
         return breaker?._parts==null || !transform.IsChildOf(breaker._parts.transform);
     }
+    // Membership must not depend on what is active when the catalogue is built. The default
+    // parent lookup skips inactive objects, so a pickup P1 already collected (or one a map
+    // hides until later) used to join P1's catalogue but not a freshly loaded P2's.
+    private static T? InParent<T>(Transform transform) where T:Component =>
+        transform.GetComponentInParent(Il2CppType.Of<T>(),true)?.TryCast<T>();
     private static bool DoorName(Transform transform)
     {
         for(var current=transform;current!=null;current=current.parent)
@@ -166,9 +189,10 @@ internal sealed partial class WorldCatalogue
         var type=component.GetIl2CppType().FullName;
         var same=component.gameObject.GetComponents<Component>().Where(c=>c.GetIl2CppType().FullName==type).ToArray();
         var index=Array.FindIndex(same,c=>c.Pointer==component.Pointer);
-        var key=Hash(PathOf(component.transform)+"|"+type+"|"+index);
+        var identity=PathOf(component.transform)+"|"+type+"|"+index;
+        var key=Hash(identity);
         if (Components.TryGetValue(key,out var prior) && prior.Pointer!=component.Pointer) throw new InvalidOperationException($"Duplicate world catalogue identity: {PathOf(component.transform)} {type} index={index}; prior={prior.Pointer}, next={component.Pointer}");
-        Components[key]=component; PointerKeys[component.Pointer]=key; return key;
+        Components[key]=component; PointerKeys[component.Pointer]=key; Identities[key]=identity; return key;
     }
     internal string? Key(Component? component) => component!=null && PointerKeys.TryGetValue(component.Pointer,out var key) ? key : null;
     // BigCat and PuppetPresident ship with the same EntityId GUID. The prefab

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 
 namespace PBDMP.Network;
 
@@ -7,15 +6,15 @@ public enum SessionRole { Offline, Host, Client }
 public sealed record SessionSnapshot(SessionRole Role, bool Connected, string Status, PlayerPose? RemotePose,
     TravelState? Travel = null, ClientReady? Ready = null);
 
-/// <summary>Two-player LAN transport. No Unity calls; one latest pose, bounded frames, monotonic async timeouts.</summary>
-public sealed class LanSession : IDisposable
+/// <summary>Two-player session over any reliable peer link. No Unity calls; one latest pose, bounded frames, monotonic async timeouts.</summary>
+public sealed class CoopSession : IDisposable
 {
     private readonly object _gate = new();
     private readonly string _gameFingerprint;
     private readonly int _protocolVersion;
     private readonly CancellationTokenSource _stop = new();
-    private TcpListener? _listener;
-    private TcpClient? _peer;
+    private IPeerListener? _listener;
+    private IPeerConnection? _peer;
     private PlayerPose _local = PlayerPose.Empty;
     private TravelState? _travel;
     private ClientReady? _ready;
@@ -53,7 +52,7 @@ public sealed class LanSession : IDisposable
         }
     }
 
-    public LanSession(string gameFingerprint, int protocolVersion = Protocol.Version)
+    public CoopSession(string gameFingerprint, int protocolVersion = Protocol.Version)
     {
         _gameFingerprint = gameFingerprint;
         _protocolVersion = protocolVersion;
@@ -91,37 +90,60 @@ public sealed class LanSession : IDisposable
     public void StartHost(int port, IPAddress? bindAddress = null)
     {
         CheckStart(port);
-        var listener = new TcpListener(bindAddress ?? IPAddress.Any, port);
-        try { listener.Start(4); }
+        IPeerListener listener;
+        try { listener = new TcpPeerListener(port, bindAddress); }
         catch { _started = false; throw; }
-        _listener = listener;
-        Set(new(SessionRole.Host, false, $"Hosting TCP port {port}; waiting for P2", null));
-        _ = AcceptLoop(listener, _stop.Token);
+        Listen(listener, $"Hosting TCP port {port}; waiting for P2");
+    }
+
+    /// <summary>Hosts on a caller-built listener, which the session disposes with itself.</summary>
+    public void StartHost(IPeerListener listener, string waiting)
+    {
+        CheckStart();
+        Listen(listener, waiting);
     }
 
     public void StartJoin(IPAddress address, int port)
     {
         CheckStart(port);
-        Set(new(SessionRole.Client, false, $"Connecting to {address}:{port}", null));
-        _ = Join(address, port, _stop.Token);
+        Connect(stop => TcpPeerConnection.ConnectAsync(address, port, stop), $"Connecting to {address}:{port}", 5);
     }
 
-    private void CheckStart(int port)
+    /// <summary>Joins through a caller-supplied dial, allowing it <paramref name="connectSeconds"/> before the handshake.</summary>
+    public void StartJoin(Func<CancellationToken, Task<IPeerConnection>> connect, string connecting, int connectSeconds)
     {
-        if (_stop.IsCancellationRequested) throw new ObjectDisposedException(nameof(LanSession));
+        CheckStart();
+        Connect(connect, connecting, connectSeconds);
+    }
+
+    private void CheckStart(int port = 1)
+    {
+        if (_stop.IsCancellationRequested) throw new ObjectDisposedException(nameof(CoopSession));
         if (_started) throw new InvalidOperationException("Session already started.");
         if (port is < 1 or > 65535) throw new ArgumentOutOfRangeException(nameof(port));
         _started = true;
     }
 
-    private async Task AcceptLoop(TcpListener listener, CancellationToken stop)
+    private void Listen(IPeerListener listener, string waiting)
+    {
+        _listener = listener;
+        Set(new(SessionRole.Host, false, waiting, null));
+        _ = AcceptLoop(listener, _stop.Token);
+    }
+
+    private void Connect(Func<CancellationToken, Task<IPeerConnection>> connect, string connecting, int connectSeconds)
+    {
+        Set(new(SessionRole.Client, false, connecting, null));
+        _ = Join(connect, connectSeconds, _stop.Token);
+    }
+
+    private async Task AcceptLoop(IPeerListener listener, CancellationToken stop)
     {
         try
         {
             while (!stop.IsCancellationRequested)
             {
-                var client = await listener.AcceptTcpClientAsync(stop).ConfigureAwait(false);
-                client.NoDelay = true;
+                var client = await listener.AcceptAsync(stop).ConfigureAwait(false);
                 if (Snapshot.Connected)
                 {
                     using (client)
@@ -129,7 +151,7 @@ public sealed class LanSession : IDisposable
                     {
                         try
                         {
-                            var stream = client.GetStream();
+                            var stream = client.Stream;
                             // Consume the bounded hello before closing: unread incoming data can reset
                             // a Windows TCP socket and discard the rejection instead of delivering it.
                             await Protocol.ReadAsync(stream, deadline.Token).ConfigureAwait(false);
@@ -144,7 +166,7 @@ public sealed class LanSession : IDisposable
                 {
                     try
                     {
-                        var stream = client.GetStream();
+                        var stream = client.Stream;
                         var hello = await Protocol.ReadAsync(stream, deadline.Token).ConfigureAwait(false);
                         var error = CheckHello(hello, MessageKind.Hello);
                         if (error != null)
@@ -173,15 +195,16 @@ public sealed class LanSession : IDisposable
         }
     }
 
-    private async Task Join(IPAddress address, int port, CancellationToken stop)
+    private async Task Join(Func<CancellationToken, Task<IPeerConnection>> connect, int connectSeconds, CancellationToken stop)
     {
-        var client = new TcpClient(address.AddressFamily) { NoDelay = true };
+        IPeerConnection? client = null;
         try
         {
+            using (var deadline = Deadline(stop, connectSeconds))
+                client = await connect(deadline.Token).ConfigureAwait(false);
             using (var deadline = Deadline(stop, 5))
             {
-                await client.ConnectAsync(address, port, deadline.Token).ConfigureAwait(false);
-                var stream = client.GetStream();
+                var stream = client.Stream;
                 await Protocol.WriteAsync(stream, new(MessageKind.Hello, _protocolVersion, _gameFingerprint), deadline.Token).ConfigureAwait(false);
                 var welcome = await Protocol.ReadAsync(stream, deadline.Token).ConfigureAwait(false);
                 if (welcome.Kind == MessageKind.Reject) throw new InvalidDataException(welcome.Text);
@@ -198,8 +221,9 @@ public sealed class LanSession : IDisposable
         }
         catch (Exception ex)
         {
-            client.Dispose();
-            if (!stop.IsCancellationRequested) Set(new(SessionRole.Client, false, $"Join failed: {ex.Message}", null));
+            client?.Dispose();
+            var reason = ex is OperationCanceledException ? "Connection timed out" : ex.Message;
+            if (!stop.IsCancellationRequested) Set(new(SessionRole.Client, false, $"Join failed: {reason}", null));
         }
     }
 
@@ -211,16 +235,20 @@ public sealed class LanSession : IDisposable
         return null;
     }
 
-    private async Task Exchange(TcpClient client, SessionRole role, CancellationToken stop)
+    private async Task Exchange(IPeerConnection client, SessionRole role, CancellationToken stop)
     {
         using var connection = CancellationTokenSource.CreateLinkedTokenSource(stop);
-        var stream = client.GetStream();
+        var stream = client.Stream;
         var sender = SendLoop(stream, role, connection.Token);
         var receiver = ReceiveLoop(stream, role, connection.Token);
         var reason = "Peer disconnected";
         try
         {
             var finished = await Task.WhenAny(sender, receiver).ConfigureAwait(false);
+            // A closing peer's stated reason can still be queued inbound when our own send fails first.
+            if (finished == sender && sender.IsFaulted)
+                await Task.WhenAny(receiver, Task.Delay(250, stop)).ConfigureAwait(false);
+            if (receiver.IsFaulted && receiver.Exception!.InnerException is InvalidDataException) finished = receiver;
             await finished.ConfigureAwait(false);
         }
         catch (Exception ex) { reason = ex is OperationCanceledException ? "Connection timed out" : ex.Message; }
@@ -332,7 +360,7 @@ public sealed class LanSession : IDisposable
         {
             if (_stop.IsCancellationRequested) return;
             _stop.Cancel();
-            _listener?.Stop();
+            _listener?.Dispose();
             _peer?.Dispose();
             _peer = null;
             _worldIn.Clear(); _worldOut.Clear();

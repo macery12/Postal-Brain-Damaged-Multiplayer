@@ -1,6 +1,6 @@
 # Campaign travel and independent respawn
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Scope confirmed October 12, 2026: base campaign; P1 controls starts/restarts/next/title/difficulty/shared pause. P2 follows automatically, waits for both ready and joins beside P1 with a one-time weapons/ammo copy. Three-second individual respawn at normal map spawn retains gear, restores health, removes armor/powerups and leaves the world intact. Saves are blocked; separate MP saves and shared combat/world snapshots follow later.
 

@@ -10,6 +10,9 @@ $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
 $previousProbe = $env:PBDMP_COMBAT_PROBE; $previousOutput = $env:PBDMP_COMBAT_OUTPUT; $previousPort = $env:PBDMP_COMBAT_PORT
 $env:PBDMP_COMBAT_PROBE = '1'; $env:PBDMP_COMBAT_OUTPUT = $output; $env:PBDMP_COMBAT_PORT = $port
+# A Steam install started directly relaunches itself through Steam unless the app id is already in its environment.
+$previousSteamApp = $env:SteamAppId
+if (!$env:SteamAppId -and !(Test-Path -LiteralPath (Join-Path $GameDir 'steam_appid.txt'))) { $env:SteamAppId = '1359980' }
 $ownedProcess = $null
 try {
     $loaderLog = Join-Path $GameDir 'BepInEx\LogOutput.log'
@@ -28,6 +31,7 @@ try {
 } finally {
     if ($ownedProcess) { $ownedProcess.Refresh(); if (!$ownedProcess.HasExited) { Stop-Process -Id $ownedProcess.Id; $ownedProcess.WaitForExit(5000) | Out-Null } }
     $env:PBDMP_COMBAT_PROBE = $previousProbe; $env:PBDMP_COMBAT_OUTPUT = $previousOutput; $env:PBDMP_COMBAT_PORT = $previousPort
+    $env:SteamAppId = $previousSteamApp
     if (Test-Path -LiteralPath (Join-Path $GameDir 'BepInEx\LogOutput.log')) { Copy-Item -LiteralPath (Join-Path $GameDir 'BepInEx\LogOutput.log') -Destination (Join-Path $output 'bepinex.log') }
     $output | Set-Content -LiteralPath (Join-Path $repo '.local\last-combat-probe.txt')
 }

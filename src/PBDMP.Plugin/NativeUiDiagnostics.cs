@@ -27,13 +27,17 @@ internal static class NativeUiDiagnostics
         if (entry.transform.GetSiblingIndex() != parent.Find("BUTTON_Horde").GetSiblingIndex() + 1 ||
             entry.onClick.GetPersistentEventCount() != 0 || view.PauseEntry.onClick.GetPersistentEventCount() != 0)
             throw new InvalidOperationException("Native entries must be correctly placed and contain no original game actions.");
-        var buttons = new[] { view.HostButton, view.JoinButton, view.DisconnectButton, view.BackButton };
+        var buttons = new[] { view.SteamHostButton, view.InviteButton, view.PrivacyButton, view.DirectButton, view.DisconnectButton, view.BackButton,
+            view.HostButton, view.JoinButton, view.DirectBackButton, view.Prompt.ConfirmButton, view.Prompt.CancelButton };
         if (buttons.Any(b => b.onClick.GetPersistentEventCount() != 0) ||
             view.Address.onValueChanged.GetPersistentEventCount() != 0 || view.Address.onSubmit.GetPersistentEventCount() != 0)
             throw new InvalidOperationException("Cloned controls must not retain native prompt actions.");
         if (entry.LabelText.font.name != "FONT_Clickable" || view.Address.textComponent.font.name != "FONT_InputText" ||
-            view.Panel.transform.Find("Multiplayer panel").GetComponent<Image>().sprite.name != "UI_Panel")
-            throw new InvalidOperationException("UI must reuse the original native fonts and panel art.");
+            view.Panel.transform.Find("Multiplayer panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
+            view.DirectDialog.transform.Find("Direct IP panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
+            view.Prompt.Root.transform.Find("Prompt panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
+            view.FirstCard.Backing.sprite.name != "UI_Text" || view.Hud.Text.font.name != "FONT_Text")
+            throw new InvalidOperationException("UI must reuse the original native fonts, panel and card art.");
         entry.LabelText.SetText(); view.PauseEntry.LabelText.SetText();
         if (entry.LabelText.text != "Multiplayer" || view.PauseEntry.LabelText.text != "Multiplayer")
             throw new InvalidOperationException("Language refresh must not overwrite multiplayer labels.");
@@ -45,6 +49,22 @@ internal static class NativeUiDiagnostics
         entry.OnPointerEnter(new PointerEventData(EventSystem.current));
         entry.OnPointerExit(new PointerEventData(EventSystem.current));
         Plugin.Logger.LogInfo("SMOKE PASS: native UI assets, safe actions, entry order/navigation, persistent labels, uniqueness and hover callbacks.");
+    }
+
+    /// <summary>Arrow/stick navigation must stay inside the topmost layer and skip disabled controls.</summary>
+    internal static void AssertLayerNavigation(NativeMultiplayerUI view, Selectable[] expected)
+    {
+        view.Refresh();
+        for (var i = 0; i < expected.Length; i++)
+        {
+            var down = expected[i].navigation.selectOnDown;
+            if (expected[i].navigation.mode != Navigation.Mode.Explicit || down == null || down.Pointer != expected[(i + 1) % expected.Length].Pointer)
+                throw new InvalidOperationException($"Dialog navigation must link {expected[i].name} to {expected[(i + 1) % expected.Length].name}.");
+        }
+        var selected = EventSystem.current?.currentSelectedGameObject;
+        if (selected == null || !expected.Any(s => s.gameObject.Pointer == selected.Pointer))
+            throw new InvalidOperationException("Selection must sit on the topmost dialog layer.");
+        Plugin.Logger.LogInfo($"SMOKE PASS: {expected.Length}-control navigation loop on the active dialog layer.");
     }
 
     internal static void AssertModal(NativeMultiplayerUI view, bool open)

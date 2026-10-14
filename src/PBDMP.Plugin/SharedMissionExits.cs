@@ -25,6 +25,7 @@ internal sealed partial class SharedWorld
     internal bool FinishMission(LevelController level)
     {
         if(!Active) return true;
+        if(!Client && _missionCompletion!=null) return false;
         if(_finishingMission) {MissionFinishesForTest++;return true;}
         if(Client) return false;
         if(BothMissionPlayersReady() && !_life.Frozen) {MissionFinishesForTest++;return true;}
@@ -32,8 +33,9 @@ internal sealed partial class SharedWorld
     }
     private void TickMissionProgress()
     {
-        if(!Active || _life.Frozen) return;
-        if(Client) {TickClientExitInteraction();return;}
+        if(!Active) return;
+        if(Client) {TickMissionCompletion();if(!_life.Frozen) TickClientExitInteraction();return;}
+        if(_life.Frozen) return;
         if(_pendingMissionEnd!=null)
         {
             if(!BothMissionPlayersReady()) return;
@@ -114,5 +116,5 @@ internal sealed partial class SharedWorld
         MissionStatus=frame.Value==0?"":frame.Value==1?"Waiting for partner at the exit.":"Waiting for both players to be alive and loaded.";
     }
     private void ClearMissions()
-    {_missionLightState.Clear();_missionExitInteraction=null;_clientExitInteraction=null;_missionBreakState.Clear();_missionArrayFields.Clear();_missionArrays.Clear();_pendingMissionEnd=null;_finishingMission=false;_lastMissionWait=null;MissionStatus="";_missionPresence.Clear();_finishedMissionExits.Clear();_missionVolumeHitAt.Clear();_missionPollAt=0;}
+    {ClearMissionCompletion();_missionLightState.Clear();_missionExitInteraction=null;_clientExitInteraction=null;_missionBreakState.Clear();_missionArrayFields.Clear();_missionArrays.Clear();_pendingMissionEnd=null;_finishingMission=false;_lastMissionWait=null;MissionStatus="";_missionPresence.Clear();_finishedMissionExits.Clear();_missionVolumeHitAt.Clear();_missionPollAt=0;}
 }

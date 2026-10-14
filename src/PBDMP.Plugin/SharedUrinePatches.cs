@@ -19,6 +19,10 @@ internal static class SharedUrinePatches
             harmony.Patch(AccessTools.Method(type,"Piss"),prefix:new(typeof(SharedUrinePatches),nameof(Piss)));
         foreach(var type in new[]{typeof(PissFiller),typeof(PissTank)})
             harmony.Patch(AccessTools.Method(type,"OnPiss"),prefix:new(typeof(SharedUrinePatches),nameof(Fill)));
+        foreach(var type in new[]{typeof(ExplosiveBarrel),typeof(BurnableObject)})
+            harmony.Patch(AccessTools.Method(type,"FlameTick"),prefix:new(typeof(SharedUrinePatches),nameof(WorldFlame)));
+        harmony.Patch(AccessTools.Method(typeof(ExplosiveBarrel),"Hit"),prefix:new(typeof(SharedUrinePatches),nameof(BarrelHit)));
+        harmony.Patch(AccessTools.Method(typeof(PeeCollisionParticle),"HandleCollision"),prefix:new(typeof(SharedUrinePatches),nameof(FirePeeCollision)));
         // Weak-spot Piss builds a frame-timed HitData and reaches the existing
         // actor-part Hit guard. Keep its native damage calculation on the sender.
         harmony.Patch(AccessTools.Method(typeof(ProjectileFireBall),"Piss"),prefix:new(typeof(SharedUrinePatches),nameof(FireBall)),postfix:new(typeof(SharedUrinePatches),nameof(Extinguished)));
@@ -32,6 +36,16 @@ internal static class SharedUrinePatches
         harmony.Patch(AccessTools.Method(typeof(RailWagon),"OnPlayerJumpedOff"),postfix:new(typeof(SharedUrinePatches),nameof(LeftWagon)));
         harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(Vector3)}),postfix:new(typeof(SharedUrinePatches),nameof(Sound)));
         harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(GameObject)}),postfix:new(typeof(SharedUrinePatches),nameof(ObjectSound)));
+    }
+    private static bool WorldFlame(Component __instance,IAiActor __0,float __1,float __2)=>SharedWorld.Current?.ClientWorldFlame(__instance,__0,__1,__2)!=true;
+    private static bool BarrelHit(ExplosiveBarrel __instance,HitData __0)=>SharedWorld.Current?.ClientBarrelHit(__instance,__0)!=true;
+    private static void FirePeeCollision(PeeCollisionParticle __instance,RaycastHit __0)
+    {
+        if(__instance._owner?.Pointer!=Player.Instance?.Pointer || __instance._playerWeaponModelDong?.PeeType!=PeeType.Fire) return;
+        // Some powered-urine collision paths burn/soak before the IPissable
+        // forwarding stub. Preserve the fuse's urine activation as well.
+        var box=__0.collider?.GetComponentInParent<FuseBox>();
+        if(box!=null) SharedWorld.Current?.ClientUrine(box);
     }
     private static bool Activate(Component __instance)=>SharedWorld.Current?.ClientUrine(__instance)!=true;
     private static bool Piss(Component __instance,PissData __0)

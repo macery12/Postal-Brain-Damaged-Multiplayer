@@ -1,6 +1,6 @@
 # Gun and door synchronization: native findings
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 October 12, 2026. Read-only inspection of the installed game's recovered declarations and matching native ISIL. **No new hooks or synchronization were runtime-tested by this research.** Implementation awaits the scope interview. Existing installed behavior remains version 0.5.
 

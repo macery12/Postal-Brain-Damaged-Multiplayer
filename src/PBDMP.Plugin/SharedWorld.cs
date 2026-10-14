@@ -11,7 +11,7 @@ namespace PBDMP.Plugin;
 internal sealed partial class SharedWorld : IDisposable
 {
     internal static SharedWorld? Current;
-    private readonly LanSession _session;
+    private readonly CoopSession _session;
     private readonly SessionLifecycle _life;
     private WorldCatalogue? _catalogue;
     private NativeAssetGraph? _assets;
@@ -74,7 +74,7 @@ internal sealed partial class SharedWorld : IDisposable
         try {SendState(true);} finally {_validatingAuditFrames=false;}
         return report.ToString();
     }
-    internal SharedWorld(LanSession session,SessionLifecycle life)
+    internal SharedWorld(CoopSession session,SessionLifecycle life)
     { _session=session; _life=life; Current=this; if (Client) life.WorldReady=false; }
     internal static NetVector Net(Vector3 v)=>new(v.x,v.y,v.z);
     internal static Vector3 Unity(NetVector v)=>new(v.X,v.Y,v.Z);
@@ -186,7 +186,7 @@ internal sealed partial class SharedWorld : IDisposable
     {
         if (frame.Kind==WorldKind.Manifest)
         {
-            if (frame.Key!=_catalogue!.Manifest) throw new InvalidDataException("Authored enemy/door catalogue mismatch.");
+            if (frame.Key!=_catalogue!.Manifest) throw new InvalidDataException("Authored enemy/door catalogue mismatch. Compare "+WorldCatalogue.ListingPath(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name)+" from both PCs.");
             if (!_snapshotApplied) Send(new(WorldKind.ManifestAck,_epoch,1,Key:_catalogue.Manifest));
             return;
         }
@@ -276,6 +276,7 @@ internal sealed partial class SharedWorld : IDisposable
         if(complete && !Client) SetMissionWait("",_pendingMissionEnd!=null?"Waiting for both players to be alive and loaded.":"",true);
         foreach(var key in _catalogue!.MissionBreakKeys) {SendMissionBreak(key,complete);yield return 0;}
         foreach(var key in _catalogue.MissionConditionKeys) {SendMissionArrays(key,complete);yield return 0;}
+        if(complete && _missionCompletion!=null) Send(_missionCompletion);
         foreach(var key in _catalogue!.UrineKeys) {SendUrineState(key,complete);yield return 0;}
         foreach(var key in _catalogue.UrineConsequences) {SendUrineConsequence(key,complete);yield return 0;}
         foreach(var step in SendUrineWagons(complete)) yield return step;

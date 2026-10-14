@@ -1,6 +1,6 @@
 # Native UI theme research
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Research date: October 12, 2026. Scope: replace PBDMP's plain injected multiplayer button and connection controls with UI built from POSTAL: Brain Damaged's installed assets and native interaction components.
 

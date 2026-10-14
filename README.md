@@ -1,8 +1,8 @@
 # POSTAL: Brain Damaged Multiplayer (PBDMP)
 
-Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign, letting you team up with a friend over LAN.
+Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign, letting you team up with a Steam friend over the internet or with someone on your LAN.
 
-Built for BepInEx 6 IL2CPP. **Current development version: 0.7.0.**
+Built for BepInEx 6 IL2CPP. **Current development version: 0.8.0.**
 
 ## Sync progress
 
@@ -10,7 +10,8 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| LAN Host / Join | | | ✅ | Connect with a friend. |
+| Steam Host / Invite / Join | | | ✅ | Friends lobby, overlay invites, Join Game; Steam relays the connection. |
+| LAN Host / Join | | | ✅ | Direct IP for LAN or a forwarded port. |
 | Player movement and aim | | | ✅ | See each other in-game. |
 | Player model and animations | | ✅ | | More visual polish planned. |
 | Campaign travel and pause | | | ✅ | Play through levels together. |
@@ -30,7 +31,7 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 
 ## Installation
 
-No release is available yet while the mod is in development. If you'd like to build it yourself, expand the instructions below.
+No public release is available yet while the mod is in development. To play with a friend, one of you builds it (instructions below), runs `.\scripts\Package.ps1`, and sends the resulting `artifacts\PBDMP-<version>.zip`; its `INSTALL.txt` lists the BepInEx build to install. Both players must use the same zip.
 
 <details>
 <summary>Build and install from source</summary>
@@ -73,18 +74,17 @@ Always pass `-GameDir` to build/install/runtime-test scripts. Their legacy defau
 
 ### Play together
 
-Launch the game normally on both PCs after installation.
+Launch the game from Steam on both PCs after installation. **Multiplayer** sits below Survival Mode in the main menu and in the pause menu; **F8** opens it anywhere.
 
-Find P1's LAN IPv4 address in PowerShell:
+**Through Steam (recommended):** no IP addresses, port forwarding or firewall rules.
 
-```powershell
-ipconfig
-```
+1. P1 selects **Host Steam game**. The lobby is friends-only by default; **Lobby: friends only / invite only** switches it.
+2. P1 selects **Invite friend** to pick a friend in the Steam overlay. Alternatively the friend uses **Join Game** on P1's name in their Steam friends list.
+3. P2 accepts while the game is running. From the menus the join starts at once; from inside a level P2 is asked first, because unsaved progress is lost. A different PBDMP build or version is reported before connecting.
 
-1. P1 opens **Multiplayer**, chooses a port (default `7777`) and selects **Host (P1)**.
-2. P2 enters P1's IPv4 address and port, then selects **Join (P2)**. `127.0.0.1` only reaches the same PC. Allow the game/TCP port on your private LAN if Windows Firewall prompts.
-3. P1 starts a built-in campaign level, or hosts an already active one. P2 loads the same map and receives the supported current world state before play resumes.
-4. Use the pause-menu entry or **F8** for connection status and disconnect. P1 controls difficulty, starts, restarts and level changes. Walk-in exits require both living players at the exit; interactable endings require both nearby. Automatic endings wait until both are alive and loaded.
+**Direct IP (LAN or a forwarded TCP port):** select **Direct IP...**. P1 chooses a port (default `7777`) and selects **Host (P1)**. P2 enters P1's IPv4 address (`ipconfig` on P1's PC) and port, then selects **Join (P2)**. `127.0.0.1` only reaches the same PC. Allow the game/TCP port on your private network if Windows Firewall prompts.
+
+Then P1 starts a built-in campaign level, or hosts an already active one. P2 loads the same map and receives the supported current world state before play resumes. The lobby panel shows both players (Steam name, avatar and ping for Steam sessions); a badge in the corner and short notifications show session changes in game. P1 controls difficulty, starts, restarts and level changes. Walk-in exits require both living players at the exit; interactable endings require both nearby. Automatic endings wait until both are alive and loaded.
 
 P2 joins in clear space near P1, with normal-map-spawn fallback. P1's weapons and ammo are copied once on joining; health, armor, keys and powerups are not copied. Later inventories stay independent.
 
@@ -98,16 +98,17 @@ From `<RepoDir>`, with `$GameDir` set as above:
 .\scripts\Build.ps1 -GameDir $GameDir
 
 .\scripts\Test-Runtime.ps1 -GameDir $GameDir
+.\scripts\Test-Steam.ps1 -GameDir $GameDir
 .\scripts\Test-Travel.ps1 -GameDir $GameDir
 
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Combat
-.\scripts\Test-Travel.ps1 -GameDir $GameDir -Mission
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -MissionExits -Level LEVEL_AD_Prison
 ```
 
-`Build.ps1 -SkipTests` skips network tests. Runtime scripts launch owned game processes and block profile writes through diagnostic flags. Most test windows are hidden; `-FocusInput` intentionally exercises window focus. Two-instance travel tests use local hardlinks/junctions and retain ignored diagnostic output. See [verification](docs/verification.md) for prerequisites, additional modes and evidence limits.
+`Build.ps1 -SkipTests` skips network tests. `Test-Steam.ps1` needs the Steam client running and signed in; it creates and leaves a private lobby and exercises the Steam connection path on one account. Runtime scripts launch owned game processes and block profile writes through diagnostic flags; on a Steam install they put the game's app id in the process environment so a direct launch is not redirected through Steam. Most test windows are hidden; `-FocusInput` intentionally exercises window focus. Two-instance travel tests use local hardlinks/junctions and retain ignored diagnostic output. See [verification](docs/verification.md) for prerequisites, additional modes and evidence limits.
 
-Source layout: `src/PBDMP.Network` contains the bounded TCP protocol/session; `src/PBDMP.Plugin` contains Unity/BepInEx adapters; `tests/PBDMP.Network.Tests` contains executable network scenarios. Start with the [documentation index](docs/README.md) and [contributor guidance](docs/contributing.md). Keep Unity calls on Unity's main thread.
+Source layout: `src/PBDMP.Network` contains the bounded protocol/session with its TCP and Steam carriers; `src/PBDMP.Plugin` contains Unity/BepInEx adapters; `tests/PBDMP.Network.Tests` contains executable network scenarios. Start with the [documentation index](docs/README.md) and [contributor guidance](docs/contributing.md). Keep Unity calls on Unity's main thread.
 
 ### Uninstall
 

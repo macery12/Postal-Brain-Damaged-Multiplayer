@@ -4,6 +4,7 @@ using Il2CppInterop.Runtime.Attributes;
 using Hyperstrange.PBD;
 using Hyperstrange.PBD.UI.Menus;
 using PBDMP.Network;
+using PBDMP.Network.Steam;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -15,7 +16,7 @@ namespace PBDMP.Plugin;
 
 public sealed partial class MultiplayerBehaviour : MonoBehaviour
 {
-    private LanSession? _session;
+    private CoopSession? _session;
     private SessionLifecycle? _lifecycle;
     private SharedWorld? _world;
     private uint _remoteLife, _remoteEpoch;
@@ -23,12 +24,13 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     private GameObject? _panel;
     private GameObject? _menuButton;
     private NativeMultiplayerUI? _view;
+    private SteamService? _steam;
+    private bool _steamSession, _promptOpenedPanel, _wasConnected;
     private GameObject? _avatar;
     private TMP_Text? _avatarLabel;
     private RemotePlayerVisual? _remoteVisual;
     private readonly LocalWeaponObserver _weaponObserver = new();
     private TMP_Text? _status;
-    private TMP_Text? _hud;
     private TMP_InputField? _address;
     private TMP_InputField? _port;
     private MainMenu? _mainMenu;
@@ -47,7 +49,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     private int _smokeStep;
     private float _smokeDeadline;
     private float _smokeNext;
-    private LanSession? _smokePeer;
+    private CoopSession? _smokePeer;
     private PlayerPose? _smokeLocal;
     private int _smokePort;
     private Button? _hostButton;
@@ -77,8 +79,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 BuildUI();
             }
             if (Input.GetKeyDown(KeyCode.F8)) TogglePanel();
-            else if (_open && Input.GetKeyDown(KeyCode.Escape)) SetPanel(false);
+            else if (_open && Input.GetKeyDown(KeyCode.Escape) && !_view!.Cancel()) SetPanel(false);
             _view!.Refresh();
+            _steam!.Tick();
             if (Time.unscaledTime >= _nextMenuScan)
             {
                 _nextMenuScan = Time.unscaledTime + 0.5f;
@@ -105,7 +108,18 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             var local = _smokeLocal ?? ReadPlayer();
             _session?.Publish(local);
             var snapshot = _session?.Snapshot ?? new(SessionRole.Offline, false, "Offline", null);
-            _view.SetSession(snapshot);
+            // A failed Steam join releases its lobby place at once, so the friend can simply try again.
+            if (_steamSession && snapshot.Role == SessionRole.Client && !snapshot.Connected && snapshot.Status.StartsWith("Join failed", StringComparison.Ordinal))
+            {
+                ResetSession(); ShowInfo(snapshot.Status.Replace("Join failed: ", "Could not join: "));
+                snapshot = new(SessionRole.Offline, false, "Offline", null);
+            }
+            if (snapshot.Connected && _view.Prompt.Busy) _view.Prompt.Hide();
+            if (snapshot.Connected != _wasConnected)
+            {
+                _wasConnected = snapshot.Connected;
+                if (snapshot.Connected) _view.Hud.Toast(snapshot.Role == SessionRole.Host ? PartnerName(snapshot) + " joined." : "Connected to " + PartnerName(snapshot) + ".");
+            }
             UpdateAvatar(snapshot, local);
             var detail = snapshot.Status;
             if (snapshot.Connected)
@@ -115,18 +129,25 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 else if (local.Level != snapshot.RemotePose.Level) detail += "\nLevel mismatch.";
                 else detail += "\nSame level. Remote " + (snapshot.Role == SessionRole.Host ? "P2" : "P1");
             }
+            else if (_steam.Phase == LobbyPhase.Creating) detail = "Creating a Steam lobby...";
+            else if (_steam.Phase == LobbyPhase.Joining) detail = "Joining a friend's Steam lobby...";
+            else if (_steam.Phase == LobbyPhase.Hosting) detail = $"Steam lobby open ({(_steam.InviteOnly ? "invite only" : "friends only")}). Invite a friend, or they can use Join Game in Steam.";
+            else if (snapshot.Role == SessionRole.Offline && !_steam.Available) detail = _steam.Unavailable;
             if(snapshot.Connected && !string.IsNullOrEmpty(_world?.MissionStatus)) detail+="\n"+_world.MissionStatus;
             _status!.text = string.IsNullOrEmpty(_feedback) ? detail : _feedback + "\n" + detail;
-            _hud!.text = snapshot.Role == SessionRole.Offline ? "" : "PBDMP | " + detail.Replace('\n', ' ') + " | F8";
+            _view.Apply(Model(snapshot, local, _status.text));
+            _view.Hud.Set(Badge(snapshot));
             if (_lastStatus != snapshot.Status)
             {
                 _lastStatus = snapshot.Status;
                 Plugin.Logger.LogInfo(snapshot.Status);
             }
             if (_smokeEnabled) RunSmoke();
+            if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(Environment.GetEnvironmentVariable("PBDMP_MISSION_EXITS_TEST")=="1") RunMissionExitTest();
+                if(Environment.GetEnvironmentVariable("PBDMP_WORLD_REGRESSION")=="1") RunWorldRegression();
+                else if(Environment.GetEnvironmentVariable("PBDMP_MISSION_EXITS_TEST")=="1") RunMissionExitTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_URINE_TEST")=="1") RunUrineTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_ACTOR_PART_TEST")=="1") RunActorPartTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_ACTOR_TEST")=="1") RunActorTest();
@@ -185,9 +206,12 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             _remoteVisual = new RemotePlayerVisual(color);
             _avatar = _remoteVisual.Root;
             _avatarLabel = TextAt(_ui!.transform, snapshot.Role == SessionRole.Host ? "P2" : "P1",
-                Vector2.zero, new Vector2(120, 36), 26);
-            _avatarLabel.color = color;
+                Vector2.zero, new Vector2(360, 36), 26);
+            _avatarLabel.color = color; _avatarLabel.enableWordWrapping = false;
         }
+        // Steam sessions name the partner; Direct IP sessions only know the role.
+        var label = _steamSession && PartnerName(snapshot) is { Length: > 0 } partner ? partner : snapshot.Role == SessionRole.Host ? "P2" : "P1";
+        if (_avatarLabel != null && _avatarLabel.text != label) _avatarLabel.text = label;
         _avatar.SetActive(true);
         if (_remoteLife != remote!.Life || _remoteEpoch != remote.Epoch)
         { _hadRemote = false; _remoteVisual!.ResetInterpolation(); _remoteLife = remote.Life; _remoteEpoch = remote.Epoch; }
@@ -240,9 +264,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         {
             _session = new(Plugin.Fingerprint);
             _session.StartHost(port);
-            if (!_smokeEnabled) _lifecycle = new(_session, message => _feedback = message, () => { if (_open) SetPanel(false); }, ResetSession);
-            if (_lifecycle != null) _world = new(_session,_lifecycle);
+            StartCampaign();
             _feedback = "Give P2 your LAN IP and this port.";
+            _view?.ShowDirect(false);
         }
         catch (Exception ex) { ResetSession(); _feedback = "Cannot host: " + ex.Message; }
     }
@@ -257,11 +281,165 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         {
             _session = new(Plugin.Fingerprint);
             _session.StartJoin(address, port);
-            if (!_smokeEnabled) _lifecycle = new(_session, message => _feedback = message, () => { if (_open) SetPanel(false); }, ResetSession);
-            if (_lifecycle != null) _world = new(_session,_lifecycle);
+            StartCampaign();
             _feedback = "";
+            _view?.ShowDirect(false);
         }
         catch (Exception ex) { ResetSession(); _feedback = "Cannot join: " + ex.Message; }
+    }
+
+    private void StartCampaign()
+    {
+        if (!_smokeEnabled) _lifecycle = new(_session!, Notify, () => { if (_open) SetPanel(false); }, ResetSession);
+        if (_lifecycle != null) _world = new(_session!, _lifecycle);
+    }
+
+    private void HostSteam()
+    {
+        ResetSession();
+        _steamSession = true;
+        _steam!.Host();
+    }
+
+    // The lobby exists; the listener only admits its members.
+    private void OnLobbyHosted()
+    {
+        try
+        {
+            var listener = new SteamP2PListener(id => id != _steam!.LocalId && _steam.IsMember(id), _steam!.Opened);
+            _steam.Listener = listener;
+            _session = new(Plugin.Fingerprint);
+            _session.StartHost(listener, "Steam lobby open; waiting for a friend");
+            StartCampaign();
+            _feedback = "";
+        }
+        catch (Exception ex) { ResetSession(); ShowInfo("Cannot host: " + ex.Message); }
+    }
+
+    [HideFromIl2Cpp]
+    private void OnJoinRequested(ulong lobby, ulong friend)
+    {
+        var name = _steam!.Name(friend);
+        var host = name.Length > 0 ? name + "'s" : "your friend's";
+        // Joining from the menus is what the player just asked Steam for; leaving a game in progress gets a question.
+        if (!SessionManager.SessionActive && _session == null && _steam.Phase == LobbyPhase.None) { JoinSteam(lobby, host); return; }
+        var leaving = SessionManager.SessionActive ? "Progress since your last save will be lost." : "You will leave the current multiplayer session.";
+        OpenForPrompt();
+        _view!.Prompt.Ask($"Join {host} game?\n{leaving}", "Join", () => JoinSteam(lobby, host), "Stay", ClosePromptPanel);
+    }
+
+    [HideFromIl2Cpp]
+    private void JoinSteam(ulong lobby, string host)
+    {
+        ResetSession();
+        _steamSession = true;
+        _steam!.Join(lobby);
+        if (_steam.Phase != LobbyPhase.Joining) return;
+        if (!_open) SetPanel(true);
+        _view!.Prompt.Wait($"Joining {host} game...", "Cancel", () => { ResetSession(); Notify("Join cancelled."); });
+    }
+
+    private void OnLobbyEntered(ulong host)
+    {
+        try
+        {
+            var name = _steam!.Name(host);
+            _session = new(Plugin.Fingerprint);
+            _session.StartJoin(stop => SteamP2P.ConnectAsync(host, stop, _steam.Opened), $"Connecting to {name} through Steam", SteamP2P.ConnectSeconds);
+            StartCampaign();
+            if (_view!.Prompt.Busy) _view.Prompt.Update($"Connecting to {name} through Steam...");
+        }
+        catch (Exception ex) { ResetSession(); ShowInfo("Cannot join: " + ex.Message); }
+    }
+
+    private void Notify(string message)
+    {
+        _feedback = message;
+        _view?.Hud.Toast(message);
+    }
+
+    // Problems the player has to read now get the native prompt, opened over whatever is on screen.
+    private void ShowInfo(string message)
+    {
+        Plugin.Logger.LogInfo("Multiplayer notice: " + message);
+        _feedback = message;
+        if (_view == null) return;
+        OpenForPrompt();
+        _view.Prompt.Ask(message, "OK", ClosePromptPanel);
+    }
+
+    private void OpenForPrompt()
+    {
+        if (_open) return;
+        _promptOpenedPanel = true;
+        SetPanel(true);
+    }
+
+    private void ClosePromptPanel()
+    {
+        if (!_promptOpenedPanel) return;
+        _promptOpenedPanel = false;
+        SetPanel(false);
+    }
+
+    [HideFromIl2Cpp]
+    private string PartnerName(SessionSnapshot snapshot)
+    {
+        if (!_steamSession || _steam?.Available != true) return snapshot.Role == SessionRole.Host ? "P2" : "P1";
+        var name = _steam.Name(_steam.Partner);
+        return name.Length > 0 ? name : snapshot.Role == SessionRole.Host ? "P2" : "P1";
+    }
+
+    [HideFromIl2Cpp]
+    private LobbyModel Model(SessionSnapshot snapshot, PlayerPose local, string status)
+    {
+        var steam = _steam!;
+        var role = snapshot.Role;
+        var inLobby = role != SessionRole.Offline || steam.Phase != LobbyPhase.None;
+        // Smoke captures are shared as documentation, so they never show the tester's Steam identity.
+        var identity = steam.Available && !_smokeEnabled;
+        var self = new CardModel(identity ? steam.Name(steam.LocalId) : "You",
+            !inLobby ? "Not in a session" : role == SessionRole.Client ? "P2  /  you" : "P1  /  host  /  you",
+            Where(local), identity ? steam.Avatar(steam.LocalId) : null, role == SessionRole.Client ? "P2" : "P1", true);
+        CardModel other;
+        if (snapshot.Connected)
+        {
+            var partner = _steamSession ? steam.Partner : 0;
+            var remote = snapshot.RemotePose;
+            var state = remote == null ? "Connected" : !remote.Alive ? "Respawning" : Where(remote);
+            if (_steamSession && steam.Ping >= 0) state += $"  /  {steam.Ping} ms";
+            other = new(PartnerName(snapshot), role == SessionRole.Host ? "P2" : "P1  /  host", state,
+                partner != 0 ? steam.Avatar(partner) : null, role == SessionRole.Host ? "P2" : "P1", true);
+        }
+        else if (role == SessionRole.Client || steam.Phase == LobbyPhase.Joining)
+            other = new("Host", "P1  /  host", "Connecting...", null, "P1", false);
+        else if (inLobby)
+            other = new("Empty slot", "P2", steam.Phase == LobbyPhase.Hosting ? "Invite a friend to fill this slot" : "Waiting for P2 to connect", null, "P2", false);
+        else
+            other = new("Empty slot", "P2", "Host a game to invite a friend", null, "P2", false);
+        var hostFirst = role != SessionRole.Client;
+        return new(role, steam.Phase, steam.Available, _steamSession, steam.InviteOnly, snapshot.Connected,
+            hostFirst ? self : other, hostFirst ? other : self, status);
+    }
+
+    [HideFromIl2Cpp]
+    private static string Where(PlayerPose pose)
+    {
+        if (!pose.Ready || pose.Level.Length == 0) return "In the menus";
+        // Level keys end in the scene name, such as LEVEL_TheWall_Interior.
+        var scene = pose.Level[(pose.Level.LastIndexOf(':') + 1)..];
+        if (scene.StartsWith("LEVEL_", StringComparison.Ordinal)) scene = scene[6..];
+        return "Playing " + scene.Replace('_', ' ');
+    }
+
+    [HideFromIl2Cpp]
+    private string Badge(SessionSnapshot snapshot)
+    {
+        if (snapshot.Role == SessionRole.Offline) return _steam!.Phase == LobbyPhase.None ? "" : "CO-OP  /  STEAM LOBBY  /  F8";
+        var role = snapshot.Role == SessionRole.Host ? "P1 HOST" : "P2";
+        if (!snapshot.Connected) return $"CO-OP  /  {role}  /  {(snapshot.Role == SessionRole.Host ? "WAITING FOR A FRIEND" : "CONNECTING")}  /  F8";
+        var ping = _steamSession && _steam!.Ping >= 0 ? $"  /  {_steam.Ping} MS" : "";
+        return $"CO-OP  /  {role}  /  WITH {PartnerName(snapshot).ToUpperInvariant()}{ping}  /  F8";
     }
 
     private bool TryPort(out int port)
@@ -280,18 +458,22 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         catch (Exception ex) { Plugin.Logger.LogError("Campaign cleanup: " + ex); }
         _lifecycle = null;
         _session?.Dispose(); _session = null;
+        // The session owned the listener; leaving releases the lobby place for the partner too.
+        _steam?.Leave(); _steamSession = false;
         _remoteVisual?.Dispose(); _remoteVisual = null;
         if (_avatarLabel != null) Object.Destroy(_avatarLabel.gameObject);
-        _avatar = null; _avatarLabel = null; _hadRemote = false; _feedback = "";
+        _avatar = null; _avatarLabel = null; _hadRemote = false; _feedback = ""; _wasConnected = false;
     }
 
     private void BuildUI()
     {
-        _view = new NativeMultiplayerUI(MenuManager.MainCanvas, Host, Join, ResetSession, TogglePanel);
+        _view = new NativeMultiplayerUI(MenuManager.MainCanvas, HostSteam, () => _steam!.Invite(), () => _steam!.TogglePrivacy(),
+            Host, Join, ResetSession, TogglePanel);
+        _steam = new SteamService(OnLobbyHosted, OnLobbyEntered, OnJoinRequested, ShowInfo, message => _view!.Hud.Toast(message));
         _ui = _view.Root; _panel = _view.Panel; _menuButton = _view.MainEntry.gameObject;
-        _address = _view.Address; _port = _view.Port; _status = _view.Status; _hud = _view.Hud;
+        _address = _view.Address; _port = _view.Port; _status = _view.Status;
         _hostButton = _view.HostButton; _joinButton = _view.JoinButton; _disconnectButton = _view.DisconnectButton;
-        Plugin.Logger.LogInfo("PBDMP native UI constructed: main/pause entries, original fonts/panel/inputs/buttons, Host/Join/Disconnect.");
+        Plugin.Logger.LogInfo("PBDMP native UI constructed: main/pause entries, lobby panel with player cards, Direct IP dialog, prompt and session badge.");
     }
 
     [HideFromIl2Cpp]
@@ -306,16 +488,18 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         if (_smokeEnabled) Plugin.Logger.LogError("PBDMP SMOKE FAIL");
         if (_open) { try { SetPanel(false); } catch { } }
         ResetSession();
+        _steam?.Dispose(); _steam = null;
         _view?.Dispose(); _view = null; _ui = null;
     }
 
-    public void OnApplicationQuit() { _weaponObserver.Dispose(); ResetSession(); }
+    public void OnApplicationQuit() { _weaponObserver.Dispose(); ResetSession(); SteamCallbackTap.Remove(); }
     public void OnDestroy()
     {
         if (_open) { try { SetPanel(false); } catch { } }
         ResetSession();
         _weaponObserver.Dispose();
         _smokePeer?.Dispose();
+        _steam?.Dispose(); _steam = null;
         _view?.Dispose(); _view = null; _ui = null;
     }
 
@@ -342,6 +526,28 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             case 1:
                 NativeUiDiagnostics.Capture(SmokeOutput());
                 CaptureUI("runtime-panel.png");
+                // Offline: Steam host, privacy (when Steam runs), Direct IP and Back are reachable; invite and leave are not.
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.SteamHostButton, _view.PrivacyButton, _view.DirectButton, _view.BackButton }
+                    .Where(s => s.interactable).ToArray());
+                SmokeAssert(!_view.InviteButton.interactable && !_view.DisconnectButton.interactable, "invite and leave stay disabled outside a session");
+                _view.DirectButton.onClick.Invoke();
+                SmokeAssert(_view.DirectOpen, "Direct IP opens as its own dialog");
+                _smokeStep = 7; _smokeNext = Time.unscaledTime + 0.5f;
+                break;
+            case 7:
+                CaptureUI("runtime-direct.png");
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _address!, _port!, _hostButton!, _joinButton!, _view!.DirectBackButton });
+                SmokeAssert(_view.Cancel() && !_view.DirectOpen && _open, "Escape closes the Direct IP dialog before the panel");
+                _view.Prompt.Ask("Join a friend's game?\nProgress since your last save will be lost.", "Join", null, "Stay", null);
+                _smokeStep = 8; _smokeNext = Time.unscaledTime + 0.5f;
+                break;
+            case 8:
+                CaptureUI("runtime-prompt.png");
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.Prompt.ConfirmButton, _view.Prompt.CancelButton });
+                SmokeAssert(_view.Cancel() && !_view.Prompt.Open && _open, "Escape answers an open prompt before closing the panel");
+                _smokeStep = 9; _smokeNext = Time.unscaledTime + 0.2f;
+                break;
+            case 9:
                 _address!.text = "invalid";
                 _address.onSubmit.Invoke(_address.text);
                 SmokeAssert(_feedback.Contains("IPv4"), "native field Enter submits join and validates IP");
@@ -468,7 +674,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 break;
             case 6:
                 CaptureUI("runtime-menu.png");
-                Plugin.Logger.LogInfo("PBDMP SMOKE PASS: native themed UI, safe menu/pause entries, modal/controller callbacks, host/join, clip retention after asset cleanup, animated Dude and native gun effects, level guard and cleanup. Synthetic poses; live gameplay untested.");
+                Plugin.Logger.LogInfo("PBDMP SMOKE PASS: native themed lobby panel, Direct IP dialog and prompt layers, safe menu/pause entries, modal/controller callbacks, host/join, clip retention after asset cleanup, animated Dude and native gun effects, level guard and cleanup. Synthetic poses; live gameplay untested.");
                 _smokeStep = 99;
                 break;
         }

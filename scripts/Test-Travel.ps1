@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$GameDir = (Join-Path $PSScriptRoot '..\..\Game'),[switch]$Mission,[switch]$MissionExits,[switch]$Urine,[switch]$UrineParts,[switch]$Performance,[ValidateRange(0,360)][int]$PerformanceFrameRate=0,[switch]$FocusInput,[switch]$ActorParts,[switch]$Actors,[switch]$JoinInput,[switch]$Combat,[switch]$Doors,[switch]$DoorReload,[switch]$MissingHandle,[switch]$State,[switch]$Audit,[string[]]$AuditLevels,[string]$Level)
+param([string]$GameDir = (Join-Path $PSScriptRoot '..\..\Game'),[switch]$WorldRegression,[switch]$Mission,[switch]$MissionExits,[switch]$Urine,[switch]$UrineParts,[switch]$Performance,[ValidateRange(0,360)][int]$PerformanceFrameRate=0,[switch]$FocusInput,[switch]$ActorParts,[switch]$Actors,[switch]$JoinInput,[switch]$Combat,[switch]$Doors,[switch]$DoorReload,[switch]$MissingHandle,[switch]$State,[switch]$Audit,[string[]]$AuditLevels,[string]$Level)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $GameDir = (Resolve-Path -LiteralPath $GameDir).Path
@@ -37,6 +37,8 @@ $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $probe.Start(); $port = $probe.LocalEndpoint.Port; $probe.Stop()
 $previousRole = $env:PBDMP_TRAVEL_TEST; $previousOutput = $env:PBDMP_TRAVEL_OUTPUT; $previousPort = $env:PBDMP_TRAVEL_PORT
 $previousCombat = $env:PBDMP_SHARED_COMBAT_TEST
+$previousWorldRegression=$env:PBDMP_WORLD_REGRESSION
+$env:PBDMP_WORLD_REGRESSION=if($WorldRegression){'1'}else{$null}
 $previousUrineParts=$env:PBDMP_URINE_PARTS_TEST
 $env:PBDMP_URINE_PARTS_TEST=if($UrineParts){'1'}else{$null}
 $previousUrine=$env:PBDMP_URINE_TEST
@@ -67,6 +69,9 @@ $env:PBDMP_AUDIT_LEVELS = if($AuditLevels) { $AuditLevels -join ',' } else { $nu
 $env:PBDMP_CAMPAIGN_AUDIT = if ($Audit) { '1' } else { $null }
 $env:PBDMP_SHARED_COMBAT_TEST = if ($Combat) { '1' } else { $null }
 $env:PBDMP_TRAVEL_OUTPUT = $output; $env:PBDMP_TRAVEL_PORT = $port
+# A Steam install started directly relaunches itself through Steam unless the app id is already in its environment.
+$previousSteamApp = $env:SteamAppId
+if (!$env:SteamAppId -and !(Test-Path -LiteralPath (Join-Path $GameDir 'steam_appid.txt'))) { $env:SteamAppId = '1359980' }
 $players = @()
 $previousPerf=$env:PBDMP_SYNC_PERF_TEST
 $previousPerfFrameRate=$env:PBDMP_SYNC_PERF_RATE
@@ -173,13 +178,15 @@ try {
         }
         Start-Sleep -Seconds 1
     }
-    $description = if ($MissionExits) {'both-player exits and deferred automatic story endings'} elseif($Mission) {'actual Neighborhood wall destruction, native passage and late join'} elseif ($Audit) {'campaign catalogue/state coverage'} elseif($ActorParts) {'native boss weak spots, balloon targets and scripted shoot-reactive humans'} elseif($Actors) {'native campaign actor family spawn/status/damage/death lifecycles'} elseif($Performance) {'steady host state-capture frame budget and native join/pause input'} elseif($FocusInput) {'overlapping pause locks, real window focus changes and native keyboard/mouse input'} elseif($JoinInput) {'immediate main-menu join controls, shared pause/resume and modal input cleanup'} elseif ($DoorReload) {'solo start, host/join, reload and both-player bedroom door interactions'} elseif ($State) {'native doors and encounter late-join state'} elseif ($Doors) {'requester-owned keys and shared unlock'} elseif ($Combat) { 'shared enemy authority and personal damage' } else { 'campaign travel/respawn' }
+    $description = if ($WorldRegression) {'native hit particles, powered urine, barrel-linked geometry and special explosion replay'} elseif ($MissionExits) {'both-player exits and deferred automatic story endings'} elseif($Mission) {'actual Neighborhood wall destruction, native passage and late join'} elseif ($Audit) {'campaign catalogue/state coverage'} elseif($ActorParts) {'native boss weak spots, balloon targets and scripted shoot-reactive humans'} elseif($Actors) {'native campaign actor family spawn/status/damage/death lifecycles'} elseif($Performance) {'steady host state-capture frame budget and native join/pause input'} elseif($FocusInput) {'overlapping pause locks, real window focus changes and native keyboard/mouse input'} elseif($JoinInput) {'immediate main-menu join controls, shared pause/resume and modal input cleanup'} elseif ($DoorReload) {'solo start, host/join, reload and both-player bedroom door interactions'} elseif ($State) {'native doors and encounter late-join state'} elseif ($Doors) {'requester-owned keys and shared unlock'} elseif ($Combat) { 'shared enemy authority and personal damage' } else { 'campaign travel/respawn' }
     Write-Host "Native game diagnostics passed: $description; $output"
 } finally {
+    $env:PBDMP_WORLD_REGRESSION=$previousWorldRegression
     $env:PBDMP_MISSION_EXITS_TEST=$previousMissionExits
     $env:PBDMP_MISSION_TEST=$previousMission
     foreach ($game in $players) { $game.Refresh(); if (!$game.HasExited) { Stop-Process -Id $game.Id; $game.WaitForExit(5000) | Out-Null } }
     $env:PBDMP_TRAVEL_TEST = $previousRole; $env:PBDMP_TRAVEL_OUTPUT = $previousOutput; $env:PBDMP_TRAVEL_PORT = $previousPort
+    $env:SteamAppId = $previousSteamApp
     $env:PBDMP_SHARED_COMBAT_TEST = $previousCombat
     $env:PBDMP_URINE_TEST=$previousUrine
     $env:PBDMP_URINE_PARTS_TEST=$previousUrineParts

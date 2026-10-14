@@ -63,6 +63,9 @@ internal static class SessionPatches
         }
         static bool Prefix() => SessionLifecycle.Current?.PermitTravel() != false;
     }
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.EndGame))]
+    private static class ClientCredits {static bool Prefix()=>SessionLifecycle.Current?.PermitTravel()!=false;}
+
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.LoadModLevel))]
     private static class ModLevel { static bool Prefix() => SessionLifecycle.Current == null; }
 
@@ -85,14 +88,25 @@ internal static class SessionPatches
     [HarmonyPatch(typeof(LevelController), "EndLevel")]
     private static class ClientEnd
     {
-        static bool Prefix(LevelController __instance,LevelController.EndLevelType __0)
+        static bool Prefix(LevelController __instance,LevelController.EndLevelType __0,out bool __state)
         {
+            __state=false;
             var life = SessionLifecycle.Current;
             if (life == null) return true;
             if (__0 == LevelController.EndLevelType.DEATH) { life.Death(); return false; }
-            if(__0==LevelController.EndLevelType.FINISH && SharedWorld.Current is {} world) return world.FinishMission(__instance);
+            if(__0==LevelController.EndLevelType.FINISH && SharedWorld.Current is {} world)
+            {var accepted=world.FinishMission(__instance);__state=accepted && !world.Client;return accepted;}
             return !life.IsClient || __0 != LevelController.EndLevelType.FINISH;
         }
+        static void Postfix(bool __state)
+        {if(__state) SharedWorld.Current?.PublishMissionCompletion();}
+    }
+
+    [HarmonyPatch(typeof(LevelController), nameof(LevelController.GetLevelStats))]
+    private static class SharedResults
+    {
+        static void Postfix(ref LevelStats __result)
+        {if(SharedWorld.Current?.ClientLevelStats is {} stats) __result=stats;}
     }
 
     [HarmonyPatch(typeof(LevelController), "OnPlayerDeathStart")]

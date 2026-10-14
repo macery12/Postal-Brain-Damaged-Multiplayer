@@ -28,8 +28,13 @@ internal sealed partial class SharedWorld
     private void ApplyMissionHit(WorldFrame frame)
     {
         if(!_catalogue!.MissionBreakKeys.Contains(frame.Key) || _catalogue.Components[frame.Key].TryCast<BreakableObject>() is not {} b || b._destroyed ||
-            Vector3.Distance(b.CenterOfMass,_remote!.CenterOfMass)>100 || Vector3.Distance(Unity(frame.Position),b.CenterOfMass)>20) return;
+            Vector3.Distance(MissionBreakCenter(b),_remote!.CenterOfMass)>100 || Vector3.Distance(Unity(frame.Position),MissionBreakCenter(b))>20) return;
         b.Hit(new HitData{dealer=_remote.Actor,originEntity=_catalogue.Assets.GetValueOrDefault(frame.Asset),damage=Mathf.Clamp(frame.Value,0,10000),position=Unity(frame.Position),direction=Unity(frame.Rotation),pushVelocity=Unity(frame.Velocity),isQuickMelee=((uint)frame.Value2&4)!=0,isPowerful=((uint)frame.Value2&8)!=0});
+    }
+    private static Vector3 MissionBreakCenter(BreakableObject b)
+    {
+        var whole=b._breaker?._wholeObject;
+        return whole?.GetComponentInChildren<Renderer>(true)?.bounds.center??b.transform.position;
     }
     internal void RequestMissionGate(WireWallGate gate,Player player)
     {
@@ -65,6 +70,7 @@ internal sealed partial class SharedWorld
     }
     private void ApplyMissionState(WorldFrame frame)
     {
+        if(frame.Flags==1024) {ReceiveMissionCompletion(frame);return;}
         if(frame.Flags==256) {ApplyMissionWait(frame);return;}
         if(frame.Flags==128) {ApplyMissionArray(frame);return;}
         if(frame.Flags==64) {ApplyMissionLight(frame);return;}
@@ -82,7 +88,19 @@ internal sealed partial class SharedWorld
         // Restore persistent geometry without executing Break/Load: those native
         // paths replay listeners, damage/progression and cosmetic debris sounds.
         breaker._wholeObject.SetActive(!destroyed);
-        if(breaker._parts!=null) breaker._parts.SetActive(false);
+        if(breaker._parts!=null)
+        {
+            // The replacement hierarchy includes the permanent wall around the
+            // hole as well as loose debris. Preserve its static mesh/collision.
+            if(destroyed)
+            {
+                breaker._parts.transform.localPosition=breaker._wholeObject.transform.localPosition-breaker._localPositionOffset;
+                breaker._parts.transform.localRotation=breaker._wholeObject.transform.localRotation;
+                if(breaker._rigidbodies!=null) foreach(var body in breaker._rigidbodies)
+                    if(body!=null && body.gameObject.Pointer!=breaker._parts.Pointer) body.gameObject.SetActive(false);
+            }
+            breaker._parts.SetActive(destroyed);
+        }
         if(breaker._occlusionPortal!=null) breaker._occlusionPortal.open=destroyed;
     }
 }

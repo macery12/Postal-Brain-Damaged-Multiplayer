@@ -447,6 +447,9 @@ internal sealed partial class SharedWorld
     {
         if(Client || !Active || component.GetComponentInParent<Npc>() is not {} npc || npc.NpcId==null) return;
         var id=Register(npc);SendEnemyIdentity(id,npc);
+        var solid=hit.collider?.GetComponentInParent<SolidOverride>()??npc.GetComponentInChildren<SolidOverride>(true);
+        if(!hit.isPiss && !hit.isFlame && solid?.SolidObjectModel is {} material)
+            PublishSolidImpact(material,hit.position,hit.normal.sqrMagnitude>0?hit.normal:-hit.direction);
         Send(new(WorldKind.ActorEffect,_epoch,1,id,Revision:HitFlags(hit),Key:ActorPartKey(component,npc.transform),Asset:hit.originEntity?.ID??"",Flags:30,
             Position:Net(hit.position),Rotation:Net(hit.direction),Velocity:Net(hit.normal),Value:hit.damage,Value2:hit.weakSpotMultiplier,
             Values:new[]{hit.ragdollForce,hit.chanceToGib,hit.pushVelocity.x,hit.pushVelocity.y,hit.pushVelocity.z}));

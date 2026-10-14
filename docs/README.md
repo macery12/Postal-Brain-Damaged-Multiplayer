@@ -9,7 +9,8 @@ Start with the [project README](../README.md) for installation and play instruct
 | [Sync progress](sync-progress.md) | Individual shared/local feature status, planning score and limits. |
 | [Verification](verification.md) | Recorded checks, repeatable commands, troubleshooting and manual acceptance. |
 | [Roadmap](roadmap.md) | Current session rules and remaining work. |
-| [Protocol](protocol.md) | Protocol 7 framing, authority, snapshots and bounds. |
+| [Protocol](protocol.md) | Protocol 7 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
+| [Steam research](steam-research.md) | How PBDMP reaches the game's Steam client, callbacks, native layouts and single-account verification. |
 | [Contributor guidance](contributing.md) | Build/test expectations and publication hygiene. |
 | [Mission-trigger design](mission-trigger-sync-plan.md) | Accepted mission/exit rules, wall root cause and adapter limits. |
 | [Development status](development-progress.md) | Short implementation handoff. |
@@ -31,4 +32,4 @@ These notes preserve the findings and scope at the time of research. They may de
 | [Shared-combat design](shared-combat-spec.md) | Accepted combat/resource ownership design. |
 | [Historical campaign census](campaign-coverage.md) | Dated component counts before the mission pass. |
 
-Historical native UI/model renders are in `images/`; they are diagnostic captures, not a full co-op gameplay recording. The multiplayer-panel capture predates shared combat, so its old footer does not describe current synchronization. Extracted game asset files and raw diagnostic reports are not distributed.
+Native UI/model renders are in `images/`; they are diagnostic captures, not a full co-op gameplay recording. The multiplayer-panel capture is the 0.8.0 lobby panel from the runtime smoke test, which never shows the tester's Steam identity. Extracted game asset files and raw diagnostic reports are not distributed.

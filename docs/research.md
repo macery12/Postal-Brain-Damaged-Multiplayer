@@ -1,6 +1,6 @@
 # PBDMP initial multiplayer research
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Research date: 2026-10-11. Scope: two players on a LAN, direct IP/port Host and Join, movement replication, and a remote cylinder avatar. This is a movement prototype; enemies, combat, pickups, saves, and progression remain independent on each machine.
 

@@ -15,6 +15,9 @@ $previousMeshGuard = $env:PBDMP_TEST_DISABLE_MESH_GUARD
 $env:PBDMP_SMOKE_TEST = '1'
 $env:PBDMP_SMOKE_OUTPUT = $output
 $env:PBDMP_TEST_DISABLE_MESH_GUARD = if ($DisableMeshGuard) { '1' } else { $null }
+# A Steam install started directly relaunches itself through Steam unless the app id is already in its environment.
+$previousSteamApp = $env:SteamAppId
+if (!$env:SteamAppId -and !(Test-Path -LiteralPath (Join-Path $GameDir 'steam_appid.txt'))) { $env:SteamAppId = '1359980' }
 $game = $null
 try {
     $game = Start-Process -FilePath (Join-Path $GameDir 'POSTAL Brain Damaged.exe') -WorkingDirectory $GameDir -WindowStyle Hidden -PassThru -ArgumentList '-screen-fullscreen','0','-screen-width', $Width,'-screen-height', $Height,'-logFile', ('"' + (Join-Path $output 'runtime-unity.log') + '"')
@@ -42,6 +45,7 @@ try {
     $env:PBDMP_SMOKE_TEST = $previousSmoke
     $env:PBDMP_SMOKE_OUTPUT = $previousOutput
     $env:PBDMP_TEST_DISABLE_MESH_GUARD = $previousMeshGuard
+    $env:SteamAppId = $previousSteamApp
     if ($game) {
         $game.Refresh()
         if (!$game.HasExited) { Stop-Process -Id $game.Id; $game.WaitForExit(5000) | Out-Null }

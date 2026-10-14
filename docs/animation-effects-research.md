@@ -1,6 +1,6 @@
 # Original Dude animations and firing effects
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Research date: October 11, 2026. This note records read-only inspection of the installed game's serialized assets using UnityPy 1.25.4, its recovered declarations, and official Unity documentation. Asset IDs describe the reference build; runtime code must resolve references and clip names rather than hard-code those IDs. Runtime rendering and playback acceptance are separate from these findings. Source paths use the `<GameDir>` and `<Decompiled>` [path placeholders](../README.md#path-placeholders).
 

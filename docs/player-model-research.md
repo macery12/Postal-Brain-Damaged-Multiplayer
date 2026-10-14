@@ -1,6 +1,6 @@
 # Postal Dude player model research
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 Research date: 2026-10-11. Sources are the reference game build's serialized assets and recovered declarations/native instructions, plus official Unity documentation. Asset inspection used UnityPy 1.25.4 against files read only. Path IDs below identify this build; they are diagnostic evidence, not stable runtime identifiers. Source paths use the `<GameDir>` and `<Decompiled>` [path placeholders](../README.md#path-placeholders).
 

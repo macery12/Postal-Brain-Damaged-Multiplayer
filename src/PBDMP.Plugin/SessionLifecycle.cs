@@ -11,7 +11,7 @@ namespace PBDMP.Plugin;
 internal sealed class SessionLifecycle : IDisposable
 {
     internal static SessionLifecycle? Current;
-    private readonly LanSession _session;
+    private readonly CoopSession _session;
     private readonly SessionRole _role;
     private readonly Action<string> _notice;
     private readonly Action _closePanel;
@@ -50,7 +50,7 @@ internal sealed class SessionLifecycle : IDisposable
         _hostPaused || (_session.Snapshot.Connected && !_host.State.Released));
     internal string Status { get; private set; } = "Campaign travel active; shared combat/doors; saves disabled.";
 
-    internal SessionLifecycle(LanSession session, Action<string> notice, Action closePanel, Action disconnect)
+    internal SessionLifecycle(CoopSession session, Action<string> notice, Action closePanel, Action disconnect)
     {
         _session = session; _role = session.Snapshot.Role; _notice = notice; _closePanel = closePanel; _disconnect = disconnect;
         if (Current != null) throw new InvalidOperationException("Wait for the previous campaign to finish unloading.");
@@ -142,7 +142,7 @@ internal sealed class SessionLifecycle : IDisposable
                 {
                     var name = button.gameObject.name;
                     var blocked = name is "BUTTON_Load" or "BUTTON_Save" or "BUTTON_Horde" or "BUTTON_Mods" or "BUTTON_LoadMods" or "BUTTON_SaveMods" ||
-                        IsClient && name is "BUTTON_Start" or "BUTTON_Restart" or "BUTTON_NextLevel";
+                        IsClient && name is "BUTTON_Start" or "BUTTON_Restart" or "BUTTON_NextLevel" or "BUTTON_LastLevel";
                     if (!blocked) continue;
                     if (!_buttons.ContainsKey(button)) _buttons[button] = button.interactable;
                 }

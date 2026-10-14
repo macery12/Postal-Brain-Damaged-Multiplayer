@@ -1,6 +1,6 @@
 # Campaign mission trigger synchronization plan
 
-October 13, 2026. Accepted mission design and implementation record. Current development build: **PBDMP 0.7.0 / protocol 7**. Feature coverage and acceptance limits are recorded in [sync progress](sync-progress.md).
+October 13, 2026. Accepted mission design and implementation record. Current development build: **PBDMP 0.8.0 / protocol 7**. Feature coverage and acceptance limits are recorded in [sync progress](sync-progress.md).
 
 ## Reported blocker
 

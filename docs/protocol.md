@@ -1,6 +1,15 @@
 # Protocol 7
 
-PBDMP 0.7.0 uses TCP over IPv4, with P1 hosting and P2 joining (default port `7777`). Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `LanSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 0.8.0 carries protocol 7 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+
+## Carriers
+
+| Carrier | Setup | Notes |
+| --- | --- | --- |
+| Steam P2P | P1's two-slot Steam lobby; P2 dials the lobby owner with `ConnectP2P` on virtual port 0. | Relayed and encrypted by Steam; the host admits only lobby members. Each protocol frame travels as one reliable Steam message. 2 MB send buffer, 512 KB/s send rate, 60-second connect allowance. Details: [Steam research](steam-research.md). |
+| Direct TCP | IPv4 address and port (default `7777`). | Unencrypted and unauthenticated; intended for a trusted LAN or a deliberately forwarded port. |
+
+`CoopSession` sees both as an ordered reliable byte stream (`IPeerConnection`), so framing, deadlines and queues below are identical. Steam lobbies additionally advertise `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (the first 16 hex characters of SHA-256 over the fingerprint) so a joiner can report a mismatch before dialling; the handshake below remains the authoritative check.
 
 ## Compatibility and framing
 
@@ -45,8 +54,16 @@ Entity identity is scoped to a travel epoch; revisions and life generations dist
 
 Gameplay release waits for matching-epoch map readiness and supported world restoration. Snapshots restore current supported state; old explosions, death audio, progression callbacks and rewards are not replayed. General scripts/timelines and persistent checkpoint/save restoration remain incomplete.
 
-Transport send/receive world queues are capped at 4,096 frames. A full send queue returns false so its caller retains and retries the frame. The native publisher drains at most 128 retained frames per tick; the transport sends batches of up to 512 per send loop. Receive saturation waits asynchronously, applying TCP backpressure rather than discarding state. Main-thread capture yields between objects under its frame budget.
+Transport send/receive world queues are capped at 4,096 frames. A full send queue returns false so its caller retains and retries the frame. The native publisher drains at most 128 retained frames per tick; the transport sends batches of up to 512 per send loop. Receive saturation waits asynchronously rather than discarding state: TCP applies backpressure to the sender, and Steam keeps unread messages queued in its client. Main-thread capture yields between objects under its frame budget.
 
-Handshake deadline: 5 seconds. Write-batch deadline: 3 seconds. Incoming-frame deadline: 10 seconds. Campaign readiness deadline: 120 unscaled seconds. Network servicing remains independent of Unity pause. P2 leaving releases host waiting; P1 leaving ends P2's session.
+Connect allowance: 5 seconds for TCP, 60 seconds for Steam. Handshake deadline: 5 seconds. Write-batch deadline: 3 seconds. Incoming-frame deadline: 10 seconds. Campaign readiness deadline: 120 unscaled seconds. Network servicing remains independent of Unity pause. When a peer closes with a Reject reason, the other side's receiver gets 250 ms to report that reason even if its own send failed first. P2 leaving releases host waiting; P1 leaving ends P2's session.
 
-Player resource values/collection remain personal. P1 owns enemies, shared hit results and supported world progression. Replica effects cannot apply the same gameplay result again. Neither authentication nor encryption is implemented; the intended environment is a trusted LAN.
+Player resource values/collection remain personal. P1 owns enemies, shared hit results and supported world progression. Replica effects cannot apply the same gameplay result again. The protocol itself adds no authentication or encryption: Steam sessions rely on Steam's authenticated, encrypted relay and lobby membership, while Direct IP sessions are meant for a trusted LAN.
+
+## Completion, fire and impact adapters
+
+`MissionState` flag 1024 carries the host's final level statistics: three current/max quantity pairs, completion bits and a decimal-string completion time in milliseconds (avoiding the bounded float field's duration limit). It persists within the travel epoch and is included in late-join snapshots. P2 opens the native result screen after map/world readiness; P1 retains level-travel authority. Statistics are captured after the native host completion method gathers them.
+
+`Special` actions 75 and 76 request supported world flame ticks and barrel hits respectively. P1 validates the target, living sender/life generation, range and bounded damage, then invokes the native target so linked explosion/progression listeners execute on the host. Barrel/burn state and linked machinery restore through the existing bounded snapshot.
+
+`Impact` flag 4 carries native material hit particles/audio and a contact normal. P1 selects flesh/armor effects after accepted NPC hits; P2 instantiates harmless presentation, including for its own attacks. Impact bursts, audio and explosions are transient and do not replay on late join.

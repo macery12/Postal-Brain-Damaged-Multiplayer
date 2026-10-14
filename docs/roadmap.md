@@ -1,10 +1,11 @@
 # Roadmap and session rules
 
-Current development baseline: **PBDMP 0.7.0 / protocol 7**. The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current development baseline: **PBDMP 0.8.0 / protocol 7**. The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
 
 ## Current behavior
 
-- Two-player direct-IP LAN sessions with native-themed main/pause-menu controls and F8 access.
+- Two-player sessions through a friends-only or invite-only Steam lobby (overlay invites, Join Game while running, Steam relay), or direct IP for LAN/forwarded ports.
+- Native-themed lobby panel with player cards, Direct IP dialog, prompts, session badge and notifications; main/pause-menu entries and F8 access. Joining from inside a solo level asks first.
 - P1 owns base-campaign level starts, restarts, difficulty, transitions and shared pause. P2 follows and cannot independently start/load/restart levels.
 - P1 owns enemy AI/health, shared combat results, supported doors, encounters, urine interactions and mission progression. Either player can interact or fight; enemies can target either player. Friendly fire is off.
 - P2 joins near P1 when safe, falling back to normal map spawn. Joining copies P1's weapons/ammo once, without copying health, armor, keys or powerups.
@@ -29,13 +30,14 @@ Keys/items are checked and consumed on the interacting player when native rules 
 | Player presentation | Weapon grip, reload/jump/death transitions and visual polish. | Keep cosmetic animation separate from gameplay authority. |
 | Checkpoints | Complete shared world capture/restoration. | Restore both players and world state consistently. |
 | Persistent co-op saves | Separate host-owned multiplayer saves and explicit solo-save import. | Never implicitly overwrite solo profiles. |
-| Transport evaluation | Measure real LAN latency, loss and snapshot pressure. | Retain bounded queues and main-thread capture budgets. |
+| Transport evaluation | Measure real LAN and Steam-relay latency, loss and snapshot pressure; consider unreliable pose messages on Steam. | Retain bounded queues and main-thread capture budgets. |
+| Steam joining | Two-account acceptance; joining from a closed game (`+connect_lobby`) and an in-game friends list. | Both players keep the strict exact-build check. |
 
 Campaign save/load, quicksave and autosave stay disabled during multiplayer until persistent restoration is implemented. Offline saving returns after session cleanup.
 
 ## Outside the current scope
 
-Survival, custom maps, DLC-specific content, more than two players, matchmaking, relays, NAT traversal, dedicated servers and host migration need separate design and validation. Internet-facing use would also require authentication/encryption work.
+Survival, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
 
 ## Historical milestones
 
@@ -47,5 +49,6 @@ Survival, custom maps, DLC-specific content, more than two players, matchmaking,
 | 0.5 | Host campaign lifecycle, joining and independent respawn. |
 | 0.6-era passes | Shared combat/actors/doors and urine interactions. |
 | 0.7.0 | Expanded mission state, required destruction, exit gathering and large-snapshot backpressure. |
+| 0.8.0 | Steam lobby hosting/joining over Steam relay; native lobby panel, player cards, prompts and in-game badge. |
 
 These are development milestones, not a list of published downloads. Older research notes describe their original scope and should not override current behavior.

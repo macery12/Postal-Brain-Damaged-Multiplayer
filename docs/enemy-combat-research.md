@@ -1,6 +1,6 @@
 # Enemy authority, damage and encounter snapshots
 
-> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.7.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
+> Historical research/census. Statements about scope, missing features and implementation status describe the dated milestone below. For current 0.8.0 behavior and limits, use [sync progress](sync-progress.md) and [verification](verification.md). Asset identifiers describe the reference build and are not portable runtime constants.
 
 October 12, 2026. Read-only recovered declaration and matching native ISIL research. No new enemy/proxy/combat hook has been runtime-validated. Let `CS` be `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD`, and `ISIL` be the matching `<Decompiled>/Cpp2IL/Native-ISIL/IsilDump/Assembly-CSharp/Hyperstrange/PBD` ([path placeholders](../README.md#path-placeholders)). Recovered C# bodies are placeholders.
 

@@ -43,6 +43,7 @@ internal sealed class NativePresentation : IDisposable
     internal void Move(Vector3 position,Quaternion rotation) => Root.transform.SetPositionAndRotation(position,rotation);
     internal void Tick(float delta)
     {foreach(var particle in _particles) if(particle!=null) particle.Simulate(delta,false,false,false);}
+    internal int ParticleCount=>_particles.Where(p=>p!=null).Sum(p=>p.particleCount);
     internal bool Alive=>Root!=null;
     public void Dispose(){if(Root!=null) Object.Destroy(Root);}
 }

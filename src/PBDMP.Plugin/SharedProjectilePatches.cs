@@ -26,6 +26,7 @@ internal static class SharedProjectilePatches
             }
         }
         harmony.Patch(AccessTools.Method(typeof(Projectile),"HandleColliderHit"),postfix:new(typeof(SharedProjectilePatches),nameof(Impact)));
+        harmony.Patch(AccessTools.Method(typeof(SolidManager),"SpawnSolidImpact"),prefix:new(typeof(SharedProjectilePatches),nameof(SolidImpact)));
         harmony.Patch(AccessTools.Method(typeof(Explosion),"Invoke"),prefix:new(typeof(SharedProjectilePatches),nameof(Explosion)));
         harmony.Patch(AccessTools.Method(typeof(Projectile),"OnEnable"),postfix:new(typeof(SharedProjectilePatches),nameof(Enabled)));
         harmony.Patch(AccessTools.Method(typeof(Projectile),"SetOwnerAndOriginEntity"),postfix:new(typeof(SharedProjectilePatches),nameof(Initialized)));
@@ -36,6 +37,7 @@ internal static class SharedProjectilePatches
     {SharedWorld.Current?.CapturedShot(__instance,__result,__0,__1,__2,__3,__4);}
     private static bool Update(Projectile __instance)=>SharedWorld.Current?.FrozenClientProjectile(__instance)!=true;
     private static void Impact(Projectile __instance,RaycastHit __0)=>SharedWorld.Current?.ProjectileImpact(__instance,__0);
+    private static bool SolidImpact(SolidObjectModel __0,RaycastHit __1)=>SharedWorld.Current?.SolidImpact(__0,__1)!=false;
     private static bool Explosion(Explosion __instance,Vector3 __0,IAiActor __1,EntityId __2)=>SharedWorld.Current?.ExplosionInvoked(__instance,__0,__1,__2)!=false;
     private static void Initialized(Projectile __instance)=>SharedWorld.Current?.NativeProjectileInitialized(__instance);
     private static void Enabled(Projectile __instance)=>SharedWorld.Current?.NativeProjectileEnabled(__instance);

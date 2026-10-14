@@ -42,14 +42,20 @@ internal sealed partial class SharedWorld
         if(frame.Flags==72) {ApplyProjectileUrine(frame);return;}
         if(!_catalogue!.UrineKeys.Contains(frame.Key) || !_catalogue.Components.TryGetValue(frame.Key,out var c) || c==null) return;
         if(c.TryCast<MetalButton>()!=null) return; // Uses the requester-owned interaction handshake.
-        if(Vector3.Distance(Unity(frame.Position),_remote!.CenterOfMass)>3 || Vector3.Distance(c.transform.position,_remote.CenterOfMass)>15) return;
+        if(frame.Flags==76)
+        {if(Vector3.Distance(Unity(frame.Position),c.transform.position)>20 || Vector3.Distance(c.transform.position,_remote!.CenterOfMass)>100) return;}
+        else if(Vector3.Distance(Unity(frame.Position),_remote!.CenterOfMass)>3 || Vector3.Distance(c.transform.position,_remote.CenterOfMass)>15) return;
         // Preserve native per-callback fill increments, with a bounded request
         // rate. Continuous listener callbacks are normally fixed-update paced.
         var rate=_urineRequests.GetValueOrDefault(frame.Key);
         if(Time.unscaledTime-rate.Time>=1) rate=(Time.unscaledTime,0);
         if(rate.Count>=120) return;
         _urineRequests[frame.Key]=(rate.Time,rate.Count+1);
-        if(frame.Flags==71 && c.TryCast<PissFiller>() is {} filler) filler.OnPiss(new PissData(_remote.Actor,frame.Value!=0));
+        if(frame.Flags==75 && c.TryCast<IFlammable>() is {} flammable)
+            flammable.FlameTick(_remote.Actor,Mathf.Clamp(frame.Value,0,0.25f),Mathf.Clamp(frame.Value2,0,10000));
+        else if(frame.Flags==76 && c.TryCast<ExplosiveBarrel>() is {} barrel)
+        {var hit=DecodeHit(frame with{Flags=frame.Revision,Value=Mathf.Clamp(frame.Value,0,10000),Value2=Mathf.Clamp(frame.Value2,0,100)});hit.dealer=_remote.Actor;barrel.Hit(hit);}
+        else if(frame.Flags==71 && c.TryCast<PissFiller>() is {} filler) filler.OnPiss(new PissData(_remote.Actor,frame.Value!=0));
         else if(frame.Flags==70 && c.TryCast<IPissable>() is {} target) target.Piss(new PissData(_remote.Actor,frame.Value!=0));
         else return;
         UrineRequestsApplied++;
