@@ -1,0 +1,25 @@
+# Contributing
+
+PBDMP is an experimental Windows/BepInEx IL2CPP mod. Read the [sync tracker](sync-progress.md), [protocol](protocol.md), [verification](verification.md) and [roadmap](roadmap.md) before extending it.
+
+## Build and changes
+
+Follow the root [build instructions](../README.md#build-and-install), supplying your own game path with `-GameDir`. Use .NET SDK 10 and compatible BepInEx-generated interop. A source checkout does not include the game, loader or recovered assemblies.
+
+Keep all Unity/native calls on Unity's main thread. Network workers exchange bounded immutable/owned data rather than Unity objects. Preserve host authority, epoch/life identity, personal resource rules, save isolation and frame-budgeted state capture. Replica presentation must not apply damage or replay progression callbacks.
+
+Investigate native behavior before hooking it. Recovered C# bodies can be placeholders, and short/shared IL2CPP method thunks may be unsafe detour targets. Prefer narrow typed adapters and a reproducible native regression for behavior changes. Run relevant network/native checks and record remaining gaps; a catalogue census is not proof of natural campaign completion.
+
+The optional `scripts/Audit-VisualParticles.py` research tool requires Python and UnityPy (the reference audit used 1.25.4). Run it with `--game-dir` pointing to your own game installation. It regenerates `AuditedVisualSources.cs` and writes an ignored audit report; it is not required to build or play.
+
+## Documentation and privacy
+
+Use relative repository links and the README's `<GameDir>`, `<RepoDir>` and `<Decompiled>` placeholders. Do not put a developer's username, drive layout, timezone, personal email or network configuration into instructions. Public Git identity is the contributor's choice; inspect author/committer metadata before publishing if privacy matters to you.
+
+Do not commit `.local`, `artifacts`, `bin`, `obj`, game/loader binaries, generated interop, saves, installation manifests/backups, private configuration, credentials or raw logs. Rendered examples should have no personal overlays or embedded identifying metadata; game imagery remains subject to its owners' rights.
+
+Before staging, inspect the exact candidate files for secrets, absolute workstation paths and generated content. Ignore rules do not protect files already tracked. Review the staged diff and commit identity before committing. Preserve the game's and third-party projects' licensing; the repository's MIT license covers original PBDMP source/documentation.
+
+## Reports and verification
+
+Include the mod version/protocol, map, host/client role, fresh/reload/late-join sequence, expected result and actual result. Attach only sanitized log excerpts. State whether the check used synthetic/native diagnostics or natural two-PC gameplay. Do not mark a planned/partial feature complete without the relevant implementation and evidence.

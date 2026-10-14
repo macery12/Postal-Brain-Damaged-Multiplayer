@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>PBDMP</AssemblyName>
+    <Version>0.7.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PBDMP.Network\PBDMP.Network.csproj" />
+    <Reference Include="BepInEx.Core"><HintPath>$(GameDir)\BepInEx\core\BepInEx.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>$(GameDir)\BepInEx\core\BepInEx.Unity.IL2CPP.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(GameDir)\BepInEx\core\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="$(GameDir)\BepInEx\interop\*.dll"><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="CheckGameBindings" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameDir)\BepInEx\interop\Assembly-CSharp.dll')" Text="Install BepInEx 6 IL2CPP win-x64 and launch the game once to generate BepInEx/interop. Do not use decompilation dummy DLLs." />
+  </Target>
+</Project>

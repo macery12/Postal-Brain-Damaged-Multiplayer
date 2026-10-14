@@ -1,0 +1,39 @@
+**/bin/
+**/obj/
+.local/
+artifacts/
+*.user
+*.suo
+.vs/
+Game/
+*.dll
+*.exe
+*.zip
+# Private configuration, credentials and keys
+.env
+.env.*
+*.cfg
+*.pem
+*.key
+*.pfx
+*.p12
+*.kdbx
+
+# Diagnostics and generated output
+*.log
+*.pdb
+*.dmp
+*.pyc
+__pycache__/
+.venv/
+venv/
+TestResults/
+coverage/
+
+# Local game/runtime and recovered assets
+BepInEx/
+decompiled/
+extracted/
+saves/
+*.assets
+*.bundle
