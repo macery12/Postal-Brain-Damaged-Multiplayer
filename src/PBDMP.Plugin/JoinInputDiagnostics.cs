@@ -9,6 +9,8 @@ public sealed partial class MultiplayerBehaviour
 {
     private int _joinInputStep;
     private bool _joinSoloReady,_joinSoloContinued;
+    private bool _joinClientLoading,_joinClientReady,_joinClientContinued;
+    private Il2CppSystem.Action? _joinClientReadyHandler;
     private Il2CppSystem.Action? _joinSoloHandler;
     private float _joinInputAt;
     private int _focusLosses,_focusReturns;
@@ -21,6 +23,24 @@ public sealed partial class MultiplayerBehaviour
     private void RunJoinInputTest()
     {
         if(_joinInputStep==99) return;
+        // Exercise admission from a running native solo map as well as title.
+        if(TravelRole=="client" && _joinInputStep==0 && Environment.GetEnvironmentVariable("PBDMP_JOIN_FROM_LEVEL")=="1")
+        {
+            if(!_joinClientLoading)
+            {
+                _joinClientLoading=true;
+                _joinClientReadyHandler=(Il2CppSystem.Action)(Action)(()=>_joinClientReady=true);
+                LevelController.OnStartLevelReady=Il2CppSystem.Delegate.Combine(LevelController.OnStartLevelReady,_joinClientReadyHandler).Cast<Il2CppSystem.Action>();
+                GameManager.LoadLevel(TestLevel(),true);return;
+            }
+            var loading=Object.FindObjectOfType<LoadingMenu>();
+            if(!_joinClientContinued && loading!=null && loading.gameObject.activeInHierarchy && loading._sceneLoaded)
+            {_joinClientContinued=true;loading.OnAnyButtonDown();}
+            if(DoorSoloGate && LevelController._instance!=null) {DoorSoloGate=false;LevelController._instance.OnAnyButtonDown();}
+            if(!_joinClientReady) return;
+            LevelController.OnStartLevelReady=Il2CppSystem.Delegate.Remove(LevelController.OnStartLevelReady,_joinClientReadyHandler)?.Cast<Il2CppSystem.Action>();
+            TravelCheck(SessionManager.SessionActive,"P2 joins from an already-loaded native solo level");
+        }
         File.WriteAllText(Marker(TravelRole+"-input-state.txt"),$"step={_joinInputStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, released={_lifecycle?.State.Released}, paused={_lifecycle?.State.Paused}, scale={Time.timeScale}, input={InputManager.Instance.CurrentInputState}, stack={string.Join(",",InputManager.InputStateStack.ToArray())}, panel={_open}");
         // Drive the native tutorial dismissal only after verifying its real input
         // map remains usable under the multiplayer hold (the original deadlock).

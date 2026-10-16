@@ -20,7 +20,8 @@ public sealed partial class MultiplayerBehaviour
         const string name="DIAGNOSTIC_NativePropSpawner";
         var existing=UnityEngine.Object.FindObjectsOfType<PhysicalObjectSpawner>(true).FirstOrDefault(s=>s.name==name);
         if(existing!=null) {existing.transform.SetParent(LevelController._instance.transform,true);return;}
-        var source=Resources.FindObjectsOfTypeAll<PhysicalObjectSpawner>().First(s=>s._physicalObjects is {Length:>0} && s._pushExplosion!=null);
+        var source=Resources.FindObjectsOfTypeAll<PhysicalObjectSpawner>().FirstOrDefault(s=>s._physicalObjects is {Length:>0} && s._pushExplosion!=null)
+            ??throw new InvalidOperationException("Prop regression requires a native spawner prefab; use LEVEL_Asylum_CoronvirusDen.");
         var root=new GameObject(name);root.transform.SetParent(LevelController._instance.transform,false);
         root.transform.position=Player.Instance.FeetPosition+Vector3.right*3+Vector3.up*2;
         var fixture=root.AddComponent<PhysicalObjectSpawner>();fixture._physicalObjects=source._physicalObjects;

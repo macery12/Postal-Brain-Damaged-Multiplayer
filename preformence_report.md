@@ -16,10 +16,16 @@
 | Total managed allocation — sampled over 20 s | ~836 MiB | ~454 MiB |
 | Traffic — P1 → P2 (KiB/s) | 65.8 | 81.0 |
 | Traffic — P2 → P1 (KiB/s) | 4.3 | 4.3 |
-| Area69 host world / sweep p95 (ms)* | 3.45 / 203.29 | 3.08 / 47.06 |
+| Area69 host world / sweep p95 (ms)* | 3.45 / 203.29 | 3.07 / 52.83 |
 | Native ownership / urine / late join / pause-input checks | Existing checks | Pass |
-| Managed network + reporting checks | 39 pass | 40 pass |
+| Avatar update — saw idle (mean / p95 ms)† | Not sampled | 0.104 / 0.106 |
+| Avatar update allocation† | Not sampled | 0 bytes / 1,000 updates |
+| Extra presentation payload / pose† | 0 bytes | 15 bytes |
+| Estimated extra traffic / sender† | 0 | ~0.29 KiB/s |
+| Managed network + reporting checks | 39 pass | 42 pass |
 
 Neighborhood idle tests: 25-second samples, eight-second warmup, frozen NPC AI, 1280×720, 120 FPS cap; both games on one PC. Before: `7106890D0DCAD31A`; after: `8C014EA539801E69`. Allocation/traffic comparisons include separate matching idle runs.
 
-Traffic measures framed application bytes, excluding TCP/IP, Steam overhead and retransmissions; more traffic can reflect faster state delivery. Profiler allocation totals are estimates. *Area69 before is the earlier recorded baseline. Active-combat and broader campaign performance remain separate work.
+Traffic measures framed application bytes, excluding TCP/IP, Steam overhead and retransmissions; more traffic can reflect faster state delivery. Profiler allocation totals are estimates. *Area69 before is the earlier recorded baseline; after is the retained-budget animation check on `C990AE9ED22FC33F`. Active-combat and broader campaign performance remain separate work.
+
+†Focused animation results on `C990AE9ED22FC33F`; avatar measurements exclude equip, rendering and world sync. Traffic increase is the 15-byte extension × nominal 20 Hz, excluding transport overhead. Earlier full-FPS comparisons above remain their original measured builds.

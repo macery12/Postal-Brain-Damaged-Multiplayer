@@ -7,6 +7,7 @@ namespace PBDMP.Plugin;
 
 internal sealed partial class SharedWorld
 {
+    internal RemotePlayerVisual? PeerVisual;
     private readonly Dictionary<(byte Actor,string Key),FMODInstance> _chargeAudio=new();
     internal IEnumerable<WeaponAction.FxModule> EffectsForTest=>_assets!.Effects.Values;
     internal int FxEventsForTest {get;private set;}
@@ -50,9 +51,12 @@ internal sealed partial class SharedWorld
             {var sound=new FMODInstance(fx._chargeEvent);sound.SetPosition(position);sound.Play();_chargeAudio[key]=sound;}
             return;
         }
+        var rotation=Quaternion.Euler(Unity(frame.Rotation));
+        if(PeerVisual is {HasWeapon:true} visual && _assets.EffectOrigins.TryGetValue(frame.Key,out var origin) && visual.WeaponKey==origin)
+        {position=visual.MuzzlePosition;rotation=visual.MuzzleRotation;}
         var source=fx._muzzleFlash?._muzzleFlash;
         if(frame.Flags<=1 && source!=null)
-        {var effect=new NativePresentation(source.gameObject);effect.Move(position,Quaternion.Euler(Unity(frame.Rotation)));_effects.Add((effect,Time.unscaledTime+2f));}
+        {var effect=new NativePresentation(source.gameObject);effect.Move(position,rotation);_effects.Add((effect,Time.unscaledTime+2f));}
         var audio=frame.Flags==1?fx._fireChargeFullEvent??fx._fireEvent:frame.Flags==4?fx._chargeFullEvent:fx._fireEvent;
         audio?.PlayOneShot(position);
     }

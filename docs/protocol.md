@@ -1,6 +1,6 @@
 # Protocol 10 (development)
 
-PBDMP 0.10.0 development source carries protocol 10 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 0.10.0 development source carries protocol 11 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 
@@ -21,7 +21,7 @@ Each frame has an int32 little-endian payload length, followed by 1–8192 paylo
 | --- | ---: | --- | --- |
 | Hello | 1 | P2 → P1 | int32 protocol version and fingerprint text. |
 | Welcome | 2 | P1 → P2 | int32 protocol version and fingerprint text. |
-| Pose | 3 | Both | Level key, readiness, feet position, yaw/height, weapon GUID, pitch, visual shot sequence, alive flag, life generation, travel epoch and optional moving-platform reference. |
+| Pose | 3 | Both | Level key, readiness, feet position, yaw/height, weapon GUID, pitch, visual shot sequence, alive flag, life generation, travel epoch, optional moving-platform reference and bounded presentation state. |
 | Reject | 4 | P1 → P2 | Reason, including host loading failure/session closure feedback. |
 | Travel | 5 | P1 → P2 | Epoch, Menu/Load/Restart action, level GUID, difficulty, host-ready/paused/released/joining flags and optional join loadout. |
 | Ready | 6 | P2 → P1 | Travel epoch and readiness. |
@@ -132,3 +132,10 @@ Shared posters use their authored native save GUIDs. `Mechanism` flag 6 carries 
 Native material impacts retain their game-selected effect and audio keys. `Special` flag 95 requests a harmless NPC surface effect: P1 validates the current player/target, bounded position and an existing solid-material asset pair. It changes no health or inventory. P1 relays `Impact` flag 4; actor 2 identifies the already-present local P2 effect, suppressing its echo on P2. Native P1 impacts are forwarded directly, rather than guessed from an arbitrary NPC child override.
 
 Urine surface flag 4 includes authored `OcclusionPortal.open` alongside renderer/collider/light/navigation bits. Legacy layouts that omit only portal bits retain their restored native portal state. All remaining lengths and boolean values are still validated. Authored prop membership is local scene-load bookkeeping; Unity instance IDs never cross the wire.
+
+
+## Player presentation extension (protocol 11)
+
+After the optional carrier, every pose appends 15 bytes: byte motion (grounded/airborne/sliding), uint16 actions, uint32 action sequence, float32 normalized phase and float32 charge. Action bits are firing 1, secondary 2, melee 4, loop 8, block 16, shield 32, charge 64, kick 128, left-hand 256 and saw-running 512. Undefined motion/action bits, non-finite numbers, phase outside 0–1 and charge outside 0–100 are rejected. Exact game/mod fingerprint checks remain unchanged.
+
+This data controls visuals only. Existing world messages still authorize attacks and damage. Death/scene generations retain their existing guards; initial snapshots do not replay old shot counters. Local native callbacks and current weapon state supply the snapshot, while remote visual rigs contain no gameplay scripts or colliders. The 20 Hz loop and save schema 2 are unchanged.

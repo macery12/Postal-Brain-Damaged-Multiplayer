@@ -15,6 +15,7 @@ internal sealed class NativeAssetGraph
     internal readonly Dictionary<string,string> ModelOrigins=new();
     private readonly Dictionary<string,string> _originAliases=new();
     internal readonly Dictionary<string,WeaponAction.FxModule> Effects=new();
+    internal readonly Dictionary<string,string> EffectOrigins=new();
     private readonly Dictionary<IntPtr,string> _effectKeys=new();
     private readonly HashSet<IntPtr> _visited=new();
     private static readonly MethodInfo CastMethod=typeof(Il2CppObjectBase).GetMethods().Single(m=>m.Name=="Cast" && m.IsGenericMethodDefinition);
@@ -65,7 +66,7 @@ internal sealed class NativeAssetGraph
             var childPath=path+"/"+property.Name;
             var key=Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(asset+"/"+childPath)));
             if(child is ProjectileModel model) {Models[key]=model;ModelKeys[model.Pointer]=key;ModelOrigins[key]=asset;}
-            else if(child is WeaponAction.FxModule effect) {Effects[key]=effect;_effectKeys[effect.Pointer]=key;}
+            else if(child is WeaponAction.FxModule effect) {Effects[key]=effect;EffectOrigins[key]=asset;_effectKeys[effect.Pointer]=key;}
             else Walk(child,asset,childPath,depth+1);
         }
     }

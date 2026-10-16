@@ -37,7 +37,15 @@ internal static class SharedMissionPatches
     }
     private static bool HostOnly(Component __instance,System.Reflection.MethodBase __originalMethod)
     {
-        if(SharedWorld.Current is not {Active:true} world || !world.OwnsMission(__instance)) return true;
+        var world=SharedWorld.Current;
+        if(world==null) return true;
+        // Damage triggers also occur in runtime prefabs outside the catalogue.
+        if(__instance.TryCast<DamageTrigger>() is {} hazard && __originalMethod.Name=="OnSlowUpdate")
+        {
+            if(!world.PermitWorldHazard) return false;
+            world.ReconcileRemoteHazardContact(hazard);return true;
+        }
+        if(!world.Active || !world.OwnsMission(__instance)) return true;
         if(__instance.TryCast<Scaler>() is {} scaler && __originalMethod.Name=="Scale") return !world.StartScale(scaler);
         if(world.Client) return false;
         return !world.RestoringNative || __instance.GetIl2CppType().Name is "Mover" or "Rotater" or "MultiRotater" or "Elevator";

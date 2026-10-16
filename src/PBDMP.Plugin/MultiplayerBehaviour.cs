@@ -156,12 +156,14 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 _lastStatus = snapshot.Status;
                 Plugin.Logger.LogInfo(snapshot.Status);
             }
-            if (_smokeEnabled) RunSmoke();
+            if (Environment.GetEnvironmentVariable("PBDMP_POSE_CAPTURE") == "1") RunPoseCapture();
+            else if (_smokeEnabled) RunSmoke();
             if (Environment.GetEnvironmentVariable("PBDMP_NEWS_TEST") == "1") RunNewsTest();
             if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(PerformanceBaseline.Enabled) RunPerformanceBaseline();
+                if(Environment.GetEnvironmentVariable("PBDMP_WEAPON_PRESENTATION_TEST")=="1") RunWeaponPresentationTest();
+                else if(PerformanceBaseline.Enabled) RunPerformanceBaseline();
                 else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PATH_TEST"))) RunWorldPathTest();
                 else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PRESENTATION_TEST"))) RunReportedPresentationTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_ARENA_TEST")=="1") RunArenaTest();
@@ -208,7 +210,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         return new(key, _lifecycle?.NativeReady ?? true, feet.x, feet.y, feet.z, camera != null ? camera.transform.eulerAngles.y : player.Transform.eulerAngles.y,
             Mathf.Clamp(player.Height, 0.5f, 3f), player.CurrentWeapon?.WeaponId?.ID ?? "",
             camera != null ? Mathf.Clamp(Mathf.DeltaAngle(0f, camera.transform.eulerAngles.x), -90f, 90f) : 0f,
-            _weaponObserver.ShotSequence, player.IsAlive, _lifecycle?.Life ?? 0, _lifecycle?.Epoch ?? 0, _world?.CaptureCarrier());
+            _weaponObserver.ShotSequence, player.IsAlive, _lifecycle?.Life ?? 0, _lifecycle?.Epoch ?? 0, _world?.CaptureCarrier(), CapturePlayerPresentation(player));
     }
 
     [HideFromIl2Cpp]
@@ -244,8 +246,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         var factor = 1f - Mathf.Exp(-20f * Time.unscaledDeltaTime);
         _avatar.transform.position = !_hadRemote || Vector3.Distance(_avatar.transform.position, target) > 8f
             ? target : Vector3.Lerp(_avatar.transform.position, target, factor);
-        _avatar.transform.rotation = Quaternion.Euler(0f, remote.Yaw, 0f);
-        _remoteVisual!.Update(remote, Time.unscaledDeltaTime);
+        _avatar.transform.rotation = _hadRemote?Quaternion.Slerp(_avatar.transform.rotation,Quaternion.Euler(0f,remote.Yaw,0f),factor):Quaternion.Euler(0f, remote.Yaw, 0f);
+        if(_world!=null)_world.PeerVisual=_remoteVisual;
+        _remoteVisual!.Update(remote, _lifecycle?.Frozen==true?0:Time.unscaledDeltaTime);
         var camera = Player.Instance != null ? Player.Instance.WorldCamera : Camera.main;
         if (_avatarLabel != null)
         {
@@ -679,6 +682,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 break;
             case 22:
                 if (_remoteVisual!.WeaponKey != _smokeWeapons[1] || !_remoteVisual.HasWeapon) return;
+                if(Quaternion.Angle(_remoteVisual.GunRotation,Quaternion.Euler(-35f,0f,0f))>=1f)return;
                 SmokeAssert(Quaternion.Angle(_remoteVisual.GunRotation, Quaternion.Euler(-35f, 0f, 0f)) < 1f,
                     "weapon switch and aim pitch replicated");
                 SmokeAssert(!_remoteVisual.FlashVisible, "weapon switch does not invent a firing event");

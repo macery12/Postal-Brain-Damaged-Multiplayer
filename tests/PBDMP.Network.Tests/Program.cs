@@ -4,6 +4,35 @@ using PBDMP.Network;
 
 Environment.SetEnvironmentVariable("PBDMP_PERF_BASELINE","1");
 var passed = 0;
+await Test("player presentation snapshots roundtrip bounded actions without changing combat",()=>
+{
+    var animation=new PlayerAnimation(PlayerMotion.Sliding,PlayerActions.Melee|PlayerActions.Loop|PlayerActions.Alternate,42,.75f,.5f);
+    var pose=new PlayerPose("level",true,1,2,3,90,1.8f,Animation:animation);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Pose,Pose:pose))).Pose==pose);
+    foreach(var invalid in new[]{animation with {Motion=(PlayerMotion)3},animation with {Actions=(PlayerActions)1024},animation with {Phase=float.NaN},animation with {Phase=1.01f},animation with {Charge=float.PositiveInfinity},animation with {Charge=-1}})
+        Throws(()=>Protocol.Encode(new(MessageKind.Pose,Pose:pose with {Animation=invalid})));
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Pose,Pose:pose with {Animation=default}))).Pose!.Animation==default);
+    return Task.CompletedTask;
+});
+
+await Test("admission reuses only an unfinished identical map load across epochs",()=>
+{
+    var load=new TravelState(2,TravelAction.Load,"prison",0,false,false,false,false);
+    var admission=load with {Epoch=3,Joining=true};
+    Check(ClientTravelPolicy.ReusePendingLoad(load,admission,false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission,true));
+    Check(!ClientTravelPolicy.ReusePendingLoad(null,admission,false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {Level="forest"},false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {Difficulty=1},false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {Action=TravelAction.Restart},false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {Joining=false},false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {Epoch=2},false));
+    // Host release describes P1's prior solo state, not P2's unfinished load.
+    Check(ClientTravelPolicy.ReusePendingLoad(load with {Released=true},admission,false));
+    Check(!ClientTravelPolicy.ReusePendingLoad(load,admission with {StoryVideo="intro"},false));
+    return Task.CompletedTask;
+});
+
 await Test("diagnostic traffic counts completed framed writes and reads, excluding failed reads",async()=>
 {
     var before=ProtocolTraffic.Read();
@@ -85,7 +114,7 @@ await Test("player poses and personal saves carry one bounded authored platform 
     CoopSaveStore.ValidatePlayer(restored);Check(restored.Carrier==carrier);
     foreach(var invalid in new[]{carrier with {Key="runtime-pointer"},carrier with {Offset=new(float.NaN,0,0)},carrier with {Offset=new(0,257,0)}})
     {Throws(()=>Protocol.Encode(new(MessageKind.Pose,Pose:pose with {Carrier=invalid})));Throws(()=>CoopSaveStore.ValidatePlayer(player with {Carrier=invalid}));}
-    var bad=(byte[])bytes.Clone();bad[bad.Length-79]=2;Throws(()=>Protocol.Decode(bad));
+    var bad=(byte[])bytes.Clone();bad[bad.Length-79-15]=2;Throws(()=>Protocol.Decode(bad));
     return Task.CompletedTask;
 });
 await Test("co-op save atomic replacement, corruption recovery and strict format isolation", () =>

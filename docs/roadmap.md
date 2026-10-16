@@ -1,6 +1,8 @@
 # Roadmap and session rules
 
-Current development source: **PBDMP 0.10.0 / protocol 10**; the last accepted baseline is 0.9.0. The megapass has a documented partial handoff. The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current development source: **PBDMP 0.10.0 / protocol 11**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+
+The focused [weapon-animation pass](weapon-animation-testing.md) is installed as **C990AE9ED22FC33F**: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
 
 ## Current behavior
 
@@ -28,7 +30,7 @@ Keys/items are checked and consumed on the interacting player when native rules 
 | Network performance | Profile snapshot size, bandwidth, queue age, combat traffic and LAN/Steam delivery under load. | Functional synchronization is separate from responsiveness; measure before transport changes. |
 | Natural campaign validation | Two-PC progression through puzzles, encounters and bosses. | Catalogue discovery alone is insufficient. |
 | Mission/world coverage | Classify remaining callbacks, specialised machinery and timeline tracks. | Preserve host authority; do not replay arbitrary client callbacks. |
-| Destructible scenery | General barrels/props and other gameplay-relevant destruction. | Required mission wall destruction already has an adapter. |
+| Scenery acceptance | Gameplay fragments and natural destruction/prop routes. | World/scenery adapters and focused rollback/rejoin checks are implemented; remaining cases are in the playtest checklist. |
 | Player presentation | Weapon grip, reload/jump/death transitions and visual polish. | Keep cosmetic animation separate from gameplay authority. |
 | Checkpoint coverage | Exercise additional natural campaign checkpoint and machinery sequences. | Native world restoration plus durable multiplayer adapters are implemented. |
 | Solo-save import | Explicit conversion into a new co-op slot. | Co-op persistence is implemented; solo slots are never implicitly imported. |

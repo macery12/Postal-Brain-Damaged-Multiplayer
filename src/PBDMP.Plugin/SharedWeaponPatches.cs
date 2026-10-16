@@ -18,7 +18,11 @@ internal static class SharedWeaponPatches
     }
     private static void StreamCreated(UnityEngine.Component __instance)=>SharedWorld.Current?.TrackStream(__instance);
     private static void Beam(Hyperstrange.PBD.LightningGun.LightningGunBeam __instance,bool __0)=>SharedWorld.Current?.BeamState(__instance,__0);
-    private static void Melee(Hyperstrange.PBD.PlayerWeapons.PlayerWeaponNoWeapon __instance)=>SharedWorld.Current?.MeleeSwing(__instance);
+    private static void Melee(Hyperstrange.PBD.PlayerWeapons.PlayerWeaponNoWeapon __instance)
+    {
+        if(__instance.Player?.Pointer==Player.Instance?.Pointer && SharedWorld.Current?.IsRemoteWeapon(__instance)!=true)LocalWeaponObserver.NativeKick();
+        SharedWorld.Current?.MeleeSwing(__instance);
+    }
     private static void Fx(WeaponAction.FxModule __instance,System.Reflection.MethodBase __originalMethod)
     {
         uint action=__originalMethod.Name switch {"PlayFireFullChargeEvent"=>1,"StartChargeLoop"=>2,"StopChargeLoop"=>3,"PlayChargeFullEvent"=>4,_=>0};

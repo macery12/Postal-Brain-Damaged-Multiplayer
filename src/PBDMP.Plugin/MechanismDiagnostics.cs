@@ -105,12 +105,22 @@ public sealed partial class MultiplayerBehaviour
         Add(components.FirstOrDefault(c=>c.TryCast<Mover>() is {} m && m._moveOffset.sqrMagnitude>.01f && m._moveCurve!=null),"mover");
         Add(components.FirstOrDefault(c=>c.TryCast<Rotater>() is {} m && m._rotateAmount.sqrMagnitude>.01f),"rotater");
         Add(components.FirstOrDefault(c=>c.TryCast<Elevator>() is {} e && e._platform!=null && e._top!=null && e._bottom!=null && Vector3.Distance(e._top.position,e._bottom.position)>1),"elevator");
+        Add(components.FirstOrDefault(c=>c.TryCast<ForestBridge>() is {} b && b._staticBridge!=null && b._animatedBridge!=null),"bridge");
         Add(components.FirstOrDefault(c=>c.TryCast<Scaler>() is {} s && Vector3.Distance(s.transform.localScale,s._scaleSize)>.1f),"scaler");
         Add(components.FirstOrDefault(c=>c.TryCast<FallingPlatform>() is {} f && !f._fallen && f._breaker?._wholeObject!=null),"fall");
         Add(components.FirstOrDefault(c=>c.TryCast<MultiRotater>() is {} m && m._animations.Length>0 && m._animations[0].amount.sqrMagnitude>.01f),"multi-rotater");
         Add(components.FirstOrDefault(c=>c.TryCast<TimelineSequence>() is {} sequence && sequence.name.Contains("SleepingCar",StringComparison.Ordinal) && sequence._playableDirector!=null),"timeline");
         Add(components.FirstOrDefault(c=>c.TryCast<RocketSequence>() is {} r && r._rocketHead!=null && r._animator!=null),"rocket");
         Add(components.FirstOrDefault(c=>c.TryCast<WireWallGate>() is {} g && g._requiredTntCount>0 && g._requiredItemsComponent!=null && g._breaker?._wholeObject!=null),"gate");
+        var cart=components.Select(c=>c.TryCast<FerrisWheelCart>()).FirstOrDefault(c=>c!=null);
+        if(cart!=null)
+        {
+            var driver=components.Select(c=>c.TryCast<Rotater>()).FirstOrDefault(r=>r!=null &&
+                Enumerable.Range(0,r._onRotateEnd?.GetPersistentEventCount()??0).Any(i=>r._onRotateEnd!.GetPersistentTarget(i)?.Pointer==cart.Pointer));
+            TravelCheck(driver!=null,"wheel driver is identified by its actual native cart-completion callback");
+            fixtures.RemoveAll(f=>f.Kind=="rotater");Add(driver,"rotater");Add(cart,"wheel-cart");
+            File.WriteAllText(Marker("wheel-driver.txt"),WorldCatalogue.DiagnosticPath(driver!.transform));
+        }
         _mechanismFixtures=fixtures.ToArray();
         TravelCheck(fixtures.Count>0,"map supplies authored native machinery fixtures");
         foreach(var f in fixtures)
@@ -120,6 +130,7 @@ public sealed partial class MultiplayerBehaviour
             if(f.Kind=="rotater") {var m=c.Cast<Rotater>();m.ResetState();m._rotateDuration=12;}
             if(f.Kind=="multi-rotater") {var m=c.Cast<MultiRotater>();m.ResetState();m._animations[0].duration=12;}
             if(f.Kind=="elevator") c.Cast<Elevator>()._duration=12;
+            if(f.Kind=="bridge") c.Cast<ForestBridge>().ResetState();
             if(f.Kind=="scaler") c.Cast<Scaler>()._scaleDuration=12;
             if(f.Kind=="fall") c.Cast<FallingPlatform>()._destructionDelay=12;
             if(f.Kind=="rocket") c.Cast<RocketSequence>().ResetState();
@@ -207,6 +218,22 @@ public sealed partial class MultiplayerBehaviour
         {
             clock=rocket._rocketHead.transform.localPosition.z;state=rocket.State;t=rocket._rocketHead.transform;
         }
+        if(c.TryCast<FerrisWheelCart>() is {} cart)
+        {
+            TravelCheck(cart._doorToClose!=null && cart._doorToOpen!=null,"wheel fixture retains both native door references");
+            var close=cart._doorToClose!;var open=cart._doorToOpen!;
+            state=(close._isLocked?1:0)|(Mathf.Abs(open._desiredRotation)>1?2:0);
+            clock=close._desiredRotation;
+        }
+        if(c.TryCast<ForestBridge>() is {} bridge)
+        {
+            state=(bridge._triggered?1:0)|(bridge._staticBridge.activeSelf?2:0)|(bridge._animatedBridge.activeSelf?4:0);
+            var values=new List<float>();
+            foreach(var root in new[]{bridge._staticBridge,bridge._animatedBridge})
+                foreach(var child in root.GetComponentsInChildren<Transform>(true).Where(WorldCatalogue.SafeMotion))
+                {var p=child.position;var q=child.rotation;var z=child.localScale;values.AddRange(new[]{p.x,p.y,p.z,q.x,q.y,q.z,q.w,z.x,z.y,z.z});}
+            animation=values.ToArray();
+        }
         var position=t.position;var rotation=t.eulerAngles;
         return new(f.Key,new[]{position.x,position.y,position.z},new[]{rotation.x,rotation.y,rotation.z},clock,state,animation);
     }
@@ -242,6 +269,8 @@ public sealed partial class MultiplayerBehaviour
                 case "rotater":c.Cast<Rotater>().Rotate();break;
                 case "elevator":c.Cast<Elevator>().CallOpposite();break;
                 case "scaler":c.Cast<Scaler>().Scale();break;
+                case "bridge":c.Cast<ForestBridge>().Fall();break;
+                case "wheel-cart":c.Cast<FerrisWheelCart>().Activate();break;
                 case "multi-rotater":c.Cast<MultiRotater>().Rotate(0);break;
                 case "timeline":c.Cast<TimelineSequence>().StartSequence();break;
                 // Invoke the native fall marker explicitly in this phase fixture;
@@ -295,7 +324,7 @@ public sealed partial class MultiplayerBehaviour
                 foreach(var f in _mechanismFixtures)
                 {
                     var c=_world!.ComponentForTest(f.Key)!;var p=ProbeMechanism(f);
-                    TravelCheck(f.Kind switch {"mover"=>p.State==3,"rotater"=>p.State==3,"elevator"=>p.State is 0 or 2,"fall"=>p.State==1,"gate"=>p.State==2,"rocket"=>p.State==2 && !c.Cast<RocketSequence>()._rocketHead.activeSelf,"multi-rotater"=>p.State==0,"timeline"=>_world.SequencePeakForTest(f.Key)>=c.Cast<TimelineSequence>()._playableDirector.duration-.15,"scaler"=>Vector3.Distance(c.transform.localScale,c.Cast<Scaler>()._scaleSize)<.01f,_=>false},"restored "+f.Kind+" reaches its native endpoint; state="+p.State+", clock="+p.Clock+", callbacks="+_mechanismCallbacks.GetValueOrDefault(f.Key));
+                    TravelCheck(f.Kind switch {"mover"=>p.State==3,"rotater"=>p.State==3,"elevator"=>p.State is 0 or 2,"fall"=>p.State==1,"gate"=>p.State==2,"rocket"=>p.State==2 && !c.Cast<RocketSequence>()._rocketHead.activeSelf,"multi-rotater"=>p.State==0,"timeline"=>_world.SequencePeakForTest(f.Key)>=c.Cast<TimelineSequence>()._playableDirector.duration-.15,"scaler"=>Vector3.Distance(c.transform.localScale,c.Cast<Scaler>()._scaleSize)<.01f,"bridge"=>p.State==5,"wheel-cart"=>(p.State&2)!=0,_=>false},"restored "+f.Kind+" reaches its native endpoint; state="+p.State+", clock="+p.Clock+", callbacks="+_mechanismCallbacks.GetValueOrDefault(f.Key));
                     if(_mechanismCallbacks.ContainsKey(f.Key)) TravelCheck(_mechanismCallbacks[f.Key]==1,"restored "+f.Kind+" invokes its future completion callback once");
                 }
                 foreach(var signal in _mechanismSignalExpected) TravelCheck(_mechanismCallbacks[signal.Key]==signal.Value,"restored timeline executes only future signal reactions; actual="+_mechanismCallbacks[signal.Key]+", expected="+signal.Value);

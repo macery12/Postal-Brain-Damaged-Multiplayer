@@ -8,10 +8,12 @@ Start with the [project README](../README.md) for installation and play instruct
 | --- | --- |
 | [Sync progress](sync-progress.md) | Individual shared/local feature status, development credit, accepted baseline and remaining gaps. |
 | [Performance baseline](performance.md) | Initial connected/disconnected FPS, stalls and repeatable budget checks. |
+| [Weapon animation checks](weapon-animation-testing.md) | Grip profiles, native animation reuse, multi-angle captures and connected presentation tests. |
+| [Megapass playtest](megapass-playtest.md) | Remaining natural campaign and edge-case checks for the maintainer. |
 | [Verification](verification.md) | Recorded checks, repeatable commands, troubleshooting and manual acceptance. |
 | [Co-op saves](co-op-saves.md) | Save controls, checkpoint restoration, personal progress and recovery. |
 | [Roadmap](roadmap.md) | Current session rules and remaining work. |
-| [Protocol](protocol.md) | Protocol 10 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
+| [Protocol](protocol.md) | Protocol 11 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
 | [Steam research](steam-research.md) | How PBDMP reaches the game's Steam client, callbacks, native layouts and single-account verification. |
 | [Contributor guidance](contributing.md) | Build/test expectations and publication hygiene. |
 | [Mission-trigger design](mission-trigger-sync-plan.md) | Accepted mission/exit rules, wall root cause and adapter limits. |

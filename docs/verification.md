@@ -1,6 +1,63 @@
 # Verification and troubleshooting
 
-Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 10 / save schema 2**; see the current playtest section below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 11 / save schema 2**; see the implementation closeout below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+
+## Weapon-animation pass — October 16, 2026
+
+Installed/exported **0.10.0 / protocol 11 / save schema 2**, build **C990AE9ED22FC33F**. Installed plugin/network hashes match build artifacts and independently hashed ZIP entries. Previous DLLs, install manifest and ZIP are retained privately for rollback. No commit or push.
+
+| Check | Result |
+| --- | --- |
+| Compile / managed scenarios | Zero compiler warnings/errors; 34 network scenarios + 8 reporting checks pass. |
+| Full native render matrix | `.local/weapon-release-20261016-144901`: 27 available regular/extra/dual variants, 23 samples each, 621 PNGs; primary/support grip < 0.035 m, grounded crouch foot < 0.01 m, no gameplay scripts/colliders. Saw before/after and all-weapon contact sheets reviewed. |
+| Connected native presentation | `.local/travel-20261016-144937`: 10 base-campaign weapon equips in both directions; native pistol/shotgun/saw attacks; eight explicit action/motion transport fixtures; pause stops and resumes clip clocks. |
+| Runtime smoke | Native menu/avatar/material/mesh/effect checks pass on the same build, including resource-unload survival, event-free animation and interpolated aim. |
+| Avatar update microbenchmark | Saw idle, 1,000 calls: mean 0.10426 ms, p95 0.10550 ms, max 0.56730 ms, zero managed allocation. Excludes construction, camera rendering and whole-world sync. |
+| Retained Area69 budget/input | `.local/travel-20261016-145157`: host world p95 3.067 ms (<4); sweep p95 52.826 ms (<200). Main-menu join, shared pause, F8/local menu and gameplay input pass. |
+| Package | `PBDMP-0.10.0-animations-C990AE9ED22FC33F.zip`; both players need this matching DLL pair. |
+
+The connected action-state fixtures are explicitly synthetic except the native equips and three native attack families; they do not certify every natural alternate mode. Internal pump/bolt/barrel/string deformation parity and complete player-death animation remain polish. Existing broad campaign/manual acceptance is unchanged. See [weapon-animation testing](weapon-animation-testing.md) for commands and asset boundaries.
+
+Earlier failed diagnostic iterations are not acceptance: ForceAttack was a native no-op; the saw uses its own press/release flow; dual bow initially constrained the wrong shoulder; partial armed clips needed a reset/native idle base to prevent procedural accumulation; crouch needed grounded feet with preserved ankle rotation. Area69 attempt 145104 used an invalid map name and was corrected to `LEVEL_Asylum_Area69` without changing assertions or production code.
+
+## Megapass implementation closeout — October 16, 2026
+
+Installed/exported **0.10.0 / protocol 10 / save schema 2**, build **E19C56EB3B893F6A**. Both installed DLLs and the independently hashed ZIP entries match the build artifacts. The previous install/package was retained privately for rollback. No commit or push was performed.
+
+| Closing check | Result |
+| --- | --- |
+| Already-loaded Prison join | Reproduced the falling-platform missing-reference disconnect; native same-map restart fixes it. Newer same-map admission metadata reuses an unfinished load. Final native join, keyboard/mouse, pause and menu cleanup pass. |
+| Runtime paw damage | Reproduced P2 applying local duplicate damage outside the authored catalogue. P1-only runtime guard passes with no native damage immunity hiding the result. |
+| Stale hazard contacts | Reproduced an extra incoming hit from a native contact ledger after P2 left its volume. Current-transform penetration revalidation rejects it; genuine overlap and the paw each deliver one expected native hit. |
+| Hazard pause / victim ownership | P2 damage leaves P1 unchanged; native shared pause delivers no extra hits. Native contact producers retain their own eligibility/layer rules. |
+| Full restored elevator | Strict live ride, shared pause, disk restore and whole-journey survival pass. Final platform travel is about 76.6 units with about 0.058 units relative drift; death/respawn latch stays enabled. |
+| Forest bridge | Native activation, every authored bridge transform, shared pause, rollback and completed state pass. This fixture invokes native Fall directly; natural P2 trigger/crossing/rejoin is in the playtest checklist. |
+| Backyard wheel/cart | Actual driver is `OBJECTIVES/Ferris_wheel_Base/Ferris_wheel`, identified through its native cart-completion callback. Driver and linked native cart-door state pass pause/rollback/future completion. Actual button/riding flow remains manual. |
+| Scenery / props | Partial damage, destruction, disk rollback, further advancement and current-world rejoin pass. Native spawner/pooling/push/restore/rejoin passes in CoronavirusDen. |
+| Persistent saves | Live capture/restore and fresh-process P1-alone resume/P2 join pass, including wall geometry, retained personal pickups/drops, gear catch-up and usable controls. |
+| Shared story | Final native host-only skip, waiting admission, both-player controls and ending/credits pass. |
+| Performance budget | Final controlled Area69 check: **3.068 ms** host-world p95 and **44.834 ms** sweep p95 against unchanged 4/200 ms limits at a 120 FPS cap; join/pause input checks pass. Active combat/transport stress remains separate. |
+| Managed checks / compile | **33 network + 8 reporting** checks pass; latest source compilation has zero warnings/errors. No wire or save schema change. |
+
+The hazard fixture uses real native component methods after catalogue construction. It tests both a stale ledger entry and an actually overlapping capsule/volume. Its first positive-control attempt incorrectly imposed the global layer matrix on the game's native contact producer; the final check preserves native contact eligibility and retains exact hit-count/health assertions. The prop fixture requires a native spawner source; Neighborhood lacks one, so the supported CoronavirusDen fixture is used. The runner now catches initialization failures promptly and reports an unsupported prop fixture clearly.
+
+Repeat targeted checks from the repository root, with `$GameDir` pointing to your isolated test installation:
+
+~~~powershell
+./scripts/Test-Travel.ps1 -GameDir $GameDir -JoinInput -JoinFromLevel -Level LEVEL_AD_Prison
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Hazard -Level LEVEL_Asylum_Area69
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Area69
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Forest
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Backyard
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Scenery -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Props -Level LEVEL_Asylum_CoronvirusDen
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Saves -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Saves -SaveResume -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Stories -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Performance -PerformanceFrameRate 120 -Level LEVEL_Asylum_Area69
+~~~
+
+The final candidate reran Prison admission, hazards, full Area69 riding, story and performance. Forest/wheel/props/save checks also passed earlier in this closeout; later production changes only add hazard authority/contact guards. See [maintainer playtests](megapass-playtest.md) for the remaining natural routes, fragment classification, interruption cases and busy-world/audio matrix. The implementation handoff leaves those explicit rather than claiming exhaustive campaign acceptance.
 
 ## Recorded checks
 

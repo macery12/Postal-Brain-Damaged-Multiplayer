@@ -190,7 +190,15 @@ internal sealed partial class SessionLifecycle : IDisposable
                 if (state.Epoch != _clientEpoch)
                 {
                     if (state.Epoch < _clientEpoch) throw new InvalidDataException("Host travel generation went backwards.");
-                    _clientState = state; _clientEpoch = state.Epoch; BeginClient(state);
+                    var reuse=ClientTravelPolicy.ReusePendingLoad(_clientState,state,_nativeReady);
+                    _clientState = state; _clientEpoch = state.Epoch;
+                    if(reuse)
+                    {
+                        _deadline=Time.unscaledTime+120;
+                        _session.PublishReady(new(state.Epoch,false));
+                        Plugin.Logger.LogInfo($"P2 admission reuses pending map load, epoch {state.Epoch}.");
+                    }
+                    else BeginClient(state);
                 }
                 else _clientState = state;
                 AutoContinue();
@@ -242,7 +250,10 @@ internal sealed partial class SessionLifecycle : IDisposable
             if (state.Action == TravelAction.Menu) { if(state.StoryEnding) GameManager.OpenCredits();else GameManager.OpenTitle(); _nativeReady = true; _joiningApplied = true; PersonalReady=true; return; }
             var level = FindLevel(state.Level);
             if (!Supported(level)) throw new InvalidDataException("Host requested an unsupported campaign map.");
-            if (state.Action == TravelAction.Restart && LevelManager.CurrentLevel?.ID == state.Level && Player.Instance != null)
+            // Native LoadLevel assumes a different scene cluster. Re-entering
+            // an already running map through it leaves dormant controllers with
+            // uninitialized component caches. Use the native same-map restart.
+            if (SessionManager.SessionActive && LevelManager.CurrentLevel?.ID == state.Level && Player.Instance != null)
                 GameManager.Load(null);
             else GameManager.LoadLevel(level!, true);
         });

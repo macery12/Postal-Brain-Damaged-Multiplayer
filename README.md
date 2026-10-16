@@ -13,15 +13,15 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 | Steam Host / Invite / Join | | | ✅ | Friends lobby, overlay invites, Join Game; Steam relays the connection. |
 | LAN Host / Join | | | ✅ | Direct IP for LAN or a forwarded port. |
 | Player movement and aim | | | ✅ | See each other in-game. |
-| Player model and animations | | ✅ | | More visual polish planned. |
+| Player model and animations | | ✅ | | Improved weapon grips and movement; further animation polish planned. |
 | Campaign travel and pause | | | ✅ | Play through levels together. |
 | Independent respawns | | | ✅ | Keep playing when someone dies. |
 | Gunfire, projectiles and combat | | | ✅ | Fight together. |
 | NPCs, pedestrians and flying enemies | | | ✅ | Shared enemies and reactions. |
 | Doors and shared unlocks | | | ✅ | Either player can interact. |
 | Urine interactions | | | ✅ | Shared puzzles and effects. |
-| Mission triggers and machinery | | ✅ | | Broader coverage in progress. |
-| Joining an active session | | ✅ | | Some world state remains unfinished. |
+| Mission triggers and machinery | | ✅ | | World adapters implemented; campaign playtesting continues. |
+| Joining an active session | | ✅ | | Current-world restoration implemented; broader playtesting continues. |
 | Shared checkpoints | | | ✅ | P1 can restore the shared recovery point. |
 | Multiplayer saves | | | ✅ | Separate co-op slots, quicksave and autosaves. |
 | FPS and network performance | | ✅ | | Optimization remains a priority. |

@@ -22,7 +22,7 @@ internal static class WorldSceneryPatches
         h.Patch(AccessTools.Method(typeof(Pusher),"Push"),prefix:new(typeof(WorldSceneryPatches),nameof(HostMechanism)));
         h.Patch(AccessTools.Method(typeof(LeonDuskSwitch),"TriggerSwitch"),prefix:new(typeof(WorldSceneryPatches),nameof(HostMechanism)));
         h.Patch(AccessTools.Method(typeof(LeonDuskSwitch),"OnSwitch_AnimationCallback"),prefix:new(typeof(WorldSceneryPatches),nameof(HostMechanism)));
-        h.Patch(AccessTools.Method(typeof(PawShockwaveTrigger),"Hit"),prefix:new(typeof(WorldSceneryPatches),nameof(HostMechanism)));
+        h.Patch(AccessTools.Method(typeof(PawShockwaveTrigger),"Hit"),prefix:new(typeof(WorldSceneryPatches),nameof(HostHazard)));
     }
     private static bool Hit(Component __instance,HitData __0)=>SharedWorld.Current?.RequestSceneryHit(__instance,__0)!=true;
     private static bool Push(PhysicalObject __instance,Vector3 __0)=>SharedWorld.Current?.RequestPhysicalPush(__instance,__0)!=true;
@@ -36,6 +36,9 @@ internal static class WorldSceneryPatches
         return true;
     }
     private static bool Spawner(Component __instance)=>SharedWorld.Current is not {Active:true,Client:true} w || !w.IsSharedSpawner(__instance);
+    // Pooled attack prefabs are not authored catalogue entries. Their damage
+    // still belongs to P1, including before readiness and during shared holds.
+    private static bool HostHazard()=>SharedWorld.Current is not {} world || world.PermitWorldHazard;
     private static bool HostMechanism(Component __instance)=>SharedWorld.Current is not {Active:true} w || !w.OwnsMission(__instance) || !w.Client && !w.RestoringNative;
     private static bool BeforeBreak(Breaker __instance)=>SharedWorld.Current?.SuppressRestoredBreak(__instance)!=true;
     private static void Broke(Breaker __instance,Vector3 __0,Vector3 __1)=>SharedWorld.Current?.SceneryBroke(__instance,__0,__1);

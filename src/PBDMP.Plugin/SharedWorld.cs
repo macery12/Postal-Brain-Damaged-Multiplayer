@@ -43,6 +43,7 @@ internal sealed partial class SharedWorld : IDisposable
     private readonly Queue<WorldFrame> _outbound=new();
     internal bool Client => _life.IsClient;
     internal bool Applying => _applying;
+    internal bool PermitWorldHazard=>Active && !Client && !_life.Frozen && !RestoringNative;
     internal RemoteActor? Remote => _remote;
     internal Npc? EnemyForTest(string asset)=>_enemies.Values.FirstOrDefault(n=>n!=null && n.gameObject.activeInHierarchy && n.NpcId!=null && (n.NpcId.ID==asset || WorldCatalogue.NpcAssetKey(n.NpcId)==asset) && n.IsAlive);
     internal Npc? EnemyForSpawnForTest(string key)=>_lastEnemy.Where(p=>p.Value.Key==key && (p.Value.Flags&1)!=0).Select(p=>_enemies.GetValueOrDefault(p.Key)).FirstOrDefault(n=>n!=null && n.IsAlive);

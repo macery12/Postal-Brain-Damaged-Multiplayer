@@ -1,5 +1,6 @@
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
+using PBDMP.Network;
 using Object = UnityEngine.Object;
 
 namespace PBDMP.Plugin;
@@ -14,8 +15,22 @@ internal sealed class RemoteAnimation : IDisposable
     private readonly Vector3 _rootPosition;
     private readonly Quaternion _rootRotation;
     private readonly Vector3 _rootScale;
+    private Transform[] _joints = Array.Empty<Transform>();
+    private Quaternion[] _previous = Array.Empty<Quaternion>(), _blendFrom = Array.Empty<Quaternion>();
+    private Quaternion[] _bindJointRotations=Array.Empty<Quaternion>();
+    private Vector3[] _bindJointPositions=Array.Empty<Vector3>();
+    private float _blend=1;
+    private string _weapon="";
+    private string[] _familyClips=Families["machinegun"];
+    private static readonly Dictionary<string,string[]> Families=new[]{"machinegun","shotgun","rocketlauncher"}.ToDictionary(f=>f,
+        f=>new[]{"alterDude@idleTarget_"+f,"alterDude@shoot_"+f,"alterDude@inAir_"+f,"alterDude@runFront_"+f,"alterDude@runBack_"+f,"alterDude@runRight_"+f,"alterDude@runLeft_"+f});
+    private static readonly string[] Slides={"alterDude@slideFront","alterDude@slideBack","alterDude@slideRight","alterDude@slideLeft"};
+    private float _swapAt=10;
+    private float _airTime;
+    private PlayerMotion _motion;
     private float _time;
     private float _shotTime = 10f;
+    internal float PlaybackTime=>_time;
     internal string CurrentClip { get; private set; } = "";
     internal GameObject Target => _target;
 
@@ -54,39 +69,67 @@ internal sealed class RemoteAnimation : IDisposable
         animator.applyRootMotion = false;
         animator.fireEvents = false;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        _joints=_target.GetComponentsInChildren<Transform>(true).Where(t=>t.name.Contains("SHJnt")).ToArray();
+        _bindJointRotations=_joints.Select(t=>t.localRotation).ToArray();_bindJointPositions=_joints.Select(t=>t.localPosition).ToArray();
+        _previous=_joints.Select(t=>t.localRotation).ToArray();_blendFrom=(Quaternion[])_previous.Clone();
         Plugin.Logger.LogInfo($"Native animation clips copied: {_clips.Count}; events stripped; controller-free Avatar binding.");
     }
 
     internal void Fire() { _shotTime = 0f; }
 
-    internal void Update(string weaponName, Vector3 localVelocity, float delta)
+    internal void Update(string weaponName, Vector3 localVelocity, float delta, PlayerAnimation state=default)
     {
-        var family = weaponName.Contains("Shotgun", StringComparison.OrdinalIgnoreCase) ? "shotgun" :
-            weaponName.Contains("Rocket", StringComparison.OrdinalIgnoreCase) ? "rocketlauncher" : "machinegun";
-        var speed = new Vector2(localVelocity.x, localVelocity.z).magnitude;
-        var armed = !string.IsNullOrEmpty(weaponName);
-        var shoot = "alterDude@shoot_" + family;
-        string clipName;
-        if (armed && _shotTime < Mathf.Min(_clips[shoot].length, 0.45f)) clipName = shoot;
-        else if (speed > 0.25f)
+
+        if(state.Motion!=_motion){_motion=state.Motion;_airTime=0;}
+        _airTime+=delta;
+        var speed=new Vector2(localVelocity.x,localVelocity.z).magnitude;
+        var armed=!string.IsNullOrEmpty(weaponName);
+        var changed=weaponName!=_weapon;
+        if(changed){if(_weapon.Length>0)_swapAt=0;_weapon=weaponName;_familyClips=Families[WeaponGripProfile.For(weaponName).Family];}
+        var direction=Math.Abs(localVelocity.z)>=Math.Abs(localVelocity.x)?localVelocity.z>=0?0:1:localVelocity.x>=0?2:3;
+        var shoot=_familyClips[1];
+        var clipName=state.Has(PlayerActions.Kicking)?"alterDude@kick":state.Motion==PlayerMotion.Sliding?Slides[direction]:
+            state.Motion==PlayerMotion.Airborne?(_airTime<.2f?"alterDude@jumpStart":_familyClips[2]):
+            _swapAt<.3f?"alterDude@weaponSwap":
+            armed && _shotTime<Mathf.Min(_clips[shoot].length,.3f)?shoot:
+            speed>.25f?_familyClips[3+direction]:
+            armed?_familyClips[0]:"AlterDude@idle";
+        if(!_clips.ContainsKey(clipName))clipName="AlterDude@idle";
+        if(clipName!=CurrentClip)
         {
-            var direction = Math.Abs(localVelocity.z) >= Math.Abs(localVelocity.x)
-                ? localVelocity.z >= 0 ? "Front" : "Back" : localVelocity.x >= 0 ? "Right" : "Left";
-            clipName = "alterDude@run" + direction + "_" + family;
+            Array.Copy(_previous,_blendFrom,_previous.Length);_blend=0;CurrentClip=clipName;_time=0;
         }
-        else clipName = armed ? "alterDude@idleTarget_" + family : "AlterDude@idle";
-        if (clipName != CurrentClip) { CurrentClip = clipName; _time = 0f; }
-        var clip = _clips[clipName];
-        _time += delta * (speed > 0.25f && clipName.Contains("run") ? Mathf.Clamp(speed / 6f, 0.4f, 1.5f) : 1f);
-        clip.SampleAnimation(_target, _time % Mathf.Max(clip.length, 0.01f));
-        // Network snapshots own motion. Imported run clips otherwise displace the character several units.
-        _target.transform.localPosition = _rootPosition; _target.transform.localRotation = _rootRotation; _target.transform.localScale = _rootScale;
-        _trajectory.localPosition = _trajectoryPosition; _trajectory.localRotation = _trajectoryRotation;
-        _shotTime += delta;
+        var clip=_clips[clipName];
+        _time+=delta*(state.Has(PlayerActions.Kicking)?3:speed>.25f && clipName.Contains("run")?Mathf.Clamp(speed/6f,.4f,1.5f):1);
+        ResetJoints();
+        // Targeting clips contain only an upper-body layer. Start from a native
+        // idle base so procedural IK/crouch cannot accumulate in unkeyed joints.
+        var idle=_clips["AlterDude@idle"];
+        if(clipName!="AlterDude@idle")idle.SampleAnimation(_target,_time%idle.length);
+        clip.SampleAnimation(_target,_time%Mathf.Max(clip.length,.01f));
+        _blend=Mathf.Min(1,_blend+delta/0.12f);
+        for(var i=0;i<_joints.Length;i++)
+        {
+            if(_blend<1)_joints[i].localRotation=Quaternion.Slerp(_blendFrom[i],_joints[i].localRotation,_blend);
+            _previous[i]=_joints[i].localRotation;
+        }
+        ResetRoot();_shotTime+=delta;_swapAt+=delta;
+    }
+
+    private void ResetJoints()
+    {
+        for(var i=0;i<_joints.Length;i++){_joints[i].localPosition=_bindJointPositions[i];_joints[i].localRotation=_bindJointRotations[i];}
+    }
+
+    private void ResetRoot()
+    {
+        _target.transform.localPosition=_rootPosition;_target.transform.localRotation=_rootRotation;_target.transform.localScale=_rootScale;
+        _trajectory.localPosition=_trajectoryPosition;_trajectory.localRotation=_trajectoryRotation;
     }
 
     internal void SampleForTest(string name, float time)
     {
+        ResetJoints();
         _clips[name].SampleAnimation(_target, time);
         _target.transform.localPosition = _rootPosition; _target.transform.localRotation = _rootRotation; _target.transform.localScale = _rootScale;
         _trajectory.localPosition = _trajectoryPosition; _trajectory.localRotation = _trajectoryRotation;

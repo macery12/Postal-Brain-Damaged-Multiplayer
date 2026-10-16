@@ -20,8 +20,8 @@ internal sealed class RemoteMuzzleEffect : IDisposable
         if (source == null) throw new InvalidOperationException("No original muzzle particle asset for this weapon.");
         SourceName = source.name;
         // Stripped IL2CPP bindings cannot disable collision/trigger modules or stop callbacks.
-        // These two original sources were audited in serialized assets (see animation-effects-research.md).
-        if (SourceName != "VFX_Muzzle_Flash_Pistol" && SourceName != "VFX_Muzzle_Flash_Shotgun")
+        // Reuse the shared serialized-module audit used by native combat presentation.
+        if (!AuditedVisualSources.Names.Contains(SourceName))
             throw new InvalidOperationException("Muzzle source needs a particle-module audit: " + SourceName);
         var staging = new GameObject("PBDMP inactive effect staging");
         staging.SetActive(false);
@@ -68,10 +68,11 @@ internal sealed class RemoteMuzzleEffect : IDisposable
         _started = Time.unscaledTime;
     }
 
-    internal void Update()
+    internal void Update(float delta=-1)
     {
+        if(delta==0)return;
         if (Root.activeSelf)
-            foreach (var system in _systems) system.Simulate(Time.unscaledDeltaTime, false, false, false);
+            foreach (var system in _systems) system.Simulate(delta<0?Time.unscaledDeltaTime:delta, false, false, false);
         if (Root.activeSelf && Time.unscaledTime - _started > 0.1f &&
             (!_systems.Any(p => p.IsAlive(false)) || Time.unscaledTime - _started > 2f)) Stop();
     }

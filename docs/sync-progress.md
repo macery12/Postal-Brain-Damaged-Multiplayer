@@ -1,32 +1,20 @@
 # Multiplayer synchronization progress
 
-**Current handoff: partially complete.** Conveyor, gravity-contact and Hospital pusher checks are closed. Eleven broad acceptance areas remain, including active-world performance and the intermittent restored-elevator failure. The first focused performance pass improves controlled connected P1 FPS from 71.3 to 117.9; see the [brief before/after report](../preformence_report.md). This does not close broad combat/world performance acceptance.
+**October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
-Updated October 16, 2026. Current development source: **PBDMP 0.10.0 / protocol 10**, with the [campaign world megapass](../megapass.md) still in progress. The current development playtest is build **0742FFD62A637F2B** (issue-form reporting update); the last fully accepted baseline remains 0.9.0. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
+Current source: **PBDMP 0.10.0 / protocol 11 / save schema 2**. Installed/exported animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
-**Development coverage: 93% (19.5 / 21 points, including partial credit). Last accepted milestone baseline: 90% (19 / 21).** The development score recognizes implemented world-sync work and focused checks while eleven acceptance areas remain. Neither score measures current-build reliability, FPS, network quality or a completed campaign playthrough. [Scoring details](#progress-score).
+**Development coverage: 93% (19.5 / 21 points). Last accepted milestone baseline: 90% (19 / 21).** The handoff does not change the scoring rubric or turn untested routes into verified results. [Scoring details](#progress-score).
 
 ## Current stopping point
 
-**Latest export:** development playtest **C8C097B0726D204B**, containing the physical-pose ownership fix. The preceding five-item acceptance batch was verified on **F68FE66F1FC90AA7**; the latest prop and arena follow-up is recorded below.
+The focused weapon/animation pass is installed: explicit weapon grips (including the saw and dual variants), supporting hand poses, movement/action metadata, native clip blending, grounded crouch feet and pause-safe animation clocks. All 621 exact-build captures, connected equip/action checks and retained performance budgets pass. First-person internal mechanism parity and player-death presentation remain separate polish; see [animation checks](weapon-animation-testing.md).
 
-The newer development source also adds direct carrier following and replaces recurring scene-wide stream searches with renderer registration. Native checks cover both Area69 conveyor arrays (32 referenced listeners), personal gravity contacts across save/rejoin and Hospital pusher victim attribution. Native lightning, line and urine presentation reach the peer, including active objects with disabled controller components. These source changes are newer than the unchanged C8C097B0726D204B export.
+P2 joining an already-loaded Prison map now uses native same-map restart and reuses duplicate in-flight admission loads. Pooled paw replicas cannot apply duplicate damage on P2. Host-owned damage triggers revalidate P2's current contact before ticking, preventing stale rider contacts from causing extra hits while preserving genuine damage. Shared pause/restore/loading holds suppress these hazards.
 
-**Known failures remain:** the latest extended restored-elevator run records a P2 death/respawn after its early checks. Earlier Area69 sweep p95 runs reached 199–203 ms after the first stream fix. The new controlled 120 FPS check reaches 47.1 ms and passes its unchanged 200 ms target; active-combat performance and residual rare stalls still need broader work. These are partial features, not completed acceptance.
+Native checks cover Forest bridge state and geometry through pause/rollback/completion; Backyard's actual wheel driver and linked cart doors; complete restored Area69 elevator survival; scenery advancement after restore/current-world rejoin; prop push/pool/restore/rejoin; live saves and fresh-process host-alone resume with the partner returning. Native story/pause/input checks and 34 managed network plus eight reporting scenarios also pass.
 
-The first acceptance-closing batch verifies native shared secrets (discovery/counts, duplicate prevention, rollback, rediscovery, disk restoration and rejoin); pending barrel chain timing (partly elapsed capture, restored remaining delay, pause and exactly one future result); and the DeathStar teleporter's real P2 button (destination/view and nonzero transformed native momentum, with P1 unchanged).
-
-The Wall cannon now passes P1 aiming, nearest-P2 targeting, a visible native shell before impact, actual P2 damage with P1 health unchanged, and suppression of independent P2 cannon simulation. Testing found and fixed invisible scenery-fired attacks: native cannon shells have no actor owner, which registration previously rejected. The six-system cannon particle hierarchy also passed the serialized-module audit before being admitted to visual replicas.
-
-Persistent capture no longer swallows live world changes. Its state reads update replication caches, so durable records now also flow through the bounded live queue. The native barrel regression verifies that a change first observed by capture reaches P2 without another world mutation or rejoin; transient historical effects remain excluded from capture. Capture yields under queue pressure while normal publication drains, and its duplicate incremental producer waits. Diagnostic capture helpers also yield across frames rather than synchronously blocking that drain.
-
-The fresh-map sweep also reproduced Hospital Goliath leg movement running before native level readiness. Host NPC simulation ticks now wait for that callback while state-entry initialization remains enabled. The exact Hospital startup audit passes with the guard; ordinary offline behavior and client AI authority stay unchanged.
-
-Three repeated strict Prison regressions pass with exact light, activation, geometry and collision comparisons. The intermittent point-light failure compared an earlier host sample with a later frame of a deliberately flickering control-panel light. The strict fixture now holds the shared world and lets state delivery settle before comparison; no light assertion or tolerance was waived.
-
-The previous world/presentation fixes remain covered: shared posters, native blood impacts, P2's host-pause screen, exact garage structure/portals/hint retirement, strict Hospital poses, stable authored catalogues, compatible older-backup recovery and progressed-save input. The host-side capsule now follows a validated carrier transform, but the latest full restored journey still detects a P2 death/respawn. Earlier passing samples and complete runs do not close this intermittent rider failure.
-
-Remaining work is the finite [megapass closing list](../megapass.md#current-remaining-work): specialised machinery contacts/routes and hazards; interaction rejection/recovery; gameplay-fragment behavior; expanded persistent and native failure recovery; active-world performance; audio/UI and natural campaign progression. The megapass remains partially complete. Development coverage is 93%; the last accepted baseline stays at 90%.
+The existing poster, blood-impact, garage/portal/hint, urine, cannon, conveyor, gravity, pusher and personal-resource behavior remains in the build. The controlled FPS improvements are in the [brief performance report](../preformence_report.md). Busy-world/network optimization and longer campaign traversal remain follow-up work.
 
 ## Reading the tables
 
@@ -84,13 +72,28 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Respawn life generation | | | ✅ | Separates the new life from stale events. |
 | P2 gameplay target on P1 | | | ✅ | Native targeting/hit proxy is separate from the visible avatar. |
 | Native Dude body model | | | ✅ | Uses the game's coat/gown rig. |
-| Weapon geometry and grip alignment | | ✅ | | Equipped geometry exists; some geometry and hand alignment remain preliminary. |
+| Weapon geometry and grip alignment | | | ✅ | Authored pickup orientation/scale and reachable palm/support targets; 27 available variants pass multi-angle grip checks. |
+| Saw holding orientation | | | ✅ | Removes pickup display tilt and aligns the blade forward. |
+| Saw teeth animation | | | ✅ | Native active/idle texture scrolling on owned material copies. |
+| Supporting-hand placement | | | ✅ | Two-arm reach follows each weapon profile through aim and action poses. |
+| Bow hold and draw | | | ✅ | Left-hand hold; right hand draws toward the player along the weapon axis. |
+| Dual-wield geometry and grips | | | ✅ | Resolves missing-pickup variants to their base geometry; independent left/right holding. |
+| Dual-wield handed muzzle flashes | | | ✅ | Native visual sources follow the reported firing hand. |
+| Weapon aim interpolation | | | ✅ | Smoothed pitch/yaw without a bone-transform network stream. |
+| Weapon swap presentation | | | ✅ | Native swap clip and a short lower/raise pose. |
+| Charge holding pose | | | ✅ | Charge metadata drives the supporting pose; resources remain personal. |
+| Blocking holding pose | | | ✅ | Native block state drives the shared visual pose. |
+| Shield holding pose | | | ✅ | Native shield state raises the weapon and supporting arms. |
+| Melee and kick presentation | | | ✅ | Native attack phase/loop and kick notifications drive visual poses. |
+| Crouching presentation | | | ✅ | Uniform body proportions, bent legs, grounded feet and weapon grips. |
+| Sliding presentation | | | ✅ | Uses native slide clips from reported movement state. |
+| Shared-pause animation clocks | | | ✅ | Clip/recoil/grip/teeth clocks stop during shared holds. |
 | Idle animation | | | ✅ | Uses native clips. |
 | Armed holding animation | | | ✅ | Uses native clips; grip polish is tracked separately. |
 | Movement animation | | | ✅ | Uses native clips. |
 | Shooting animation | | | ✅ | Uses native clips. |
-| Complete reload animation transitions | ✅ | | | Remote presentation remains unfinished. |
-| Complete jump animation transitions | ✅ | | | Remote presentation remains unfinished. |
+| Weapon internal mechanism/recovery parity | | ✅ | | Recoil and native character-family recovery exist; dedicated pump/bolt/barrel and every first-person mechanism remain polish. No universal reload gameplay is added. |
+| Jump and airborne presentation | | | ✅ | Native movement snapshots select jump-start and air clips; connected state delivery is covered. |
 | Complete player death animation transitions | ✅ | | | Life-state visibility exists; complete animation presentation remains unfinished. |
 | Independent respawn timer | | | ✅ | Three seconds; waits during P1's shared pause. |
 | Respawn location | | | ✅ | Normal map spawn; the world is not reset. |
@@ -159,6 +162,12 @@ Coverage is for registered base-campaign weapon paths. P1 resolves shared combat
 | Covid eye targets | | | ✅ | CovidEye and MiniCovidEye parts are included. |
 | Elon mech weak spots | | | ✅ | Independent weak-spot hit/state authority. |
 | Enemy attacks | | | ✅ | P1 owns attack/hit results. |
+| Runtime paw damage authority | | | ✅ | Pooled attacks use P1 authority even without an authored catalogue key. |
+| P2 paw duplicate prevention | | | ✅ | Native replica cannot apply local duplicate damage. |
+| Runtime damage-trigger authority | | | ✅ | Native damage ticks run on P1; replicas stay passive. |
+| Stale remote hazard contacts | | | ✅ | Current capsule/volume overlap replaces stale contact membership before damage. |
+| Genuine remote hazard damage | | | ✅ | Native positive control still hurts P2 once. |
+| Hazard shared-pause gating | | | ✅ | Native paw and damage-trigger ticks honor session holds. |
 | Enemy projectile authority | | | ✅ | Host-owned projectiles; replicas cannot deal duplicate damage. |
 | Incoming player-hit events | | | ✅ | P1 sends the hit to its victim; personal health/armor is applied locally. |
 | Enemy health | | | ✅ | Both players' attacks resolve on P1. |
@@ -317,8 +326,8 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | General scripted world triggers | | ✅ | | Expanded host-owned mission graph, state adapters and exit rules exist. Unclassified callbacks and complete natural campaign acceptance remain; see [mission pass details](mission-trigger-sync-plan.md). |
 | Unrelated puzzle machinery | | ✅ | | Expanded authored references and dedicated machinery adapters exist; remaining specialized and natural-route checks are tracked in the megapass. |
 | Moving elevator platforms | | ✅ | | Referenced platform poses and elevator state are replicated; every natural ride/attachment scenario still needs acceptance. |
-| Moving-platform rider positioning | | ✅ | | Direct carrier following is implemented, but the latest full restored Area69 ride still detects a P2 death/respawn. Root cause and external-obstruction checks remain open. |
-| Elevator underside-hit prevention | | ✅ | | Parenting corrects the reproduced stale-capsule path; extended restored rides still intermittently fail, so safety is not accepted. |
+| Moving-platform rider positioning | | ✅ | | Complete Area69 live/pause/restored journey passes after stale hazard-contact correction; other natural rides and obstructions remain manual. |
+| Elevator underside-hit prevention | | ✅ | | Current-transform contact revalidation rejects stale underside hits; genuine overlap remains dangerous. Full restored ride passes; natural obstruction cases remain manual. |
 | Conveyor activation | | | ✅ | Both native Area69 controllers execute on P1; P2 does not independently advance them. |
 | Conveyor listener motion | | | ✅ | Native arrays of 12 and 20 listeners follow host poses and resume after restoration. |
 | Conveyor collision geometry | | | ✅ | Solid collider bounds, enabled states and native ray contacts agree on both peers. |
@@ -327,7 +336,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Pusher victim attribution | | | ✅ | Hospital's native pusher reaches P2's movement component without pushing P1. |
 | Pusher duplicate prevention | | | ✅ | P2's passive replica produces no independent push; one host force is received. |
 | TNT/destructible gates | | ✅ | | Native WireWallGate requester planting, remaining fuse and shared destruction pass the focused The Wall fixture. Other gate routes and negative cases remain in the megapass. |
-| Cat-paw machinery | | ✅ | | Referenced movers/rotators/switches are covered; specialised trap damage and full natural puzzle flow need validation. |
+| Cat-paw machinery | | ✅ | | Runtime damage authority and pause/victim checks pass; referenced machinery exists. Natural trap/puzzle flow remains manual. |
 | Shootable explosive barrels | | | ✅ | P1 owns shooting/fire damage, native explosion and linked mission results; decorative breakables remain separate. |
 | Breakable props | | ✅ | | Host-owned destruction and current structural state exist; Neighborhood/Backyard native fixtures pass. Broader natural-route acceptance remains in progress. |
 | Decorative glass damage | | | ✅ | P2 native hits reach P1; current broken state restores without replaying old smash events. |
@@ -498,7 +507,7 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Evidence and practical limits
 
-- Current protocol 10 passes **32 managed acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
+- Current protocol 10 passes **33 managed network acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
 
 - Urine regressions use two native processes in Neighborhood, Prison, Hospital and ComicCon: either-player electrical-box/tank activation, catalogued garage surface/collision and tutorial-trigger state (including native portal bits and exact host hint retirement), fractional fill and linked motion/scale, toilet overflow/flush, fireball extinguishing and disconnect/rejoin restoration. The subsequent house-wall regression is fixed by a dedicated destruction adapter; native tests now check the actual renderer, collider and matching player-controller passage before and after joining again. An exposed native boss weak spot also accepts P2's frame-timed urine damage through the existing actor-hit authority path.
 - All 15 campaign maps pass discovery and bounded serialization with the new urine/progression catalogue. This does not establish natural completion of every urine puzzle, rail ride, rocket sequence or boss fight. An earlier urine-only VIP fixture stopped in a native shared pause before its action. The later focused machinery fixture passes native launch/rollback/continuation; natural progression remains manual acceptance work.
@@ -513,22 +522,22 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 - All **15 base-campaign maps** pass authored actor catalogue/snapshot audits: **43 distinct authored NPC families across 243 map/family rows**. These audits establish discovery and bounded serialization, not a complete combat playthrough of every map.
 - Two-PC play is verified by the maintainer. Regression testing should continue to exercise natural mission/boss sequences, LAN latency and special attacks alongside native fixtures.
 
-## Remaining megapass acceptance
+## Remaining manual acceptance
 
-All rows below are **partially complete**: adapters or focused checks exist, while the stated result remains outstanding.
+The implementation closeout is handed over with these **partially verified** campaign cases. Use the [playtest checklist](megapass-playtest.md); they do not require another exhaustive automated pass before other development continues.
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| Forest bridge progression | | ✅ | | Validate natural fall and the usable route after join/rollback. |
-| Wheel/cart progression | | ✅ | | Validate the actual driver, doors and rider through save/rejoin. |
-| Cat-paw/shockwave damage | | ✅ | | Validate runtime source, victims, cadence and pause/life gating. |
-| Laser/crush/rider safety | | ✅ | | Extended elevator death/respawn still reproduces; complete obstruction, cadence and duplicate-hit checks. |
+| Forest bridge progression | | ✅ | | Native fall/geometry/pause/rollback/completion pass; natural crossing and current-world join remain maintainer playtests. |
+| Wheel/cart progression | | ✅ | | Actual driver and linked doors pass pause/rollback/completion; natural button/rider/save/rejoin flow remains manual. |
+| Cat-paw/shockwave damage | | ✅ | | Runtime authority, duplicate prevention, victim isolation and pause pass; natural boss/trap variants and cadence remain manual. |
+| Laser/crush/rider safety | | ✅ | | Stale-contact extra damage is fixed and a full restored ride passes; natural laser/ceiling/obstruction behavior remains manual. |
 | Rejected/stale interactions | | ✅ | | Finish eligibility, simultaneous/stale requests, timeout and item-refund cases. |
 | Gameplay-fragment behavior | | ✅ | | Finish native fragment classification, collision and interaction checks. |
-| Cross-family persistent recovery | | ✅ | | Fresh-process restore, further progression and then rejoin for remaining families. |
+| Cross-family persistent recovery | | ✅ | | Live and fresh-process save checks pass; extended family/progression/rejoin matrix remains manual. |
 | Native interrupted recovery | | ✅ | | Missing targets, interrupted transfer/restore and peer loss must preserve files and release or fail clearly. |
-| Active-world performance | | ✅ | | FPS/network complaints remain; unchanged timing targets are not consistently met under current load. |
-| Audio/story/UI regression | | ✅ | | Finish loop seek/cleanup/pause and final story/input/UI checks; queued checks after the rider failure did not run. |
+| Active-world performance | | ✅ | | Controlled idle hardening passes; busy combat/world and real transport load belong to the next optimization phase. |
+| Audio/story/UI regression | | ✅ | | Targeted pause/story/input checks pass; natural loop, seek and sequence combinations remain manual. |
 | Natural campaign routes | | ✅ | | Complete meaningful traversal with both players, save points and rejoining. |
 
 ## Remaining work

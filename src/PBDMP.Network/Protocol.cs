@@ -7,7 +7,7 @@ public enum MessageKind : byte { Hello = 1, Welcome = 2, Pose = 3, Reject = 4, T
 
 // Immutable snapshots can cross worker/main-thread boundaries without Unity objects.
 public sealed record PlayerPose(string Level, bool Ready, float X, float Y, float Z, float Yaw, float Height,
-    string Weapon = "", float Pitch = 0f, uint ShotSequence = 0, bool Alive = true, uint Life = 0, uint Epoch = 0, PlayerCarrier? Carrier = null)
+    string Weapon = "", float Pitch = 0f, uint ShotSequence = 0, bool Alive = true, uint Life = 0, uint Epoch = 0, PlayerCarrier? Carrier = null, PlayerAnimation Animation = default)
 {
     public static readonly PlayerPose Empty = new("", false, 0, 0, 0, 0, 1.8f);
 }
@@ -24,7 +24,7 @@ public sealed record Packet(MessageKind Kind, int Version = Protocol.Version, st
 
 public static class Protocol
 {
-    public const int Version = 10;
+    public const int Version = 11;
     public const int MaxFrameBytes = 8192;
     public const int MaxInventoryItems = 64;
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -64,6 +64,8 @@ public static class Protocol
                 writer.Write(pose.Carrier!=null);
                 if(pose.Carrier is {} carrier)
                 {WriteText(writer,carrier.Key);writer.Write(carrier.Offset.X);writer.Write(carrier.Offset.Y);writer.Write(carrier.Offset.Z);}
+                writer.Write((byte)pose.Animation.Motion);writer.Write((ushort)pose.Animation.Actions);
+                writer.Write(pose.Animation.Sequence);writer.Write(pose.Animation.Phase);writer.Write(pose.Animation.Charge);
                 break;
             case MessageKind.Travel:
                 var travel = packet.Travel ?? throw new InvalidDataException("Missing travel state.");
@@ -104,7 +106,7 @@ public static class Protocol
             MessageKind.Reject => new Packet(kind, Text: ReadText(reader)),
             MessageKind.Pose => new Packet(kind, Pose: new PlayerPose(ReadText(reader), ReadReady(reader),
                 reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
-                ReadText(reader), reader.ReadSingle(), reader.ReadUInt32(), ReadReady(reader), reader.ReadUInt32(), reader.ReadUInt32(), ReadCarrier(reader))),
+                ReadText(reader), reader.ReadSingle(), reader.ReadUInt32(), ReadReady(reader), reader.ReadUInt32(), reader.ReadUInt32(), ReadCarrier(reader), ReadAnimation(reader))),
             MessageKind.Travel => new Packet(kind, Travel: ReadTravel(reader)),
             MessageKind.Ready => new Packet(kind, Ready: new ClientReady(reader.ReadUInt32(), ReadReady(reader))),
             _ => throw new InvalidDataException("Unknown message kind.")
@@ -114,6 +116,8 @@ public static class Protocol
         if (packet.Travel != null) Validate(packet.Travel);
         return packet;
     }
+
+    private static PlayerAnimation ReadAnimation(BinaryReader reader) => new((PlayerMotion)reader.ReadByte(),(PlayerActions)reader.ReadUInt16(),reader.ReadUInt32(),reader.ReadSingle(),reader.ReadSingle());
 
     private static PlayerCarrier? ReadCarrier(BinaryReader reader) => ReadReady(reader)
         ? new(ReadText(reader),new(reader.ReadSingle(),reader.ReadSingle(),reader.ReadSingle())) : null;
@@ -213,6 +217,7 @@ public static class Protocol
     private static void Validate(PlayerPose pose)
     {
         PlayerCarrier.Validate(pose.Carrier);
+        PlayerAnimation.Validate(pose.Animation);
         if (!float.IsFinite(pose.X) || !float.IsFinite(pose.Y) || !float.IsFinite(pose.Z) ||
             !float.IsFinite(pose.Yaw) || !float.IsFinite(pose.Height) || !float.IsFinite(pose.Pitch) ||
             Math.Abs(pose.X) > 1_000_000 || Math.Abs(pose.Y) > 1_000_000 || Math.Abs(pose.Z) > 1_000_000 ||

@@ -84,7 +84,7 @@ internal sealed partial class SharedWorld
         var gate=c.TryCast<WireWallGate>();var falling=c.TryCast<FallingPlatform>();
         var destroyed=(frame.Flags&1)!=0;
         if(b!=null) {b._destroyed=destroyed;b._indestructible=(frame.Flags&2)!=0;}else if(collision!=null) collision._destroyed=destroyed;else if(falling!=null) falling._fallen=destroyed;
-        var breaker=b?._breaker??collision?._breaker??gate?._breaker??falling?._breaker;if(breaker==null || breaker._wholeObject==null) throw new InvalidDataException("Missing authored mission breakable geometry.");
+        var breaker=b?._breaker??collision?._breaker??gate?._breaker??falling?._breaker;if(breaker==null || breaker._wholeObject==null) throw new InvalidDataException($"Missing authored mission breakable geometry: type={c.GetIl2CppType().Name}, key={frame.Key}, identity={_catalogue.Identities.GetValueOrDefault(frame.Key)}, breaker={breaker!=null}, whole={breaker?._wholeObject!=null}, parts={breaker?._parts!=null}, destroyed={destroyed}.");
         // Restore persistent geometry without executing Break/Load: those native
         // paths replay listeners, damage/progression and cosmetic debris sounds.
         breaker._wholeObject.SetActive(!destroyed);

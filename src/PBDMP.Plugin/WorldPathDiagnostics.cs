@@ -22,6 +22,7 @@ public sealed partial class MultiplayerBehaviour
     private PlayerTriggerSecretComponent PathSecret=>_world!.ComponentForTest(_pathKey)!.Cast<PlayerTriggerSecretComponent>();
     private void RunWorldPathTest()
     {
+        if(PathMode=="hazard") {RunHazardTest();return;}
         if(PathMode=="gravity") {RunGravityTest();return;}
         if(PathMode=="pusher") {RunPusherTest();return;}
         if(PathMode=="conveyor") {RunConveyorTest();return;}

@@ -1,44 +1,48 @@
 # Campaign world consistency megapass
 
-**Current handoff: partially complete.** Conveyor, gravity-contact and Hospital pusher checks are closed. Eleven acceptance areas remain; the extended restored-elevator ride still has an intermittent death/respawn failure. FPS and network performance are major priorities for the next optimization pass.
+**October 16, 2026 — implementation closeout.** The agreed world systems are implemented, with focused regressions for the closing fixes. Broad campaign traversal and the remaining edge-case matrix are handed to the maintainer for playtesting, per the updated testing preference. [Campaign playtest checklist](docs/megapass-playtest.md) records those cases without reopening an exhaustive automated testing phase.
 
-**Current status — October 15, 2026:** implementation and focused regressions are substantially advanced; the megapass is **not complete**. Current source is **0.10.0 / protocol 10 / save schema 2**. Use the list below for remaining work and [sync-progress.md](docs/sync-progress.md) for granular feature status. Later sections retain the original research and dated checkpoints; an old “pending” statement there does not reopen a check recorded as passed later.
+Current source: **0.10.0 / protocol 11 / save schema 2** after the subsequent [weapon-animation pass](docs/weapon-animation-testing.md). The megapass evidence below refers to its recorded protocol-10 builds. Sync status continues to distinguish implemented behavior from unverified campaign cases. No commit or push is included in this closeout.
 
 ## Current remaining work
 
-**Physical restoration follow-up:** saved generic local transforms could override the current physics pose with an older interpolated display sample. The native regression forces a three-unit stale display pose on an active body; it fails before the ownership change and passes afterward. Physics publication follows parent transforms, disk restoration defers bodies until parents settle, and generic transforms retain activation/scale without replacing a shared body pose. Prop pooling/rejoin and the shifted-arena regression pass.
+The remaining work is manual acceptance and the next performance phase. It is separate from the implementation closeout; partial checkmarks remain where coverage is incomplete.
 
-**Contact checks closed:** both Area69 conveyor controllers (12 and 20 native listeners) pass movement, solid collider/ray-contact, pause, disk restoration, future movement and current-world rejoin. The gravity-zero AirTube passes independent P1/P2 contacts, native gravity/fall-speed restoration and clean re-entry after joining. Hospital's native pusher applies one real force to P2 without moving P1 or running duplicate client simulation.
-
-**Known rider regression:** a stale host-side capsule was observed entering the elevator's lethal underside. Direct carrier parenting improves that path and earlier full-journey runs pass, but the latest extended rerun still records P2 dying/respawning after its early restored-ride sample. Rider safety remains partial; do not call the capsule change a complete fix. Native mover/rotater/elevator endpoints still pass in that failed run. The queued pause/story regressions did not execute after the failure.
-
-**Performance handoff:** the maintainer reports substantial FPS and network-performance problems during co-op play. Removing recurring global stream-renderer searches reduces measured stream work from about 2.52 ms to 0.041–0.044 ms p95 and Area69 sweep latency from 934 ms to roughly 199–203 ms. Some runs still exceed the unchanged 200 ms target. Performance acceptance stays open. Profile real FPS/frame pacing, capture allocations, bandwidth, queue age and LAN/Steam delivery under active combat/machinery load next.
-
-The current milestone is a documented partial handoff; full megapass acceptance remains outstanding. The [sync tracker](docs/sync-progress.md#progress-score) separates development credit from the accepted baseline. No cleanup commit or push has been made.
-
-This is the closing list for the already agreed scope. Most listed systems already have adapters; the remaining work is targeted native validation and fixes where those checks fail. It does not authorize a new feature phase or increase the accepted milestone score.
-
-| Item | Remaining result needed | Existing lookup |
+| Original closing area | Result / handoff | Lookup |
 | --- | --- | --- |
-| Forest bridge route | Verify the natural fall transition and usable route after join/rollback. | T07 |
-| Wheel/cart route | Confirm the actual driver, doors and player riding through save/rejoin. | T08 |
-| Cat-paw/shockwave damage | Identify the runtime source and verify intended victims, cadence and life/pause gating. | T12 |
-| Laser/crush behavior | Validate native hazard damage and rider obstruction without duplicate incoming hits. | T13 |
-| Negative interaction cases | Complete eligibility, stale/simultaneous request and rejection/timeout/refund cases for relevant machinery and scenery. | T10, T19–T20 |
-| Gameplay fragments | Finish native classification and collision/interaction checks; harmless debris stays cosmetic. | T27; WorldFragments.cs |
-| Cross-family persistent recovery | Repeated fresh-process restore/rollback, advance after load then rejoin, and the next real progression action for the new families. | T30–T32 |
-| Native failure recovery | Missing target, interrupted restore/transfer, lost peer and unusable recovery state must retain files and release safely or fail clearly. Managed file/transport checks already exist. | T33 |
-| Active-world performance | Measure moving machinery/destruction/join load and bounded queues against the retained frame/capture budgets. | T34 |
-| Audio/UI regression | Validate loop cleanup/seek/pause, story/input ownership and native UI after the final changes. | T15–T16, T35 |
-| Meaningful campaign progression | Traverse relevant routes with both players, save/rejoin at useful points, and distinguish those results from synthetic fixtures and catalogue census. | T36 |
+| Forest bridge route | Native fall, full transform state, pause, rollback and completed state pass; natural trigger/crossing/rejoin goes to campaign playtest. | T07; MechanismDiagnostics.cs |
+| Wheel/cart route | Actual wheel driver and linked cart doors pass pause/rollback/completion; real button/rider/save/rejoin flow goes to campaign playtest. | T08; MechanismDiagnostics.cs |
+| Cat-paw/shockwave | Fixed runtime-prefab authority: harmless P2 replicas, one host hit, correct victim and shared-pause gating. Natural attack cadence/variants remain manual. | T12; WorldSceneryPatches.cs; HazardDiagnostics.cs |
+| Laser/crush/rider safety | Fixed stale host hazard contacts using current capsule/volume geometry; genuine damage remains active. Full Area69 restored ride passes. Natural obstructions/lasers remain manual. | T13; WorldHazards.cs; SharedMissionPatches.cs |
+| Negative interactions | Eligibility/idempotence/retry/refund paths audited; simultaneous and interruption combinations remain manual. | T10, T19–T20; WorldInteractionLedger.cs; SharedDoors.cs |
+| Gameplay fragments | Physical/spawned prop pushes, pooling, disk rollback and rejoin pass. Native fragment classification/collision remains explicitly partial for playtesting. | T27; WorldFragments.cs; PropDiagnostics.cs |
+| Cross-family persistence | Live save and fresh-process host-alone resume/P2 join pass; extended family/route matrix remains manual. | T30–T32; SaveDiagnostics.cs |
+| Native failure recovery | Save/transfer bounds, corruption and compatibility have managed evidence; abrupt native interruptions/missing targets remain manual. | T33; CoopSaveService.cs; WorldNativeCapture.cs |
+| Active-world performance | Prior connected-idle FPS fix retained. Busy combat/world and real transport load move to the optimization phase. | T34; docs/performance.md |
+| Audio/story/UI | Targeted native pause/story/input checks pass. Natural loop/audio/sequence combinations remain manual. | T15–T16, T35; StoryDiagnostics.cs |
+| Campaign traversal | Maintainer campaign playtest with meaningful saves/rejoins. Existing all-map census stays separately labeled. | T36; docs/megapass-playtest.md |
 
-**Acceptance follow-up — first closing batch complete:** build **F68FE66F1FC90AA7** was verified and packaged. Earlier installed playtest **C8C097B0726D204B** adds the physical-pose ownership correction. Native checks close T14's cannon/requester-teleport cases, T17 secret discovery/count/rollback/rejoin, T26's partly elapsed barrel fuse and T22's strict Prison light/state comparison. Cannon testing exposed two real gaps: ownerless scenery projectiles were rejected, and Projectile_Cannon lacked a serialized particle-module audit. Both are corrected; P2 now sees the native shell before its authoritative hit. The strict Prison fixture compares the same held world state instead of different moments of deliberate control-panel flicker. Exact light/geometry/collision assertions remain. These results close five named rows, not all remaining acceptance work. Source lookup: [WorldActionDiagnostics.cs](src/PBDMP.Plugin/WorldActionDiagnostics.cs), [WorldPathDiagnostics.cs](src/PBDMP.Plugin/WorldPathDiagnostics.cs), [SharedProjectiles.cs](src/PBDMP.Plugin/SharedProjectiles.cs), [WorldRegressionDiagnostics.cs](src/PBDMP.Plugin/WorldRegressionDiagnostics.cs).
+## Closing fixes and source lookup
 
-**Previous focused handoff closed:** 31 managed scenarios pass; the final Area69 machinery/rider regression and all 15 fresh-process catalogue/bounded-state audits pass. Build **0795BA97D71F6A39** is installed and packaged with byte-identical host/peer/archive DLL pairs. This closes the selected world/presentation follow-up, not the remaining acceptance rows above. No commit or push.
+- **Already-loaded-map join:** P2 uses the native same-map restart path, and newer admission metadata can reuse an unfinished identical map load. This fixes the reproduced Prison falling-platform missing-reference disconnect without skipping world records. [SessionLifecycle.cs](src/PBDMP.Plugin/SessionLifecycle.cs), [ClientTravelPolicy.cs](src/PBDMP.Network/ClientTravelPolicy.cs), [JoinInputDiagnostics.cs](src/PBDMP.Plugin/JoinInputDiagnostics.cs).
+- **Runtime hazards:** pooled paw attacks and damage-trigger ticks belong to P1 even without an authored catalogue key. Shared holds suppress damage. Before a native damage tick, P2's existing contact is checked against current transforms; departed/dead contacts are removed. Native eligibility is retained, and genuine overlap is a positive control. [WorldHazards.cs](src/PBDMP.Plugin/WorldHazards.cs), [SharedMissionPatches.cs](src/PBDMP.Plugin/SharedMissionPatches.cs), [WorldSceneryPatches.cs](src/PBDMP.Plugin/WorldSceneryPatches.cs), [HazardDiagnostics.cs](src/PBDMP.Plugin/HazardDiagnostics.cs).
+- **Bridge/wheel checks:** the existing machinery test now covers Forest bridge geometry/state and Backyard's real root driver with both cart-door references. [MechanismDiagnostics.cs](src/PBDMP.Plugin/MechanismDiagnostics.cs).
 
-Already closed in the preceding world/presentation follow-up: shared poster collection/count/save/rejoin; native blood material-impact delivery and echo suppression; P2's native host-pause screen/caption/owned resume; garage structural/portal state and exact hint retirement; strict Hospital live/late-join pose comparisons; authored-catalogue drift and compatible older-backup recovery; progressed-save player input. See the [latest evidence](docs/verification.md#current-worldpresentation-playtest). These need regression protection, not another implementation pass.
+The native hazard regression failed before the fix on P2 local duplicate damage and separately on stale-contact extra damage. Its positive control verifies that the fix does not make P2 immune. The full restored-elevator survival latch remains enabled; no tolerance or death check was removed.
 
-No Survival, DLC, custom maps, solo-save import, extra players, host migration or unrelated animation/refactor work is added to this closing list. No commit or push is included.
+## Handoff gate
+
+- [x] Retain the approved campaign, personal-resource, save, authority and exit rules.
+- [x] Resolve reproduced closing blockers with focused native regressions.
+- [x] Keep catalogue discovery, synthetic fixtures and natural campaign acceptance distinguishable.
+- [x] Record unverified routes, fragment classification, failure injection and active-load work in the maintainer checklist.
+- [x] Final matching build/install/package verification: **E19C56EB3B893F6A**; installed, artifact and partner ZIP DLL hashes match. See the latest verification entry.
+
+Development coverage remains 93%; the last accepted milestone baseline remains 90%. Transferring manual testing does not invent acceptance evidence or inflate these scores.
+
+## Historical plan and checkpoints
+
+The original research, strict acceptance matrix and dated checkpoints below are retained for lookup. Their old installed-build IDs and pending statements are historical; current status above takes precedence.
 
 ### Original research baseline (historical)
 
@@ -316,7 +320,7 @@ Maintain per-map/per-family evidence: native class/source identity, exact object
 
 The 0.9.0 baseline has 22 managed acceptance scenarios and representative native save/UI/performance checks. Its save fixture covers Neighborhood wall/NPC/door, personal pickups/generated loot, autosave/checkpoint/results. It does not establish every natural elevator, trap or timeline. Serialization success alone does not earn a synced checkmark.
 
-## Completion gate
+## Original full acceptance gate
 
 - [x] Q1–Q6 resolved; gameplay choices recorded.
 - [x] Maintainer explicitly confirms final shared understanding before implementation.
