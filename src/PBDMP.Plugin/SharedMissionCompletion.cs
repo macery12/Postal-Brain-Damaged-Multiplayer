@@ -18,8 +18,9 @@ internal sealed partial class SharedWorld
             Values:new[]{(float)stats.KillsStat.CurrentCount,stats.KillsStat.MaxCount,stats.SecretsStat.CurrentCount,stats.SecretsStat.MaxCount,
                 stats.QuantityStat.CurrentCount,stats.QuantityStat.MaxCount},
             Data:new[]{stats.TimeStat.CompletionTime.ToString(CultureInfo.InvariantCulture)});
-        Send(_missionCompletion);
+        _clientMissionCompleted=true;Send(_missionCompletion);
     }
+    internal bool ReplayingCompletion=>_finishingMission && _missionCompletion!=null;
     private void ReceiveMissionCompletion(WorldFrame frame)
     {
         if(frame.Values is not {Length:6} v || frame.Revision>7 || v.Any(n=>n<0 || n!=MathF.Floor(n)) ||

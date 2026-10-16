@@ -3,6 +3,239 @@ using System.Net.Sockets;
 using PBDMP.Network;
 
 var passed = 0;
+await Test("catalogue recovery reads only a fully compatible backup and preserves the primary", () =>
+{
+    var folder=Path.Combine(Path.GetTempPath(),"pbdmp-compat-"+Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store=new CoopSaveStore(folder);
+        var save=new CoopSave {Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="auto-1",Name="Compatible backup",Level="level",Mod="test",Host=new("direct:owner","level",new() {{"_saveData","{}"}},Array.Empty<string>()),Native=new() {{"world",new() {{"state","true"}}}}};
+        store.Write(save);var file=Path.Combine(folder,"auto-1.pbdmp");
+        // Reproduce an existing legacy recovery generation. The current writer
+        // deliberately does not promote a different-catalogue primary over it.
+        File.Copy(file,file+".bak");
+        var catalogue=save.Catalogue;save.Catalogue=new string('D',64);save.Name="Incompatible primary";store.Write(save);
+        var original=File.ReadAllBytes(file);
+        var recovered=store.ReadCompatibleRecovery("auto-1",save.Game,catalogue,"level");
+        Check(recovered.Recovered && recovered.Save.Name=="Compatible backup" && File.ReadAllBytes(file).SequenceEqual(original));
+        Throws(()=>store.ReadCompatibleRecovery("auto-1",save.Game,new string('E',64),"level"));
+        Throws(()=>store.ReadCompatibleRecovery("auto-1",new string('F',64),catalogue,"level"));
+        Throws(()=>store.ReadCompatibleRecovery("auto-1",save.Game,catalogue,"other-level"));
+        Throws(()=>store.ReadCompatibleRecovery("../solo",save.Game,catalogue,"level"));
+        Check(store.Read("auto-1").Save.Name=="Incompatible primary" && File.ReadAllBytes(file).SequenceEqual(original));
+        save.Catalogue=catalogue;save.Name="New compatible primary";store.Write(save);
+        Check(store.Read("auto-1").Save.Name=="New compatible primary");
+        Check(store.ReadCompatibleRecovery("auto-1",save.Game,catalogue,"level").Save.Name=="Compatible backup");
+    }
+    finally {if(Directory.Exists(folder)) Directory.Delete(folder,true);}
+    return Task.CompletedTask;
+});
+await Test("host menu pause is atomic travel metadata and distinct from capture holds", () =>
+{
+    var state=new TravelState(4,TravelAction.Load,"level",0,true,true,true,false,HostMenuPaused:true);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:state))).Travel==state);
+    Check(!Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:state with {HostMenuPaused=false}))).Travel!.HostMenuPaused);
+    Throws(()=>Protocol.Validate(state with {Paused=false}));
+    return Task.CompletedTask;
+});
+await Test("native tank progress accepts drain/fill endpoint overshoot but rejects corrupt values", () =>
+{
+    Check(NativeProgress.Unit(-0.005902154f)==0 && NativeProgress.Unit(1.005f)==1 && NativeProgress.Unit(.625f)==.625f);
+    Throws(()=>NativeProgress.Unit(float.NaN));Throws(()=>NativeProgress.Unit(float.PositiveInfinity));Throws(()=>NativeProgress.Unit(1_000_001));
+    return Task.CompletedTask;
+});
+await Test("autosave clock advances only during play, waits for its interval and never catches up with a write storm", () =>
+{
+    var clock=new AutosaveClock(300);
+    clock.Advance(299,true);Check(!clock.Due && !clock.TryConsume());
+    clock.Advance(3600,false);Check(clock.Remaining==1 && !clock.Due);
+    clock.Advance(1,true);Check(clock.Due);clock.Advance(3600,true);
+    Check(clock.TryConsume() && !clock.TryConsume() && clock.Remaining==300);
+    clock.Advance(250,true);clock.Reset();Check(clock.Remaining==300);
+    Throws(()=>clock.Advance(double.NaN,true));Throws(()=>clock.Advance(-1,true));Throws(()=>new AutosaveClock(0));
+    return Task.CompletedTask;
+});
+await Test("player poses and personal saves carry one bounded authored platform reference", () =>
+{
+    var carrier=new PlayerCarrier(new string('A',64),new(.25f,1,-3));
+    var pose=new PlayerPose("level",true,1,2,3,90,1.8f,Carrier:carrier);
+    var bytes=Protocol.Encode(new(MessageKind.Pose,Pose:pose));
+    Check(Protocol.Decode(bytes).Pose==pose);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Pose,Pose:pose with {Carrier=null}))).Pose!.Carrier==null);
+    var player=new SavedPlayer("direct:owner","level",new() {{"_saveData","{}"}},Array.Empty<string>(),carrier);
+    var json=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(player);
+    var restored=System.Text.Json.JsonSerializer.Deserialize<SavedPlayer>(json)!;
+    CoopSaveStore.ValidatePlayer(restored);Check(restored.Carrier==carrier);
+    foreach(var invalid in new[]{carrier with {Key="runtime-pointer"},carrier with {Offset=new(float.NaN,0,0)},carrier with {Offset=new(0,257,0)}})
+    {Throws(()=>Protocol.Encode(new(MessageKind.Pose,Pose:pose with {Carrier=invalid})));Throws(()=>CoopSaveStore.ValidatePlayer(player with {Carrier=invalid}));}
+    var bad=(byte[])bytes.Clone();bad[bad.Length-79]=2;Throws(()=>Protocol.Decode(bad));
+    return Task.CompletedTask;
+});
+await Test("co-op save atomic replacement, corruption recovery and strict format isolation", () =>
+{
+    var folder=Path.Combine(Path.GetTempPath(),"pbdmp-save-test-"+Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store=new CoopSaveStore(folder);
+        CoopSave Example()=>new() {Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="manual-test",Name="First",Level="level",Mod="test",
+            Host=new("direct:"+Guid.NewGuid().ToString("N"),"level",new() {{"_saveData","{}"}},new[]{"a:pickup-one"}),Native=new() {{"world",new() {{"state","true"}}}},
+            World=new[]{new WorldFrame(WorldKind.MissionState,1,1,Key:"wall",Flags:1)}};
+        var save=Example();store.Write(save);Check(store.Read(save.Slot).Save.Name=="First");
+        save.Name="Second";store.Write(save);Check(store.Read(save.Slot).Save.Name=="Second" && !store.Read(save.Slot).Recovered);
+        var file=Path.Combine(folder,save.Slot+".pbdmp");File.WriteAllText(file,"interrupted or corrupt");
+        var recovered=store.Read(save.Slot);Check(recovered.Recovered && recovered.Save.Name=="First");
+        save.Name="Third";store.Write(save);Check(store.Read(save.Slot).Save.Name=="Third");
+        File.WriteAllText(file,"corrupt again");Check(store.Read(save.Slot).Save.Name=="First");
+        Throws(()=>store.Read("../solo-profile"));
+        save.Schema=99;Throws(()=>store.Write(save));Check(store.Read(save.Slot).Save.Name=="First");save.Schema=2;
+        save.World=new[]{new WorldFrame(WorldKind.Fire,1,1)};Throws(()=>store.Write(save));
+        File.WriteAllText(Path.Combine(folder,"manual-other.pbdmp.writing-abandoned"),"partial");
+        Check(store.List().Length==1 && store.List()[0].Backup);
+        save=Example();save.Host=save.Host with {Collected=new[]{"duplicate","duplicate"}};Throws(()=>store.Write(save));
+        File.WriteAllText(file+".bak","also corrupt");Throws(()=>store.Read("manual-test"));Check(store.List()[0].Error!=null);
+    }
+    finally {if(Directory.Exists(folder)) {foreach(var file in Directory.EnumerateFiles(folder)) File.Delete(file);Directory.Delete(folder);}}
+    return Task.CompletedTask;
+});
+await Test("shared story travel metadata is bounded and round trips without changing loadout ownership", () =>
+{
+    var story=new TravelState(9,TravelAction.Load,"level",2,false,false,false,false,StoryVideo:"VIDEO_Episode_1",StoryTime:12.5f,StoryWaiting:true);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:story))).Travel==story);
+    Throws(()=>Protocol.Validate(story with {StoryTime=float.NaN}));
+    Throws(()=>Protocol.Validate(story with {StoryTime=-1}));
+    Throws(()=>Protocol.Validate(story with {StoryVideo="",StoryWaiting=true}));
+    Throws(()=>Protocol.Validate(story with {StoryVideo=new string('x',129)}));
+    Throws(()=>Protocol.Validate(story with {StoryVideo="bad\nname"}));
+    return Task.CompletedTask;
+});
+await Test("legacy co-op saves remain readable and untouched but cannot silently reset new world families", () =>
+{
+    var folder=Path.Combine(Path.GetTempPath(),"pbdmp-legacy-test-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(folder);
+    try
+    {
+        var legacy=new CoopSave {Schema=1,Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="legacy",Name="Original",
+            Level="level",Host=new("direct:original","level",new() {{"_saveData","{}"}},Array.Empty<string>()),Native=new() {{"world",new() {{"state","true"}}}}};
+        var payload=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(legacy);
+        var path=Path.Combine(folder,"legacy.pbdmp");
+        using(var stream=File.Create(path)) using(var writer=new BinaryWriter(stream))
+        {writer.Write(System.Text.Encoding.ASCII.GetBytes("PBDMPS01"));writer.Write(payload.Length);writer.Write(System.Security.Cryptography.SHA256.HashData(payload));writer.Write(payload);}
+        var original=File.ReadAllBytes(path);var store=new CoopSaveStore(folder);var read=store.Read("legacy").Save;
+        Check(read.Schema==1);Throws(()=>CoopSaveStore.RequireRestorableFormat(read));Throws(()=>store.Write(read));
+        Check(File.ReadAllBytes(path).SequenceEqual(original) && !File.Exists(path+".bak"));
+        read.Schema=2;CoopSaveStore.RequireRestorableFormat(read);
+        read.World=new[]{new WorldFrame(WorldKind.Scenery,1,1,Key:"glass",Flags:1,Values:new[]{1f,0}),
+            new WorldFrame(WorldKind.Mechanism,1,1,Key:"gate",Flags:4,Value:2.5f,Values:new[]{1f}),
+            new WorldFrame(WorldKind.Sequence,1,1,Key:"train",Flags:3,Value:4,Value2:10)};
+        store.Write(read);Check(store.Read("legacy").Save.World.Length==3);
+        read.World=new[]{new WorldFrame(WorldKind.SceneryEvent,1,1,Key:"old-smash",Flags:1)};Throws(()=>store.Write(read));
+    }
+    finally {foreach(var file in Directory.EnumerateFiles(folder)) File.Delete(file);Directory.Delete(folder);}
+    return Task.CompletedTask;
+});
+await Test("large current-world baselines survive paging, cancellation and strict bounds", () =>
+{
+    var data=new byte[9*1024*1024+17];new Random(17).NextBytes(data);
+    using var baseline=new WorldBaseline();var pages=new SaveAssembler();uint transaction=1;
+    byte[]? Transfer(SaveCommand command,byte[] bytes)
+    {
+        byte[]? result=null;
+        foreach(var page in SaveProtocol.Split(command,7,transaction++,bytes))
+        {
+            var assembled=pages.Accept(Protocol.Decode(Protocol.Encode(new(MessageKind.Save,Save:page))).Save!);
+            if(assembled!=null) result=baseline.Accept(command,assembled);
+        }
+        return result;
+    }
+    Transfer(SaveCommand.WorldRestoreBegin,WorldBaseline.Begin(data));
+    for(var at=0;at<data.Length;at+=WorldBaseline.ChunkBytes)
+        Transfer(SaveCommand.WorldRestore,data.AsSpan(at,Math.Min(WorldBaseline.ChunkBytes,data.Length-at)).ToArray());
+    Check(Transfer(SaveCommand.WorldRestoreEnd,Array.Empty<byte>())!.SequenceEqual(data));
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestore,new byte[]{1}));
+    Throws(()=>WorldBaseline.Begin(Array.Empty<byte>()));
+    Throws(()=>WorldBaseline.Begin(new byte[CoopSaveStore.MaxBytes+1]));
+    var small=new byte[]{1,2,3};var header=WorldBaseline.Begin(small);
+    baseline.Accept(SaveCommand.WorldRestoreBegin,header);
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestoreBegin,header));
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestore,new byte[WorldBaseline.ChunkBytes+1]));
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestore,new byte[4]));
+    baseline.Accept(SaveCommand.WorldRestore,new byte[]{1,2});
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestoreEnd,Array.Empty<byte>()));
+    baseline.Reset();baseline.Accept(SaveCommand.WorldRestoreBegin,header);
+    baseline.Accept(SaveCommand.WorldRestore,new byte[]{1,2,4});
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestoreEnd,Array.Empty<byte>()));
+    baseline.Reset();baseline.Accept(SaveCommand.WorldRestoreBegin,header);
+    baseline.Accept(SaveCommand.WorldRestore,small);
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestoreEnd,new byte[]{0}));
+    Check(baseline.Accept(SaveCommand.WorldRestoreEnd,Array.Empty<byte>())!.SequenceEqual(small));
+    var oversized=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new {Bytes=int.MaxValue,Hash=new string('A',64)});
+    Throws(()=>baseline.Accept(SaveCommand.WorldRestoreBegin,oversized));
+    baseline.Accept(SaveCommand.WorldRestoreBegin,header);baseline.Reset();
+    baseline.Accept(SaveCommand.WorldRestoreBegin,header);baseline.Accept(SaveCommand.WorldRestore,small);
+    Check(baseline.Accept(SaveCommand.WorldRestoreEnd,Array.Empty<byte>())!.SequenceEqual(small));
+    return Task.CompletedTask;
+});
+
+await Test("large world baselines retain order under TCP and message-carrier backpressure", async () =>
+{
+    foreach(var messages in new[]{false,true})
+    {
+        using var listener=new LoopbackListener(64);
+        using var host=new CoopSession("baseline-bulk");using var client=new CoopSession("baseline-bulk");
+        if(messages) {host.StartHost(listener,"Hosting");client.StartJoin(listener.ConnectAsync,"Connecting",5);}
+        else {var port=FreePort();host.StartHost(port,IPAddress.Loopback);client.StartJoin(IPAddress.Loopback,port);}
+        await Until(()=>host.Snapshot.Connected && client.Snapshot.Connected);
+        var data=new byte[9*1024*1024+7];new Random(41).NextBytes(data);
+        var outbound=new Queue<SavePage>();uint transaction=1;
+        void Enqueue(SaveCommand command,byte[] bytes)
+        {foreach(var page in SaveProtocol.Split(command,3,transaction++,bytes)) outbound.Enqueue(page);}
+        Enqueue(SaveCommand.WorldRestoreBegin,WorldBaseline.Begin(data));
+        for(var at=0;at<data.Length;at+=WorldBaseline.ChunkBytes)
+            Enqueue(SaveCommand.WorldRestore,data.AsSpan(at,Math.Min(WorldBaseline.ChunkBytes,data.Length-at)).ToArray());
+        Enqueue(SaveCommand.WorldRestoreEnd,Array.Empty<byte>());
+        using var baseline=new WorldBaseline();var pages=new SaveAssembler();byte[]? received=null;
+        var clock=System.Diagnostics.Stopwatch.StartNew();var blocked=false;
+        while(received==null)
+        {
+            Check(clock.Elapsed.TotalSeconds<20 && host.Snapshot.Connected && client.Snapshot.Connected);
+            while(outbound.Count>0)
+            {if(!host.PublishSave(outbound.Peek())) {blocked=true;break;}outbound.Dequeue();}
+            // A loading client does not immediately drain the main-thread queue.
+            if(clock.Elapsed.TotalMilliseconds>=600) foreach(var page in client.DrainSaves())
+            {var payload=pages.Accept(page);if(payload!=null) received=baseline.Accept(page.Command,payload);}
+            await Task.Delay(1);
+        }
+        Check(blocked && outbound.Count==0 && received.SequenceEqual(data));
+        host.DropPeer("baseline cancellation test");await Until(()=>!client.Snapshot.Connected && !host.Snapshot.Connected);
+        Check(client.DrainSaves().Length==0 && host.DrainSaves().Length==0);
+    }
+});
+
+await Test("bounded co-op save pages preserve identity/data and enforce ordering", () =>
+{
+    var data=Enumerable.Range(0,13000).Select(i=>(byte)i).ToArray();var pages=SaveProtocol.Split(SaveCommand.Restore,3,7,data);
+    var assembler=new SaveAssembler();byte[]? result=null;
+    foreach(var page in pages)
+    {var encoded=Protocol.Encode(new(MessageKind.Save,Save:page));var decoded=Protocol.Decode(encoded).Save!;result=assembler.Accept(decoded);}
+    Check(result!.SequenceEqual(data));
+    Throws(()=>new SaveAssembler().Accept(pages[1]));
+    assembler=new SaveAssembler();assembler.Accept(pages[0]);Throws(()=>assembler.Accept(pages[0]));
+    Throws(()=>SaveProtocol.Validate(pages[0] with {Count=int.MaxValue}));
+    Throws(()=>SaveProtocol.Validate(pages[0] with {Command=(SaveCommand)99}));
+    Throws(()=>SaveProtocol.Validate(pages[0] with {Bytes=new byte[4097]}));
+    return Task.CompletedTask;
+});
+await Test("save controls enforce sender authority over a real reliable session", async () =>
+{
+    var port=FreePort();using var host=new CoopSession("save");using var guest=new CoopSession("save");host.StartHost(port,IPAddress.Loopback);guest.StartJoin(IPAddress.Loopback,port);
+    await Until(()=>host.Snapshot.Connected && guest.Snapshot.Connected);
+    var identity=SaveProtocol.Split(SaveCommand.Identity,0,1,new byte[]{1,2,3})[0];guest.PublishSave(identity);identity.Bytes[0]=99;
+    host.PublishSave(SaveProtocol.Split(SaveCommand.Capture,1,1,Array.Empty<byte>())[0]);
+    Throws(()=>host.PublishSave(SaveProtocol.Split(SaveCommand.GuestState,1,2,new byte[]{1})[0]));
+    Throws(()=>guest.PublishSave(SaveProtocol.Split(SaveCommand.Resume,1,2,Array.Empty<byte>())[0]));
+    var toHost=new List<SavePage>();var toGuest=new List<SavePage>();
+    await Until(()=>{toHost.AddRange(host.DrainSaves());toGuest.AddRange(guest.DrainSaves());return toHost.Count==1 && toGuest.Count==1;});
+    Check(toHost[0].Bytes[0]==1 && toGuest[0].Command==SaveCommand.Capture);
+});
 await Test("world codec bounds, strict values and per-event preservation", () =>
 {
     var frame = new WorldFrame(WorldKind.Projectile,2,17,21,3,"key","asset",2,4,1,

@@ -36,6 +36,8 @@ internal static class SharedEncounterPatches
     {
         var world=SharedWorld.Current;
         if(world is {Client:false,Active:true} && world.OwnsMission(trigger)) return false;
+        if(world is {Client:true,Active:true} && !exiting && Player.Instance is {} localPlayer && collider.GetComponentInParent<Player>()?.Pointer==localPlayer.Pointer && trigger.GetComponent<Hyperstrange.PBD.Contraptions.PlayerTriggerCheckpointComponent>() is {} checkpoint)
+        {localPlayer.SaveLastCheckpointPosition();CoopSaveService.Current?.Checkpoint(checkpoint);}
         if(world is not {Client:true,Active:true} || !world.SharedComponent(trigger)) return true;
         if(collider.GetComponentInParent<Player>()?.Pointer==Player.Instance?.Pointer) world.TriggerEncounter(trigger,exiting);
         return false;

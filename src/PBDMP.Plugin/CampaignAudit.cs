@@ -46,6 +46,7 @@ public sealed partial class MultiplayerBehaviour
             .Select(s=>s!.NpcId).DistinctBy(a=>WorldCatalogue.NpcAssetKey(a)).OrderBy(a=>a.name)
             .Select(a=>$"{a.name}\t{a._npcPrefab.GetComponent<Npc>()?.GetIl2CppType().Name}\t{WorldCatalogue.NpcAssetKey(a)}"));
         File.WriteAllLines(Marker("bosses-"+_auditLevels[_auditIndex].name+".tsv"),Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c=>c.GetIl2CppType().Name.Contains("BossArena")).Select(c=>$"{c.GetIl2CppType().Name}\t{c.name}\tscene={c.gameObject.scene.name}\tvalid={c.gameObject.scene.IsValid()}\tactive={c.gameObject.activeInHierarchy}"));
+        File.WriteAllLines(Marker("sequences-"+_auditLevels[_auditIndex].name+".tsv"),_world.CatalogueForTest.SequenceAudit);
         Plugin.Logger.LogInfo("CAMPAIGN AUDIT: "+_auditLevels[_auditIndex].name);
         _auditIndex++;
         if(_auditIndex==_auditLevels.Length)

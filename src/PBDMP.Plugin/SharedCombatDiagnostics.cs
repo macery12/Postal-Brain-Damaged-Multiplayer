@@ -26,16 +26,26 @@ public sealed partial class MultiplayerBehaviour
     private float _sharedCombatHostHealth;
     private Hyperstrange.PBD.LightningGun.LightningGunBeam? _sharedCombatBeam;
     private float _sharedCombatBeamUntil;
+    private bool _sharedCombatSawBeamVisual;
+    private Hyperstrange.Base.LineController? _combatLineFixture;
+    private PeeStreamRenderer? _combatPeeFixture;
     private BagPickup? _sharedCombatLoot;
     private int _testReflections;
     private int _testLocalReflections;
     private void RunSharedCombatTest()
     {
         if (_sharedCombatStep==99) return;
+        if(TravelRole=="host" && _sharedCombatStep==11 && _world?.RemoteBeamPresentationsForTest>0) _sharedCombatSawBeamVisual=true;
         if (_travelStarted==0) _travelStarted=Time.unscaledTime;
-        File.WriteAllText(Marker(TravelRole+"-state.txt"),$"combat={_sharedCombatStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, status={_lifecycle?.Status}");
+        File.WriteAllText(Marker(TravelRole+"-state.txt"),$"combat={_sharedCombatStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, status={_lifecycle?.Status}, tutorial={_lifecycle?.LocalTutorialActive}, menu={InputManager.InputStateStack.Contains(InputManager.InputState.MENU)}, health={Player.Instance?.HitPoints.Current}");
         if (Time.unscaledTime-_travelStarted>180) throw new TimeoutException("Shared combat diagnostic timed out.");
         if (_lifecycle is {NativeReady:false}) _lifecycle.AutoContinue();
+        if (_lifecycle is {NativeReady:true,LocalTutorialActive:true})
+        {
+            TravelCheck(true,"native tutorial waiting for Use input is dismissed by the combat fixture at stage "+_sharedCombatStep);
+            Player.Instance!.GetComponent<PlayerTutorialComponent>().OnUseDown();
+            return;
+        }
         if (_sharedCombatStep==0)
         {
             _port!.text=Environment.GetEnvironmentVariable("PBDMP_TRAVEL_PORT")!;
@@ -44,6 +54,18 @@ public sealed partial class MultiplayerBehaviour
         }
         if (_sharedCombatStep<4 && _lifecycle?.NativeReady!=true) return;
         if (TravelRole=="host") SharedCombatHost(); else SharedCombatClient();
+    }
+    private void BeginCombatStreamFixtures()
+    {
+        var origin=Player.Instance.CenterOfMass+Player.Instance.Forward;
+        var line=Resources.FindObjectsOfTypeAll<Hyperstrange.Base.LineController>().First(c=>!c.gameObject.scene.IsValid());
+        _combatLineFixture=Object.Instantiate(line,origin,Quaternion.identity);_combatLineFixture.gameObject.SetActive(true);_combatLineFixture.enabled=false;
+        _combatLineFixture.OriginalPoolable=line.Cast<Hyperstrange.Base.IPoolable>();
+        var renderer=_combatLineFixture.Renderer;renderer.useWorldSpace=true;renderer.positionCount=2;renderer.SetPosition(0,origin);renderer.SetPosition(1,origin+Vector3.right*2);
+        var pee=Resources.FindObjectsOfTypeAll<PeeStreamRenderer>().First(c=>!c.gameObject.scene.IsValid());
+        _combatPeeFixture=Object.Instantiate(pee,origin,Quaternion.identity);_combatPeeFixture.gameObject.SetActive(true);_combatPeeFixture.enabled=false;
+        _combatPeeFixture.OriginalPoolable=pee.Cast<Hyperstrange.Base.IPoolable>();_combatPeeFixture._disconnectedFromDong=true;_combatPeeFixture._currentAlpha=1;
+        renderer=_combatPeeFixture._lineRenderer;renderer.useWorldSpace=true;renderer.positionCount=2;renderer.SetPosition(0,origin);renderer.SetPosition(1,origin+Vector3.up*2);
     }
     private void SharedCombatHost()
     {
@@ -116,9 +138,11 @@ public sealed partial class MultiplayerBehaviour
             case 11 when Marked("client-beam-ended") && _sharedCombatNpc!.HitPoints.Current<_sharedCombatProjectileHealth:
                 var lightningId=Resources.FindObjectsOfTypeAll<WeaponId>().First(w=>w.name=="WEAPON_LightningGun").ID;
                 TravelCheck(_world!.AttackOriginCount(lightningId)>0,"shared beam damage is attributed to lightning rather than lingering explosives");
+                TravelCheck(_sharedCombatSawBeamVisual,"P1 sees P2's native continuous beam through the renderer registry");
                 TravelCheck(true,"P2 native continuous beam resolves shared enemy damage on P1");TravelMark("host-beam-result");_sharedCombatStep=12;break;
-            case 12 when Marked("client-beam-shared"):
-                TravelMark("host-defense-ready");_sharedCombatStep=13;break;
+            case 12 when Marked("client-beam-shared") && _world!.StreamKindForTest(101) && _world.StreamKindForTest(102):
+                TravelCheck(true,"P1 receives native line and urine visuals from active objects with disabled renderer controllers");
+                TravelMark("host-streams-replicated");TravelMark("host-defense-ready");_sharedCombatStep=13;break;
             case 13 when Marked("client-block-ready"):
                 SendDefenseTestHit(false);TravelMark("host-block-hit");_sharedCombatStep=14;break;
             case 14 when Marked("client-blocked"):
@@ -235,6 +259,7 @@ public sealed partial class MultiplayerBehaviour
                 Plugin.Logger.LogInfo($"BEAM TEST origin={camera.position}; aim={aimPoint}; enemy={_sharedCombatNpc.FeetPosition}; colliders={string.Join(";",_sharedCombatNpc.GetComponentsInChildren<Collider>(true).Select(c=>c.name+":"+c.enabled+":"+c.gameObject.activeInHierarchy+":"+c.bounds.center))}");
                 _sharedCombatBeam.OnCollisionHit=(Il2CppSystem.Action<RaycastHit,float>)(System.Action<RaycastHit,float>)((hit,delta)=>Plugin.Logger.LogInfo($"BEAM TEST hit {hit.collider?.name} at {hit.point}; dt={delta}"));
                 _sharedCombatBeam.SetActive(true);_sharedCombatBeam.SetMaterial(template._beamRendererPrefab._material,Color.white);
+                TravelCheck(_world!.StreamTrackedForTest(_sharedCombatBeam._mainBeamRenderer),"new native pooled beam registers for visual replication without a scene search");
                 _sharedCombatBeamUntil=Time.unscaledTime+0.6f;_sharedCombatStep=15;break;
             case 15:
                 if(Time.unscaledTime<_sharedCombatBeamUntil) _sharedCombatBeam!.HandleUpdate(Time.unscaledDeltaTime);
@@ -242,7 +267,12 @@ public sealed partial class MultiplayerBehaviour
                 break;
             case 16 when Marked("host-beam-result") && _sharedCombatNpc!.HitPoints.Current<57:
                 TravelCheck(true,"P2 receives native beam damage through shared health without replica damage");
-                TravelMark("client-beam-shared");_sharedCombatStep=17;break;
+                BeginCombatStreamFixtures();TravelMark("client-beam-shared");_sharedCombatAt=Time.unscaledTime+8;_sharedCombatStep=160;break;
+            case 160:
+                if(!Marked("host-streams-replicated") && Time.unscaledTime<_sharedCombatAt) return;
+                TravelCheck(Marked("host-streams-replicated"),"line and urine renderer creation reaches the peer without a scene scan");
+                Object.Destroy(_combatLineFixture!.gameObject);Object.Destroy(_combatPeeFixture!.gameObject);_combatLineFixture=null;_combatPeeFixture=null;
+                _sharedCombatStep=17;break;
             case 17 when Marked("host-defense-ready"):
                 var unarmed=Resources.FindObjectsOfTypeAll<WeaponId>().First(w=>w.name=="WEAPON_NoWeapon");
                 var defenseInventory=Player.Instance.GetComponent<PlayerInventoryComponent>();defenseInventory.AddItem(unarmed,1);

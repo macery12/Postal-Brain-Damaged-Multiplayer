@@ -17,6 +17,8 @@ internal static class SharedUrinePatches
             harmony.Patch(AccessTools.Method(pair.Item1,pair.Item2),prefix:new(typeof(SharedUrinePatches),nameof(Activate)));
         foreach(var type in new[]{typeof(MetalButton),typeof(Toilet),typeof(PissListener)})
             harmony.Patch(AccessTools.Method(type,"Piss"),prefix:new(typeof(SharedUrinePatches),nameof(Piss)));
+        foreach(var type in new[]{typeof(PissFillListenerMovingObject),typeof(PissFillListenerScalingObject)})
+            harmony.Patch(AccessTools.Method(type,"OnFillChanged"),prefix:new(typeof(SharedUrinePatches),nameof(FillSurface)));
         foreach(var type in new[]{typeof(PissFiller),typeof(PissTank)})
             harmony.Patch(AccessTools.Method(type,"OnPiss"),prefix:new(typeof(SharedUrinePatches),nameof(Fill)));
         foreach(var type in new[]{typeof(ExplosiveBarrel),typeof(BurnableObject)})
@@ -34,11 +36,12 @@ internal static class SharedUrinePatches
         harmony.Patch(AccessTools.Method(typeof(RailWagon),"AttachPlayer",new[]{typeof(Player)}),postfix:new(typeof(SharedUrinePatches),nameof(Boarded)));
         // KickPlayerOff and OnPlayerJumpedOff share the same substantive body.
         harmony.Patch(AccessTools.Method(typeof(RailWagon),"OnPlayerJumpedOff"),postfix:new(typeof(SharedUrinePatches),nameof(LeftWagon)));
-        harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(Vector3)}),postfix:new(typeof(SharedUrinePatches),nameof(Sound)));
-        harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(GameObject)}),postfix:new(typeof(SharedUrinePatches),nameof(ObjectSound)));
+        harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(Vector3)}),prefix:new(typeof(SharedUrinePatches),nameof(PermitSound)),postfix:new(typeof(SharedUrinePatches),nameof(Sound)));
+        harmony.Patch(AccessTools.Method(typeof(FMODEvent),"PlayOneShot",new[]{typeof(GameObject)}),prefix:new(typeof(SharedUrinePatches),nameof(PermitSound)),postfix:new(typeof(SharedUrinePatches),nameof(ObjectSound)));
     }
-    private static bool WorldFlame(Component __instance,IAiActor __0,float __1,float __2)=>SharedWorld.Current?.ClientWorldFlame(__instance,__0,__1,__2)!=true;
-    private static bool BarrelHit(ExplosiveBarrel __instance,HitData __0)=>SharedWorld.Current?.ClientBarrelHit(__instance,__0)!=true;
+    private static bool WorldFlame(Component __instance,IAiActor __0,float __1,float __2)
+    {var world=SharedWorld.Current;if(__instance.TryCast<ExplosiveBarrel>() is {} barrel) return world?.QueueBarrelFlame(barrel,__0,__1,__2)!=true;return world?.ClientWorldFlame(__instance,__0,__1,__2)!=true;}
+    private static bool BarrelHit(ExplosiveBarrel __instance,HitData __0)=>SharedWorld.Current?.QueueBarrelHit(__instance,__0)!=true;
     private static void FirePeeCollision(PeeCollisionParticle __instance,RaycastHit __0)
     {
         if(__instance._owner?.Pointer!=Player.Instance?.Pointer || __instance._playerWeaponModelDong?.PeeType!=PeeType.Fire) return;
@@ -59,6 +62,7 @@ internal static class SharedUrinePatches
         }
         return SharedWorld.Current?.ClientUrine(__instance,70,__0.stagger)!=true;
     }
+    private static bool FillSurface(Component __instance)=>SharedWorld.Current?.PermitFillDrivenSurface(__instance)!=false;
     private static bool Fill(Component __instance,PissData __0)=>SharedWorld.Current?.ClientUrine(__instance,71,__0.stagger)!=true;
     private static bool FireBall(ProjectileFireBall __instance,PissData __0)=>SharedWorld.Current?.ClientProjectileUrine(__instance,__0)!=true;
     private static void Extinguished(ProjectileFireBall __instance)=>SharedWorld.Current?.FireBallExtinguished(__instance);
@@ -68,11 +72,18 @@ internal static class SharedUrinePatches
         return SharedWorld.Current is not {Client:true,Active:true} world || !world.OwnsUrineConsequence(__instance);
     }
     private static bool Flush()=>SharedWorld.Current is not {Client:true,Active:true};
-    private static bool Consequence(Component __instance)=>SharedWorld.Current is not {Client:true,Active:true} world || !world.OwnsUrineConsequence(__instance);
+    private static bool Consequence(Component __instance,System.Reflection.MethodBase __originalMethod)
+    {
+        var world=SharedWorld.Current;
+        if(__instance.TryCast<RocketSequence>() is {} rocket && __originalMethod.Name=="ShootRocket") return world?.StartRocketLaunch(rocket)!=true;
+        if(world is not {Active:true} || !world.OwnsUrineConsequence(__instance)) return true;
+        return !world.Client && (!world.RestoringNative || __instance.TryCast<RocketSequence>()==null);
+    }
     private static bool WagonUpdate(RailWagon __instance)=>SharedWorld.Current?.UpdateReplicaWagon(__instance)!=true;
     private static void Boarded(RailWagon __instance,Player __0) {if(__0?.Pointer==Player.Instance?.Pointer) SharedWorld.Current?.UrineWagonBoarded(__instance,true);}
     private static void LeftWagon(RailWagon __instance)=>SharedWorld.Current?.UrineWagonBoarded(__instance,false);
     private static void FlushFx(Toilet __instance)=>SharedWorld.Current?.ToiletFlushPresentation(__instance);
+    private static bool PermitSound(FMODEvent __instance)=>SharedWorld.Current?.PermitWorldOneShot(__instance)!=false;
     private static void Sound(FMODEvent __instance,Vector3 __0)=>SharedWorld.Current?.UrineSound(__instance,__0);
     private static void ObjectSound(FMODEvent __instance,GameObject __0) {if(__0!=null) SharedWorld.Current?.UrineSound(__instance,__0.transform.position);}
 }

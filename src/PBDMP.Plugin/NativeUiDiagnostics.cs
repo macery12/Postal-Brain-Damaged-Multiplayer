@@ -27,7 +27,7 @@ internal static class NativeUiDiagnostics
         if (entry.transform.GetSiblingIndex() != parent.Find("BUTTON_Horde").GetSiblingIndex() + 1 ||
             entry.onClick.GetPersistentEventCount() != 0 || view.PauseEntry.onClick.GetPersistentEventCount() != 0)
             throw new InvalidOperationException("Native entries must be correctly placed and contain no original game actions.");
-        var buttons = new[] { view.SteamHostButton, view.InviteButton, view.PrivacyButton, view.DirectButton, view.DisconnectButton, view.BackButton,
+        var buttons = new[] { view.SteamHostButton, view.InviteButton, view.PrivacyButton, view.DirectButton, view.DisconnectButton, view.SavesButton, view.BackButton,
             view.HostButton, view.JoinButton, view.DirectBackButton, view.Prompt.ConfirmButton, view.Prompt.CancelButton };
         if (buttons.Any(b => b.onClick.GetPersistentEventCount() != 0) ||
             view.Address.onValueChanged.GetPersistentEventCount() != 0 || view.Address.onSubmit.GetPersistentEventCount() != 0)
@@ -35,6 +35,7 @@ internal static class NativeUiDiagnostics
         if (entry.LabelText.font.name != "FONT_Clickable" || view.Address.textComponent.font.name != "FONT_InputText" ||
             view.Panel.transform.Find("Multiplayer panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
             view.DirectDialog.transform.Find("Direct IP panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
+            view.Saves.Root.transform.Find("Co-op Saves panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
             view.Prompt.Root.transform.Find("Prompt panel").GetComponent<Image>().sprite.name != "UI_Panel" ||
             view.FirstCard.Backing.sprite.name != "UI_Text" || view.Hud.Text.font.name != "FONT_Text")
             throw new InvalidOperationException("UI must reuse the original native fonts, panel and card art.");

@@ -17,15 +17,28 @@ internal static class SessionPatches
         foreach (var patch in typeof(SessionPatches).GetNestedTypes(BindingFlags.NonPublic))
             harmony.CreateClassProcessor(patch).Patch();
     }
+    [HarmonyPatch(typeof(UnityEngine.Cursor), "set_lockState")]
+    private static class UnattendedCursorLock
+    {
+        static void Prefix(ref UnityEngine.CursorLockMode __0)
+        {if(DiagnosticCursor.KeepFree) __0=UnityEngine.CursorLockMode.None;}
+    }
+    [HarmonyPatch(typeof(UnityEngine.Cursor), "set_visible")]
+    private static class UnattendedCursorVisibility
+    {
+        static void Prefix(ref bool __0)
+        {if(DiagnosticCursor.KeepFree) __0=true;}
+    }
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.LoadLevel))]
     private static class LoadLevel
     {
-        static bool Prefix(LevelId levelId)
+        static bool Prefix(LevelId levelId,bool loaded)
         {
             var life = SessionLifecycle.Current;
             if (life == null) return true;
             if (!life.PermitTravel()) return false;
             if (!SessionLifecycle.Supported(levelId)) { life.Explain("Multiplayer supports built-in base campaign maps only."); return false; }
+            if(!loaded && levelId.VideoData!=null && !SettingsManager.GeneralSettings.SkipCutscenes && !DebugManager.NoVideo) life.ExpectStory(levelId.VideoData);
             life.BeginHost(PBDMP.Network.TravelAction.Load, levelId); return true;
         }
     }
@@ -140,14 +153,26 @@ internal static class SessionPatches
                 OwnedInputMode.Removed(stack.Pointer,stack.Count);
         }
     }
+    [HarmonyPatch(typeof(Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent), "OnTutorialShow")]
+    private static class TutorialShow
+    {static void Prefix()=>SessionLifecycle.Current?.BeginTutorial();}
+    [HarmonyPatch(typeof(Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent), "OnUseDown")]
+    private static class TutorialDismiss
+    {
+        static void Prefix(Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent __instance,out bool __state)
+        {__state=__instance._isTutorialShown;}
+        static void Postfix(bool __state)
+        {if(__state) SessionLifecycle.Current?.EndTutorial();}
+    }
+
     [HarmonyPatch(typeof(TimeManager), nameof(TimeManager.SetApplicationTimeScale))]
     private static class TimeScale
     { static void Prefix(ref float applicationTimeScale) => SessionLifecycle.Current?.NativeTime(ref applicationTimeScale); }
 
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.PauseGame))]
-    private static class Pause { static bool Prefix() => SessionLifecycle.Current?.ClientPause() != true; }
+    private static class Pause { static bool Prefix() {var life=SessionLifecycle.Current;if(life?.ClientPause()==true) return false;life?.HostPauseRequest(true);return true;} }
     [HarmonyPatch(typeof(GameManager), nameof(GameManager.DisableMenu))]
-    private static class Unpause { static bool Prefix() => SessionLifecycle.Current?.ClientUnpause() != true; }
+    private static class Unpause { static bool Prefix() {var life=SessionLifecycle.Current;if(life?.ClientUnpause()==true) return false;life?.HostPauseRequest(false);return true;} }
 
     [HarmonyPatch]
     private static class SaveBlock

@@ -25,8 +25,9 @@ internal static class SharedMissionPatches
             var method=type.GetMethods(BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.DeclaredOnly).Single(m=>m.Name==name && m.GetParameters().Length==count);
             harmony.Patch(method,prefix:new(typeof(SharedMissionPatches),nameof(HostOnly)));
         }
+        harmony.Patch(AccessTools.Method(typeof(Trigger),nameof(Trigger.Disable)),postfix:new(typeof(SharedMissionPatches),nameof(DisabledTrigger)));
         harmony.Patch(AccessTools.Method(typeof(BreakableObject),"Hit"),prefix:new(typeof(SharedMissionPatches),nameof(BreakHit)));
-        harmony.Patch(AccessTools.Method(typeof(CollisionBreakableObject),"OnTriggerEnter"),prefix:new(typeof(SharedMissionPatches),nameof(HostOnly)));
+        harmony.Patch(AccessTools.Method(typeof(CollisionBreakableObject),"OnTriggerEnter"),prefix:new(typeof(SharedMissionPatches),nameof(Collision)));
         harmony.Patch(AccessTools.Method(typeof(WireWallGate),"Interact"),prefix:new(typeof(SharedMissionPatches),nameof(Gate)));
         harmony.Patch(AccessTools.Method(typeof(PlayerTriggerListener),"OnPlayerEnter"),prefix:new(typeof(SharedMissionPatches),nameof(Listener)));
         harmony.Patch(AccessTools.Method(typeof(PlayerTriggerListener),"OnPlayerExit"),prefix:new(typeof(SharedMissionPatches),nameof(Listener)));
@@ -34,23 +35,28 @@ internal static class SharedMissionPatches
         foreach(var method in typeof(FallingPlatform).GetMethods(BindingFlags.Public|BindingFlags.NonPublic|BindingFlags.Instance|BindingFlags.DeclaredOnly).Where(m=>m.Name is "Fall" or "FallWithDelay"))
             harmony.Patch(method,prefix:new(typeof(SharedMissionPatches),nameof(Falling)));
     }
-    private static bool HostOnly(Component __instance)=>SharedWorld.Current is not {Client:true,Active:true} world || !world.OwnsMission(__instance);
+    private static bool HostOnly(Component __instance,System.Reflection.MethodBase __originalMethod)
+    {
+        if(SharedWorld.Current is not {Active:true} world || !world.OwnsMission(__instance)) return true;
+        if(__instance.TryCast<Scaler>() is {} scaler && __originalMethod.Name=="Scale") return !world.StartScale(scaler);
+        if(world.Client) return false;
+        return !world.RestoringNative || __instance.GetIl2CppType().Name is "Mover" or "Rotater" or "MultiRotater" or "Elevator";
+    }
+    private static void DisabledTrigger(Trigger __instance)=>SharedWorld.Current?.RetireTriggerHint(__instance);
+    private static bool Collision(CollisionBreakableObject __instance,Collider __0)=>SharedWorld.Current?.RequestCollisionBreak(__instance,__0)!=true;
     private static bool Volume(GameplayVolume __instance)
     {
         if(SharedWorld.Current is not {Active:true} world || !world.OwnsMission(__instance)) return true;
         return __instance.kind!=VolumeKind.Win && !world.Client && __instance.isActiveAndEnabled;
     }
-    private static bool Falling(FallingPlatform __instance)
-    {
-        if(SharedWorld.Current is not {Client:true,Active:true} world || !world.OwnsMission(__instance)) return true;
-        world.ClientMissionFall(__instance);return false;
-    }
+    private static bool Falling(FallingPlatform __instance,System.Reflection.MethodBase __originalMethod)=>SharedWorld.Current?.MechanismFall(__instance,__originalMethod.Name)!=true;
     private static bool Listener(PlayerTriggerListener __instance,System.Reflection.MethodBase __originalMethod)
     {
         if(SharedWorld.Current is not {Client:true,Active:true} world || !world.OwnsMission(__instance.GetComponent<PlayerTrigger>())) return true;
         var events=__originalMethod.Name=="OnPlayerExit"?__instance._onTriggerExitEvents:__instance._onTriggerEvents;
         if(events!=null) for(var i=0;i<events.GetPersistentEventCount();i++)
             if(events.GetPersistentTarget(i)?.TryCast<TutorialId>() is {} tutorial && events.GetPersistentMethodName(i)=="Show") tutorial.Show(Player.Instance);
+                else if(events.GetPersistentTarget(i)?.TryCast<Hyperstrange.Base.LocalizedString>() is {} text && events.GetPersistentMethodName(i)=="ShowNotification") text.ShowNotification(Player.Instance);
         return false;
     }
     private static bool BreakHit(BreakableObject __instance,HitData __0)

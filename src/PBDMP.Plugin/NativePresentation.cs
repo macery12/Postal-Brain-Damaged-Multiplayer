@@ -7,7 +7,7 @@ internal sealed class NativePresentation : IDisposable
 {
     internal GameObject Root {get;}
     private readonly ParticleSystem[] _particles;
-    internal NativePresentation(GameObject source,bool beamRenderer=false)
+    internal NativePresentation(GameObject source,bool beamRenderer=false,bool geometryOnly=false)
     {
         // Do not execute Awake/OnEnable from any original gameplay hierarchy.
         var staging=new GameObject("PBDMP visual staging"); staging.SetActive(false);
@@ -15,6 +15,13 @@ internal sealed class NativePresentation : IDisposable
         try
         {
             copy=Object.Instantiate(source,staging.transform,false); copy.SetActive(false);
+            if(geometryOnly)
+            {
+                // Cosmetic fragments can acquire runtime impact particles. Copy
+                // only their render geometry; original VFX use the audited path.
+                foreach(var renderer in copy.GetComponentsInChildren<ParticleSystemRenderer>(true)) Object.DestroyImmediate(renderer);
+                foreach(var particle in copy.GetComponentsInChildren<ParticleSystem>(true)) Object.DestroyImmediate(particle);
+            }
             foreach(var component in copy.GetComponentsInChildren<Component>(true))
             {
                 // This specific native renderer only draws its original mesh/material.

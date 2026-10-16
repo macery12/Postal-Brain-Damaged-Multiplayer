@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>PBDMP</AssemblyName>
-    <Version>0.8.0</Version>
+    <Version>0.10.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PBDMP.Network\PBDMP.Network.csproj" />

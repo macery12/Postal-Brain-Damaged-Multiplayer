@@ -8,7 +8,7 @@ using Object = UnityEngine.Object;
 
 namespace PBDMP.Plugin;
 
-internal sealed class SessionLifecycle : IDisposable
+internal sealed partial class SessionLifecycle : IDisposable
 {
     internal static SessionLifecycle? Current;
     private readonly CoopSession _session;
@@ -28,7 +28,7 @@ internal sealed class SessionLifecycle : IDisposable
     private readonly Dictionary<UnityEngine.UI.Button, bool> _buttons = new();
     private bool _connected, _everConnected, _nativeReady, _gateArmed, _joiningApplied, _disposed;
     private bool _cleanupPending;
-    private bool _hostPaused, _timeBypass;
+    private bool _hostPaused, _timeBypass, _hostMenuPaused;
     private bool _loadingContinued;
     private float _deadline;
     private float _guardScanAt;
@@ -46,9 +46,13 @@ internal sealed class SessionLifecycle : IDisposable
     internal string LevelKey { get; private set; } = "";
     internal TravelState State => IsClient ? _clientState ?? _host.State : _host.State;
     internal PlayerSessionState PlayerState => _player;
-    internal bool Frozen => _nativeReady && (IsClient ? _clientState is { } state && (!state.Released || state.Paused) :
-        _hostPaused || (_session.Snapshot.Connected && !_host.State.Released));
-    internal string Status { get; private set; } = "Campaign travel active; shared combat/doors; saves disabled.";
+    private bool _persistenceHold;
+    internal bool PersistenceHold {get=>_persistenceHold;set {if(_persistenceHold==value) return;_persistenceHold=value;if(!_disposed) ApplyTime();}}
+    internal bool RestoringWorld {get;set;}
+    internal bool PersonalReady {get;set;}
+    internal bool Frozen => _nativeReady && (PersistenceHold || (IsClient ? _clientState is { } state && (!state.Released || state.Paused || state.StoryVideo.Length>0) :
+        _hostPaused || (!_storyAdmissionPending && _session.Snapshot.Connected && !_host.State.Released)));
+    internal string Status { get; private set; } = "Campaign travel active; shared combat/doors; co-op saves available.";
 
     internal SessionLifecycle(CoopSession session, Action<string> notice, Action closePanel, Action disconnect)
     {
@@ -73,6 +77,7 @@ internal sealed class SessionLifecycle : IDisposable
         LevelController.OnStartLevelReady = Il2CppSystem.Delegate.Combine(LevelController.OnStartLevelReady, _readyHandler).Cast<Il2CppSystem.Action>();
         Current = this;
         ProfileManager.SetCurrentSaveData(null);
+        if (!IsClient && LocalTutorialActive) BeginTutorial();
     }
 
     internal static bool Supported(LevelId? level) => level != null && !level.IsMod && !level.name.StartsWith("LEVEL_CustomMaps_",StringComparison.Ordinal) && level.Type == LevelId.TypeEnum.CAMPAIGN &&
@@ -94,18 +99,20 @@ internal sealed class SessionLifecycle : IDisposable
 
     internal bool PermitTravel()
     {
-        if (!IsClient || Bypass) return true;
+        if(Bypass) return true;
+        if(CoopSaveService.Current?.TransactionActive==true) {_notice("Wait for co-op save capture/restoration to finish.");return false;}
+        if (!IsClient) return true;
         _notice("P1 controls level starts, restarts and travel."); return false;
     }
     internal void Explain(string message) => _notice(message);
 
-    internal void BeginHost(TravelAction action, LevelId? level)
+    internal void BeginHost(TravelAction action, LevelId? level, bool restoring=false)
     {
         if (Bypass || IsClient) return;
         _closePanel(); _menuInput.Release(); _barrierInput.Release(); _player.Cancel();
-        _nativeReady = action == TravelAction.Menu; _gateArmed = false; _loadingContinued = false; _hostPaused = false;
-        _host.Begin(action, level?.ID ?? "", Difficulty()); _deadline = Time.unscaledTime + 120;
-        _session.PublishTravel(_host.State);
+        _nativeReady = action == TravelAction.Menu; _gateArmed = false; _loadingContinued = false; _hostPaused = false; _hostMenuPaused=false; _tutorialPause = false; _pauseBeforeTutorial = false;
+        _endedCredits=false;_host.Begin(action, level?.ID ?? "", Difficulty(),restoring); _deadline = Time.unscaledTime + 120;
+        _session.PublishTravel(AdvertisedState);
         Status = action == TravelAction.Menu ? "Returning to main menu." : "P1 loading campaign; waiting for both players.";
     }
 
@@ -116,7 +123,7 @@ internal sealed class SessionLifecycle : IDisposable
         if (activeLevel == null || activeLevel.ID != State.Level) return;
         _nativeReady = true; MapGeneration++; _gateArmed = false; _player.CaptureStart();
         LevelKey = $"{activeLevel.Type}:{activeLevel.Id}:{activeLevel.name}";
-        if (!IsClient)
+        if (!IsClient && !RestoringWorld)
         {
             _host.SetReady(_host.State.Joining ? _player.CaptureJoin() : null);
             if (!_session.Snapshot.Connected) _host.PeerLeft();
@@ -124,6 +131,11 @@ internal sealed class SessionLifecycle : IDisposable
         Plugin.Logger.LogInfo($"Campaign initialized: {LevelManager.CurrentLevel.name}, epoch {Epoch}, role {Role}.");
         ApplyTime();
     }
+
+    internal void CompletePersonalRestore() {_joiningApplied=true;PersonalReady=true;}
+
+    internal void CompletePersistentRestore()
+    {_host.SetReady(_player.CaptureJoin());if(!_session.Snapshot.Connected) _host.PeerLeft();}
 
     internal void ArmGate() { if (!_nativeReady) _gateArmed = true; }
     internal void Death() { if (_nativeReady) _player.Died(); }
@@ -158,22 +170,23 @@ internal sealed class SessionLifecycle : IDisposable
             _everConnected = true; _deadline = Time.unscaledTime + 120;
             if (!IsClient)
             {
-                var level = _host.State.Action == TravelAction.Menu ? null : FindLevel(_host.State.Level);
-                _host.Begin(level == null ? TravelAction.Menu : TravelAction.Load, level?.ID ?? "", Difficulty(), level != null);
-                if (level == null) _host.SetReady();
-                else if (_nativeReady && Player.Instance.IsAlive) _host.SetReady(_player.CaptureJoin());
+                if(StoryActive) _storyAdmissionPending=true;else AdmitPeer();
             }
         }
         if (_connected && !snapshot.Connected)
         {
             if (IsClient) { StopClient(snapshot.Status + ". Returned to main menu."); return; }
-            _host.PeerLeft(); _notice("P2 left; P1 can continue.");
+            _storyAdmissionPending=false;_host.PeerLeft(); _notice("P2 left; P1 can continue.");
         }
         _connected = snapshot.Connected;
+        if(!IsClient && _storyAdmissionPending && !StoryActive)
+        {_storyAdmissionPending=false;if(snapshot.Connected) AdmitPeer();}
+        if(!IsClient && StoryActive) _deadline=Time.unscaledTime+120;
         if (IsClient)
         {
             if (snapshot.Travel is { } state)
             {
+                if(FollowStory(state)) {ApplyTime();return;}
                 if (state.Epoch != _clientEpoch)
                 {
                     if (state.Epoch < _clientEpoch) throw new InvalidDataException("Host travel generation went backwards.");
@@ -181,15 +194,15 @@ internal sealed class SessionLifecycle : IDisposable
                 }
                 else _clientState = state;
                 AutoContinue();
-                if (_nativeReady && state.Joining && !_joiningApplied && state.Loadout != null)
+                if (_nativeReady && PersonalReady && state.Joining && !_joiningApplied && state.Loadout != null)
                 {
                     var nearby = _player.ApplyJoin(state.Loadout); _joiningApplied = true;
                     if (!nearby) _notice("No clear space beside P1; used normal map spawn.");
                 }
-                var ready = _nativeReady && WorldReady && (!state.Joining || _joiningApplied);
+                var ready = _nativeReady && WorldReady && PersonalReady && (!state.Joining || _joiningApplied);
                 _session.PublishReady(new(_clientEpoch, ready));
                 Status = state.Action == TravelAction.Menu ? "Connected. Waiting for P1 to start campaign." : !ready || !state.Released ? "Loading/waiting for both players." : state.Paused ? "P1 paused the session." :
-                    "Campaign connected. Enemies, combat and doors shared; saves disabled.";
+                    "Campaign connected. Enemies, combat and doors shared; co-op saves available.";
                 if (!state.Released && Time.unscaledTime > _deadline)
                 { StopClient("Campaign loading timed out. Returned to menu; P1 can continue."); return; }
             }
@@ -201,29 +214,32 @@ internal sealed class SessionLifecycle : IDisposable
             // A late join while P1 is dead waits for P1's player-only respawn before capturing a spawn/loadout.
             if (_nativeReady && _host.State.Joining && _host.State.Loadout == null && Player.Instance != null && Player.Instance.IsAlive)
                 _host.SetReady(_player.CaptureJoin());
-            _host.SetPaused(_hostPaused); _host.Acknowledge(snapshot.Ready);
-            _session.PublishTravel(_host.State);
+            _host.SetPaused(_hostPaused || PersistenceHold); if(!PersistenceHold) _host.Acknowledge(snapshot.Ready);
+            _session.PublishTravel(AdvertisedState);
             Status = _host.State.Action == TravelAction.Menu ? "Hosting. P1 can start a campaign level." : snapshot.Connected && !_host.State.Released ? "Waiting for P2 to load." : _hostPaused ? "P1 paused the session." :
-                "Campaign host. Enemies, combat and doors shared; saves disabled.";
+                "Campaign host. Enemies, combat and doors shared; co-op saves available.";
             if (snapshot.Connected && !_host.State.Released && Time.unscaledTime > _deadline)
             { _session.DropPeer("Campaign loading timed out."); _host.PeerLeft(); _notice("P2 load timed out; P1 can continue."); }
         }
+        UpdateHostPauseMenu();
         _player.Tick(Time.unscaledDeltaTime, IsClient ? _clientState?.Paused == true : _hostPaused);
         ApplyTime();
     }
 
     private void BeginClient(TravelState state)
     {
+        ReleaseHostPauseMenu();
         _closePanel(); _menuInput.Release(); _barrierInput.Release(); _player.Cancel();
-        _nativeReady = false; _gateArmed = false; _loadingContinued = false; _joiningApplied = false;
+        _nativeReady = false; _gateArmed = false; _loadingContinued = false; _joiningApplied = false; PersonalReady=false;
         _deadline = Time.unscaledTime + 120;
         _session.PublishReady(new(state.Epoch, false));
         Authorized(() =>
         {
             ProfileManager.SetCurrentSaveData(null);
+        if (!IsClient && LocalTutorialActive) BeginTutorial();
             if (state.Difficulty >= DifficultyManager.Difficulties.Count) throw new InvalidDataException("Unavailable host difficulty.");
             SettingsManager.GameplaySettings.SetDifficulty(DifficultyManager.Difficulties[state.Difficulty]);
-            if (state.Action == TravelAction.Menu) { GameManager.OpenTitle(); _nativeReady = true; _joiningApplied = true; return; }
+            if (state.Action == TravelAction.Menu) { if(state.StoryEnding) GameManager.OpenCredits();else GameManager.OpenTitle(); _nativeReady = true; _joiningApplied = true; PersonalReady=true; return; }
             var level = FindLevel(state.Level);
             if (!Supported(level)) throw new InvalidDataException("Host requested an unsupported campaign map.");
             if (state.Action == TravelAction.Restart && LevelManager.CurrentLevel?.ID == state.Level && Player.Instance != null)
@@ -248,7 +264,9 @@ internal sealed class SessionLifecycle : IDisposable
     internal void NativeTime(ref float scale)
     {
         if (_timeBypass || _disposed) return;
-        if (!IsClient && _nativeReady) _hostPaused = scale == 0;
+        // Native menus/serializers can restore a cached zero during a join or save hold.
+        // That temporary barrier must not become a new user-owned shared pause.
+        if (!IsClient && !_tutorialPause && _nativeReady && !PersistenceHold && _host.State.Released) _hostPaused = scale == 0;
         if (Frozen) scale = 0;
     }
 
@@ -258,24 +276,35 @@ internal sealed class SessionLifecycle : IDisposable
         // P1's native pause menu already owns MENU. Adding NONE above it makes
         // native resume pop our lock instead of its menu, leaving controls blocked.
         var nativeHostMenu=!IsClient && _hostPaused && InputManager.InputStateStack.Contains(InputManager.InputState.MENU);
-        _barrierInput.Set(Frozen && !nativeHostMenu);
+        _barrierInput.Set(Frozen && !nativeHostMenu && !(IsClient && _menuInput.Active) && !LocalTutorialActive);
         _timeBypass = true;
-        try { TimeManager.SetApplicationTimeScale(Frozen ? 0 : 1); }
+        try { TimeManager.SetApplicationTimeScale(Frozen || LocalTutorialActive ? 0 : 1); }
         finally { _timeBypass = false; }
     }
 
+    internal void HostPauseRequest(bool paused)
+    {
+        if(!IsClient)
+        {
+            _hostMenuPaused=paused;
+            if (_tutorialPause) _pauseBeforeTutorial=paused;
+            _hostPaused=paused || _tutorialPause;_host.SetPaused(_hostPaused || PersistenceHold);
+        }
+    }
     internal bool ClientPause()
     {
         if (!IsClient) return false;
+        if(_hostPauseMenuOwned) return true;
         _menuInput.Set(true); MenuManager.OpenPauseMenu(); return true;
     }
     internal bool ClientUnpause()
     {
         if (!IsClient || Bypass) return false;
+        if(HostPauseNotice) return true;
         _closePanel(); _menuInput.Release(); MenuManager.CloseAll(); ApplyTime(); return true;
     }
 
-    private void StopClient(string reason)
+    internal void StopClient(string reason)
     {
         _closePanel(); _disconnect(); _notice(reason);
     }
@@ -287,7 +316,7 @@ internal sealed class SessionLifecycle : IDisposable
     {
         if (_disposed) return;
         // A guest never continues this campaign as an offline session.
-        if (IsClient && _everConnected && SessionManager.SessionActive) { _closePanel(); Authorized(GameManager.OpenTitle); }
+        if (IsClient && _everConnected) { _closePanel(); _closingStory=true;Authorized(()=>{var video=UnityEngine.Object.FindObjectOfType<MenuManager>()?._cutsceneMenu;MenuManager.CloseAll();if(video!=null) video.gameObject.SetActive(false);GameManager.OpenTitle();}); }
         if (!IsClient) _player.FinishRespawn();
         _disposed = true; _player.Cancel(); _barrierInput.Release(); _menuInput.Release();
         LevelController.OnStartLevelReady = Il2CppSystem.Delegate.Remove(LevelController.OnStartLevelReady, _readyHandler).Cast<Il2CppSystem.Action>();

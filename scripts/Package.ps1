@@ -12,11 +12,16 @@ $sha = [Security.Cryptography.SHA256]::Create()
 try { $buildId = (($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($hashes[0] + $hashes[1])) | ForEach-Object { $_.ToString('X2') }) -join '').Substring(0, 16) }
 finally { $sha.Dispose() }
 
-$staging = Join-Path $repo '.local\package'
+$stagingParent = [IO.Path]::GetFullPath((Join-Path $repo '.local'))
+$staging = Join-Path $stagingParent 'package'
+if ([IO.Path]::GetRelativePath($repo,$staging) -ne '.local\package') { throw 'Package staging path is outside the repository.' }
+if ((Test-Path -LiteralPath $stagingParent) -and (Get-Item -LiteralPath $stagingParent).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw 'Package parent cannot be a junction or symbolic link.' }
+if ((Test-Path -LiteralPath $staging) -and (Get-Item -LiteralPath $staging).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw 'Package staging cannot be a junction or symbolic link.' }
 if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 $plugin = Join-Path $staging 'BepInEx\plugins\PBDMP'
 New-Item -ItemType Directory -Force -Path $plugin | Out-Null
 Copy-Item -LiteralPath $files -Destination $plugin
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $staging
 @"
 PBDMP $version - POSTAL: Brain Damaged two-player co-op (development build $buildId)
 
@@ -35,6 +40,9 @@ Playing through Steam
 - No IP addresses or port forwarding are needed; Steam relays the connection.
 
 Playing over a LAN or a forwarded port: Multiplayer > Direct IP.
+
+Co-op progress: P1 hosts a lobby, then opens Multiplayer > Co-op saves... to save or resume.
+Host-owned saves live in BepInEx/PBDMP/saves and are separate from solo saves.
 
 Files:
   PBDMP.dll          $($hashes[0])

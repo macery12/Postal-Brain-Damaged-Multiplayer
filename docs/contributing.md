@@ -12,6 +12,17 @@ Investigate native behavior before hooking it. Recovered C# bodies can be placeh
 
 The optional `scripts/Audit-VisualParticles.py` research tool requires Python and UnityPy (the reference audit used 1.25.4). Run it with `--game-dir` pointing to your own game installation. It regenerates `AuditedVisualSources.cs` and writes an ignored audit report; it is not required to build or play.
 
+To reproduce the current allowlist, retain all previously audited files when adding a source. For the reference base-campaign build, this includes the cannon, COVID arena and train data:
+
+```powershell
+python ./scripts/Audit-VisualParticles.py --game-dir $GameDir `
+  --additional-asset sharedassets5.assets --additional-asset level5 `
+  --additional-asset sharedassets10.assets --additional-asset level10 `
+  --additional-asset sharedassets15.assets --additional-asset level15
+```
+
+The shared base asset file is included automatically. Review the generated registry diff and investigate removed names rather than silently discarding a prior audit. Match scene files to your installed build; do not distribute recovered asset data.
+
 ## Documentation and privacy
 
 Use relative repository links and the README's `<GameDir>`, `<RepoDir>` and `<Decompiled>` placeholders. Do not put a developer's username, drive layout, timezone, personal email or network configuration into instructions. Public Git identity is the contributor's choice; inspect author/committer metadata before publishing if privacy matters to you.

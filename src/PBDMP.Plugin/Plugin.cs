@@ -13,10 +13,11 @@ namespace PBDMP.Plugin;
 [BepInPlugin("pbdmp.multiplayer", "PBDMP", Version)]
 public sealed class Plugin : BasePlugin
 {
-    internal const string Version = "0.8.0";
+    internal const string Version = "0.10.0";
     internal static ManualLogSource Logger = null!;
     internal static string Fingerprint = "";
     internal static string BuildId = "";
+    internal static ConfigEntry<int> AutosaveMinutes = null!;
     /// <summary>Short public form of <see cref="Fingerprint"/>, advertised on Steam lobbies.</summary>
     internal static string LobbyBuild = "";
     internal static string DefaultAddress = "127.0.0.1";
@@ -26,6 +27,7 @@ public sealed class Plugin : BasePlugin
     public override void Load()
     {
         Logger = Log;
+        AutosaveMinutes = Config.Bind("Saves","AutosaveMinutes",5,new ConfigDescription("Host autosave interval in active gameplay minutes. Checkpoint volumes do not bypass this timer.",new AcceptableValueRange<int>(5,10)));
         DefaultAddress = Config.Bind("Connection", "Address", "127.0.0.1", "Numeric LAN IP of the host.").Value;
         DefaultPort = Config.Bind("Connection", "Port", 7777, "TCP port, 1-65535.").Value;
         InviteOnly = Config.Bind("Steam", "InviteOnly", false, "Hosted Steam lobbies accept invited friends only; otherwise any Steam friend can use Join Game.");
@@ -34,7 +36,25 @@ public sealed class Plugin : BasePlugin
         Fingerprint = Hash(Path.Combine(Paths.GameRootPath, "GameAssembly.dll")) + ":" +
             Hash(Path.Combine(Paths.GameRootPath, "POSTAL Brain Damaged_Data", "il2cpp_data", "Metadata", "global-metadata.dat"))+":"+BuildId;
         LobbyBuild = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Fingerprint)))[..16];
+        WorldAuthoredProps.Install();
+        SessionStoryPatches.Install(new Harmony("pbdmp.multiplayer.story"));
         SessionPatches.Install(new Harmony("pbdmp.multiplayer.session"));
+        if(DiagnosticCursor.KeepFree)
+        {
+            DiagnosticCursor.Release();
+            Log.LogInfo("Unattended native diagnostics keep the desktop cursor unlocked.");
+        }
+        CoopSavePatches.Install(new Harmony("pbdmp.multiplayer.saves"));
+        WorldScriptedActionPatches.Install(new Harmony("pbdmp.multiplayer.scripted-actions"));
+        WorldCannonPatches.Install(new Harmony("pbdmp.multiplayer.cannon"));
+        WorldArenaPatches.Install(new Harmony("pbdmp.multiplayer.arena"));
+        WorldSpawnerCapturePatches.Install(new Harmony("pbdmp.multiplayer.spawn-capture"));
+        WorldPropPushPatches.Install(new Harmony("pbdmp.multiplayer.prop-pushing"));
+        WorldSequencePatches.Install(new Harmony("pbdmp.multiplayer.sequences"));
+        WorldGateFusePatches.Install(new Harmony("pbdmp.multiplayer.gate-fuses"));
+        WorldPosterPatches.Install(new Harmony("pbdmp.multiplayer.posters"));
+        WorldSecretPatches.Install(new Harmony("pbdmp.multiplayer.secrets"));
+        WorldSceneryPatches.Install(new Harmony("pbdmp.multiplayer.scenery"));
         SharedWorldPatches.Install(new Harmony("pbdmp.multiplayer.world"));
         SharedActorPatches.Install(new Harmony("pbdmp.multiplayer.actors"));
         Log.LogInfo("Installing shared door hooks.");
@@ -56,7 +76,7 @@ public sealed class Plugin : BasePlugin
             Environment.GetEnvironmentVariable("PBDMP_TEST_DISABLE_MESH_GUARD") != "1")
             new Harmony("pbdmp.multiplayer.solid-materials").PatchAll(typeof(UnreadableMeshGuard));
         AddComponent<MultiplayerBehaviour>();
-        Log.LogInfo($"PBDMP {Version} development build {BuildId[..16]} loaded (wire {Protocol.Version}). Host-owned enemies/combat, shared doors, personal resources; multiplayer saves disabled.");
+        Log.LogInfo($"PBDMP {Version} development build {BuildId[..16]} loaded (wire {Protocol.Version}). Host-owned enemies/combat, shared doors, personal resources; host-owned co-op saves.");
     }
 
     private static string Hash(string path)

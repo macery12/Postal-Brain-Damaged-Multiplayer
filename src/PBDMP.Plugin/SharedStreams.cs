@@ -14,6 +14,30 @@ internal sealed partial class SharedWorld
     private readonly Dictionary<string,Mesh> _streamMeshes=new();
     private readonly Dictionary<IntPtr,uint> _localStreamIds=new();
     private readonly Dictionary<IntPtr,LightningGunBeam> _beamLogic=new();
+    private readonly Dictionary<IntPtr,LightningGunBeamRenderer> _streamBeams=new();
+    private readonly Dictionary<IntPtr,LineController> _streamLines=new();
+    private readonly Dictionary<IntPtr,PeeStreamRenderer> _streamPee=new();
+    private readonly HashSet<uint> _receivedStreamKinds=new();
+    internal bool StreamKindForTest(uint kind)=>_receivedStreamKinds.Contains(kind);
+    internal int RemoteBeamPresentationsForTest=>_streams.Values.Count(s=>s.Visual.Root.GetComponent<LightningGunBeamRenderer>()!=null);
+    internal bool StreamTrackedForTest(LightningGunBeamRenderer beam)=>_streamBeams.ContainsKey(beam.Pointer);
+    internal void TrackStream(Component component)
+    {
+        if(component.TryCast<LightningGunBeamRenderer>() is {} beam) _streamBeams[beam.Pointer]=beam;
+        else if(component.TryCast<LineController>() is {} line) _streamLines[line.Pointer]=line;
+        else if(component.TryCast<PeeStreamRenderer>() is {} pee) _streamPee[pee.Pointer]=pee;
+    }
+    private static IEnumerable<T> LiveStreams<T>(Dictionary<IntPtr,T> sources) where T:Component
+    {
+        foreach(var pair in sources.ToArray())
+        {
+            var source=pair.Value;
+            if(source==null) {sources.Remove(pair.Key);continue;}
+            // Match FindObjectsOfType: active objects include disabled components.
+            // A LineController can still supply a visible line when disabled.
+            if(source.gameObject.activeInHierarchy) yield return source;
+        }
+    }
     internal void BeamState(LightningGunBeam beam,bool active)
     {if(active) _beamLogic[beam.Pointer]=beam;else _beamLogic.Remove(beam.Pointer);}
     private readonly Dictionary<(byte Actor,uint Id),(NativePresentation Visual,float Until,FMODInstance? Audio)> _streams=new();
@@ -22,6 +46,12 @@ internal sealed partial class SharedWorld
     private int _streamCapturePhase=-1;
     private void BuildStreams()
     {
+        // Seed once for renderers enabled before catalogue construction. New
+        // pooled instances register from Awake; disabled instances stay cached
+        // for pool reuse, and destroyed instances are pruned during sampling.
+        foreach(var beam in Object.FindObjectsOfType<LightningGunBeamRenderer>(true)) TrackStream(beam);
+        foreach(var line in Object.FindObjectsOfType<LineController>(true)) TrackStream(line);
+        foreach(var pee in Object.FindObjectsOfType<PeeStreamRenderer>(true)) TrackStream(pee);
         foreach(var component in Resources.FindObjectsOfTypeAll<MonoBehaviour>())
             if(!component.gameObject.scene.IsValid() && component.GetIl2CppType().Name is "LightningGunBeamRenderer" or "LineController" or "PeeStreamRenderer")
                 _streamPrefabs[EffectKey("stream",component.name)]=component.gameObject;
@@ -32,13 +62,13 @@ internal sealed partial class SharedWorld
     {
         if(!_life.Frozen)
         {
-            // Each type still polls once per cycle; avoid three scene-wide
-            // Unity searches on the same gameplay frame, including empty scenes.
+            // Sample native renderers once per cycle without scene-wide searches
+            // competing with the bounded world-capture slice every frame.
             if(_streamCapturePhase<0 && Time.unscaledTime>=_streamAt)
             {_streamAt=Time.unscaledTime+0.1f;_streamCapturePhase=0;}
             if(_streamCapturePhase==0)
             {
-                foreach(var beam in Object.FindObjectsOfType<LightningGunBeamRenderer>())
+                foreach(var beam in LiveStreams(_streamBeams))
                 {
                     if(ReplicaStream(beam.transform)) continue;
                     var source=beam.OriginalPoolable?.TryCast<Component>();var name=source?.name??beam.name.Replace("(Clone)","",StringComparison.Ordinal);
@@ -49,7 +79,7 @@ internal sealed partial class SharedWorld
             }
             else if(_streamCapturePhase==1)
             {
-                foreach(var line in Object.FindObjectsOfType<LineController>())
+                foreach(var line in LiveStreams(_streamLines))
                 {
                     if(ReplicaStream(line.transform) || line.Renderer==null || line.Renderer.positionCount<2) continue;
                     var source=line.OriginalPoolable?.TryCast<Component>();var name=source?.name??line.name.Replace("(Clone)","",StringComparison.Ordinal);
@@ -61,7 +91,7 @@ internal sealed partial class SharedWorld
             }
             else if(_streamCapturePhase==2)
             {
-                foreach(var pee in Object.FindObjectsOfType<PeeStreamRenderer>())
+                foreach(var pee in LiveStreams(_streamPee))
                 {
                     if(ReplicaStream(pee.transform) || pee._lineRenderer==null || pee._lineRenderer.positionCount<2) continue;
                     var source=pee.OriginalPoolable?.TryCast<Component>();var name=source?.name??pee.name.Replace("(Clone)","",StringComparison.Ordinal);
@@ -122,10 +152,11 @@ internal sealed partial class SharedWorld
                 if(offset!=0) {var block=new MaterialPropertyBlock();block.SetColor("_BaseColor",new(points[0],points[1],points[2],points[3]));renderer.SetPropertyBlock(block);}
             }
         }
+        _receivedStreamKinds.Add(frame.Flags);
         _streams[key]=(stream.Visual,Time.unscaledTime+0.5f,stream.Audio);
     }
     private void ClearStreams()
-    {ClearRemoteStreams();_localStreamIds.Clear();_beamLogic.Clear();_streamPrefabs.Clear();_streamMaterials.Clear();_streamMeshes.Clear();_streamCapturePhase=-1;_streamAt=0;}
+    {ClearRemoteStreams();_localStreamIds.Clear();_beamLogic.Clear();_streamPrefabs.Clear();_streamMaterials.Clear();_streamMeshes.Clear();_streamCapturePhase=-1;_streamAt=0;_streamBeams.Clear();_streamLines.Clear();_streamPee.Clear();_receivedStreamKinds.Clear();}
     private void ClearRemoteStreams()
     {foreach(var stream in _streams.Values){stream.Visual.Dispose();stream.Audio?.Stop(false);stream.Audio?.Release();}_streams.Clear();}
 }

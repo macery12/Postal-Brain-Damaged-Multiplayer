@@ -6,7 +6,7 @@ public enum WorldKind : byte
 {
     Manifest = 1, ManifestAck, SnapshotBegin, SnapshotEnd, SnapshotAck,
     Enemy, Door, Projectile, Loot, Encounter, Impact, IncomingHit, WeaponEffect, InteractionResult, ActorState, ActorEffect,
-    UrineState, MissionState,
+    UrineState, MissionState, Scenery, SceneryEvent, Mechanism, Sequence, PlayerEffect,
     Fire = 32, Melee, Interact, Trigger, Defense, Reflect, Special, ClientEffect
 }
 
@@ -26,6 +26,14 @@ public static class WorldProtocol
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
     public static bool FromClient(WorldKind kind) => kind is WorldKind.ManifestAck or WorldKind.SnapshotAck || (byte)kind >= 32;
+    public static bool Durable(WorldFrame frame)=>frame.Kind switch
+    {
+        WorldKind.UrineState=>frame.Flags is 0 or 4 or 16 or 32,
+        WorldKind.MissionState=>frame.Flags is not (256 or 512),
+        WorldKind.Enemy or WorldKind.Door or WorldKind.Loot or WorldKind.Encounter or WorldKind.ActorState or
+            WorldKind.Scenery or WorldKind.Mechanism or WorldKind.Sequence=>true,
+        _=>false
+    };
     public static void Validate(WorldFrame frame)
     {
         if (!Enum.IsDefined(typeof(WorldKind), frame.Kind) || frame.Epoch == 0 || frame.Sequence == 0 || frame.Actor > 2 ||

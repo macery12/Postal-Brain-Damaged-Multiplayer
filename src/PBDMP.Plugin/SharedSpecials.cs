@@ -33,6 +33,10 @@ internal sealed partial class SharedWorld
         var pose=_session.Snapshot.RemotePose;
         if(_life.Frozen || pose?.Alive!=true || frame.Actor!=2 || frame.Life!=pose.Life || _remote==null) return;
         if(frame.Flags is >=70 and <=76) {ApplyUrineRequest(frame);return;}
+        if(frame.Flags==95) {ApplySolidImpactRequest(frame);return;}
+        if(frame.Flags==94) {ApplyPosterRequest(frame);return;}
+        if(frame.Flags==93) {ApplyBodyPush(frame);return;}
+        if(frame.Flags is >=90 and <=92) {ApplySceneryRequest(frame);return;}
         if(frame.Flags==80) {ApplyMissionHit(frame);return;}
         if(frame.Flags==81) {ApplyMissionFall(frame);return;}
         if(frame.Flags==82) {ApplyMissionExitRequest(frame);return;}

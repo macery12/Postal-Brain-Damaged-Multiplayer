@@ -32,8 +32,8 @@ public sealed partial class MultiplayerBehaviour
             case 1 when _world?.Active==true:
                 QuietNpcs();SharedWorldPatches.DiagnosticFreeze=true;TimeManager.SetApplicationTimeScale(1);
                 var targets=_world.CatalogueForTest.UrineKeys.Select(k=>_world.ComponentForTest(k)!).ToArray();
-                _urineTarget=targets.FirstOrDefault(c=>c.TryCast<FuseBox>()!=null)??targets.First(c=>c.TryCast<PissTank>()!=null);
-                if(_urineTarget.TryCast<PissTank>() is {} tank) {tank.Enable();tank._shrinkSpeed=0;tank._fillSpeed=100;}
+                _urineTarget=Environment.GetEnvironmentVariable("PBDMP_TANK_REPLAY")=="1"?targets.First(c=>c.TryCast<PissTank>()!=null):targets.FirstOrDefault(c=>c.TryCast<FuseBox>()!=null)??targets.First(c=>c.TryCast<PissTank>()!=null);
+                if(_urineTarget.TryCast<PissTank>() is {} tank) {tank.Enable();tank._shrinkSpeed=0;tank._fillSpeed=100;if(Environment.GetEnvironmentVariable("PBDMP_TANK_REPLAY")=="1") tank.FillPercentage=-0.005902154f;}
                 _urineBefore=WorldCatalogue.Save(_urineTarget);File.WriteAllText(Marker("urine-target"),_world.KeyForTest(_urineTarget)!);
                 TravelMark("host-ready");_urineStep=2;break;
             case 2 when _lifecycle!.WorldReady && _lifecycle.State.Released && Marked("client-target-ready"):
@@ -52,8 +52,12 @@ public sealed partial class MultiplayerBehaviour
                     var events=fuse.GetComponent<ExplosionListener>()._onExplosionEvents;
                     for(var i=0;i<events.GetPersistentEventCount();i++) {var c=events.GetPersistentTarget(i)?.TryCast<Component>();if(c==null) continue;TravelCheck(_world!.KeyForTest(c)!=null,"fuse progression target is catalogued: "+c.name+"."+events.GetPersistentMethodName(i));if(c.TryCast<Trigger>() is {} trigger) TravelCheck(!trigger._enabled,"P2 activation disables the P1 urine tutorial trigger");}
                 }
+                // Compare one stable physical-world instant, not a prop pose
+                // sampled before it continued settling during the peer's load.
+                GameManager.PauseGame();
                 WriteUrineFixture("urine-live.json");TravelMark("host-urine-shared");_urineStep=5;break;
             case 5 when Marked("client-live-checked"):
+                GameManager.DisableMenu();
                 if(MissionTest) {_urineStep=14;break;}
                 _urineToilet=_world!.CatalogueForTest.UrineKeys.Select(k=>_world.ComponentForTest(k)!.TryCast<Toilet>()).First(t=>t!=null && t._toiletHandle!=null && t._flushParticle!=null);
                 _urineToilet!._isOpen=true;if(_urineToilet._toiletFlap!=null) _urineToilet._toiletFlap._isFirstState=false;_urineToilet._currentWaterLevel=0.99f;_urineToilet.UpdateWaterLevel(true);
@@ -75,7 +79,10 @@ public sealed partial class MultiplayerBehaviour
                 else if(_urineTarget.TryCast<PissTank>() is {} filled) {for(var i=0;i<10;i++) filled.OnPiss(new PissData(Player.Instance.Cast<IAiActor>()));TravelCheck(filled._filled,"P1 urine completes the shared native tank");}
                 _urineAt=Time.unscaledTime+2;_urineStep=6;break;
             case 6 when Time.unscaledTime>=_urineAt:
+                GameManager.PauseGame();
                 WriteUrineFixture("urine-late.json");TravelMark("host-urine-late");_urineStep=7;break;
+            case 7 when Marked("client-late-ready") && !Marked("host-urine-current"):
+                WriteUrineFixture("urine-current.json");TravelMark("host-urine-current");break;
             case 7 when Marked("client-late-checked"):
                 ResetSession();SharedWorldPatches.DiagnosticFreeze=false;SharedUrinePatches.DiagnosticHoldTankMotion=false;_urineStep=8;break;
             case 8 when Marked("client-pass"):
@@ -122,7 +129,8 @@ public sealed partial class MultiplayerBehaviour
             case 6 when SessionLifecycle.Current==null && !SessionManager.SessionActive:
                 _address!.text="127.0.0.1";Join();_urineStep=7;break;
             case 7 when _world?.Active==true && _lifecycle!.WorldReady && _lifecycle.State.Released:
-                CheckUrineFixture("urine-late.json");TravelCheck(_world.UrineEffectsPlayed==0,"late join restores urine state without replaying historical effects/sounds");TravelMark("client-late-checked");_urineStep=8;break;
+                TravelMark("client-late-ready");if(!Marked("host-urine-current")) return;
+                CheckUrineFixture("urine-current.json");TravelCheck(_world.UrineEffectsPlayed==0,"late join restores urine state without replaying historical effects/sounds");TravelMark("client-late-checked");_urineStep=8;break;
             case 8 when SessionLifecycle.Current==null && !SessionManager.SessionActive:
                 TravelMark("client-pass");_urineStep=99;break;
         }
@@ -131,16 +139,31 @@ public sealed partial class MultiplayerBehaviour
     {
         WriteMissionWallFixture(name);
         var catalogue=_world!.CatalogueForTest;var fixtures=new List<UrineFixture>();
-        foreach(var key in catalogue.UrineKeys) {var data=WorldCatalogue.Save(catalogue.Components[key]);if(data.Length>0) fixtures.Add(new(key,data));}
+        var tankReplay=Environment.GetEnvironmentVariable("PBDMP_TANK_REPLAY")=="1";
+        HashSet<IntPtr>? tankTransforms=null;
+        if(tankReplay)
+        {
+            // The endpoint replay is explicitly a single-tank regression. Its
+            // fixture includes that tank and every directly fill-driven linked
+            // mover/scaler, rather than unrelated moving scenery across the map.
+            tankTransforms=new();
+            void Include(Transform? root) {if(root!=null) foreach(var t in root.GetComponentsInChildren<Transform>(true)) tankTransforms.Add(t.Pointer);}
+            var tank=_urineTarget!.Cast<PissTank>();Include(tank.transform);
+            foreach(var t in new[]{tank._view.fillContainer,tank._view.totem,tank._view.piston01,tank._view.piston02,tank._view.leftCog,tank._view.rightCog}) Include(t);
+            foreach(var listener in UnityEngine.Object.FindObjectsOfType<PissFillListener>(true))
+                if(listener._pissFillablesGO.Any(go=>go!=null && go.Pointer==tank.gameObject.Pointer))
+                {Include(listener.TryCast<PissFillListenerMovingObject>()?._moveTransform);Include(listener.TryCast<PissFillListenerScalingObject>()?._scaleTransform);}
+        }
+        foreach(var key in catalogue.UrineKeys.Where(k=>!tankReplay || k==catalogue.Key(_urineTarget!))) {var data=SharedWorld.UrineSnapshot(catalogue.Components[key]);if(data.Length>0) fixtures.Add(new(key,data));}
         foreach(var pair in catalogue.UrineSurfaces)
         {
-            var t=catalogue.EncounterMotion[pair.Key];var p=t.localPosition;var r=t.localEulerAngles;var s=t.localScale;
+            var t=catalogue.EncounterMotion[pair.Key];if(tankTransforms!=null && !tankTransforms.Contains(t.Pointer)) continue;var p=t.localPosition;var r=t.localEulerAngles;var s=t.localScale;
             fixtures.Add(new(pair.Key,new[]{t.gameObject.activeSelf.ToString()},new[]{p.x,p.y,p.z,r.x,r.y,r.z,s.x,s.y,s.z},pair.Value.Select(c=>UrineFixtureEnabled(c)?1f:0f).ToArray()));
         }
         File.WriteAllText(Marker(name),JsonSerializer.Serialize(fixtures));
     }
-    private static bool UrineFixtureEnabled(Component c)=>c.TryCast<Renderer>()?.enabled??c.TryCast<Collider>()?.enabled??c.TryCast<Light>()?.enabled??c.TryCast<UnityEngine.AI.NavMeshObstacle>()?.enabled??false;
-    private void CheckUrineFixture(string name)
+    private static bool UrineFixtureEnabled(Component c)=>c.TryCast<Renderer>()?.enabled??c.TryCast<Collider>()?.enabled??c.TryCast<Light>()?.enabled??c.TryCast<UnityEngine.AI.NavMeshObstacle>()?.enabled??c.TryCast<OcclusionPortal>()?.open??false;
+    private void CheckUrineFixture(string name,bool progressionOnly=false)
     {
         CheckMissionWallFixture(name);
         foreach(var fixture in JsonSerializer.Deserialize<UrineFixture[]>(File.ReadAllText(Marker(name)))!)
@@ -148,11 +171,24 @@ public sealed partial class MultiplayerBehaviour
             if(fixture.Pose is {} pose)
             {
                 var t=_world!.CatalogueForTest.EncounterMotion[fixture.Key];var enabled=_world.CatalogueForTest.UrineSurfaces[fixture.Key].Select(c=>UrineFixtureEnabled(c)?1f:0f).ToArray();
-                TravelCheck(enabled.SequenceEqual(fixture.Enabled!) && t.gameObject.activeSelf.ToString()==fixture.Data[0],"urine-driven renderer/collision/activation matches P1: "+t.name);
+                var matches=enabled.SequenceEqual(fixture.Enabled!) && t.gameObject.activeSelf.ToString()==fixture.Data[0];
+                var components=_world.CatalogueForTest.UrineSurfaces[fixture.Key];
+                if(!matches && progressionOnly && components.Length>0 && components.All(c=>c.TryCast<Light>()!=null) && t.GetComponentsInChildren<Collider>(true).Length==0)
+                {
+                    // This optional pre-play check is explicitly narrower than
+                    // the default strict regression; never waive collision or
+                    // structural geometry. Retain each cosmetic mismatch.
+                    File.AppendAllText(Marker("regression-light-differences.tsv"),WorldCatalogue.DiagnosticPath(t)+"\tactive="+t.gameObject.activeSelf+"/"+fixture.Data[0]+"\tenabled="+string.Join(',',enabled)+"/"+string.Join(',',fixture.Enabled!)+"\n");
+                    Plugin.Logger.LogWarning("PREPLAY: light-only difference deferred: "+WorldCatalogue.DiagnosticPath(t));
+                    continue;
+                }
+                if(!matches) File.WriteAllText(Marker("surface-mismatch.json"),JsonSerializer.Serialize(new{path=WorldCatalogue.DiagnosticPath(t),key=fixture.Key,expectedActive=fixture.Data[0],actualActive=t.gameObject.activeSelf,expected=fixture.Enabled,actual=enabled,received=_world.ReceivedSurfaceForTest(fixture.Key),components=components.Select(c=>c.GetIl2CppType().Name),parents=t.GetComponentsInParent<MonoBehaviour>(true).Select(c=>new{path=WorldCatalogue.DiagnosticPath(c.transform),type=c.GetIl2CppType().Name,c.enabled})}));
+                TravelCheck(matches,"urine-driven renderer/collision/activation matches P1: "+t.name);
+                File.AppendAllText(Marker("urine-pose-comparison.jsonl"),JsonSerializer.Serialize(new{phase=name,path=WorldCatalogue.DiagnosticPath(t),expected=pose,position=t.localPosition.ToString("F5"),rotation=t.localEulerAngles.ToString("F5"),scale=t.localScale.ToString("F5"),body=t.GetComponent<Rigidbody>() is {} body?new{position=body.position.ToString("F5"),rotation=body.rotation.eulerAngles.ToString("F5"),interpolation=body.interpolation.ToString(),kinematic=body.isKinematic}:null,animators=t.GetComponentsInParent<Animator>(true).Select(a=>new{a.name,a.enabled}),listeners=UnityEngine.Object.FindObjectsOfType<PissFillListenerMovingObject>(true).Where(l=>l._moveTransform?.Pointer==t.Pointer).Select(l=>new{l.name,l.enabled,start=l._startPos.position.ToString("F5"),end=l._endPos.position.ToString("F5")})})+"\n");
                 TravelCheck(Vector3.Distance(t.localPosition,new(pose[0],pose[1],pose[2]))<0.03f && Quaternion.Angle(t.localRotation,Quaternion.Euler(pose[3],pose[4],pose[5]))<1 && Vector3.Distance(t.localScale,new(pose[6],pose[7],pose[8]))<0.03f,"urine-driven motion/scale matches P1: "+t.name);
                 continue;
             }
-            var c=_world!.ComponentForTest(fixture.Key);TravelCheck(c!=null,"urine snapshot target exists: "+fixture.Key[..8]);var data=WorldCatalogue.Save(c!);
+            var c=_world!.ComponentForTest(fixture.Key);TravelCheck(c!=null,"urine snapshot target exists: "+fixture.Key[..8]);var data=SharedWorld.UrineSnapshot(c!);
             TravelCheck(data.Length==fixture.Data.Length && data.Zip(fixture.Data).All(p=>EquivalentNativeText(p.First,p.Second)),"current urine target state matches host: "+c!.name);
         }
     }

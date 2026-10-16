@@ -1,6 +1,6 @@
-# Protocol 7
+# Protocol 10 (development)
 
-PBDMP 0.8.0 carries protocol 7 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 0.10.0 development source carries protocol 10 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 
@@ -21,13 +21,14 @@ Each frame has an int32 little-endian payload length, followed by 1–8192 paylo
 | --- | ---: | --- | --- |
 | Hello | 1 | P2 → P1 | int32 protocol version and fingerprint text. |
 | Welcome | 2 | P1 → P2 | int32 protocol version and fingerprint text. |
-| Pose | 3 | Both | Level key, readiness, feet position, yaw/height, weapon GUID, pitch, visual shot sequence, alive flag, life generation and travel epoch. |
+| Pose | 3 | Both | Level key, readiness, feet position, yaw/height, weapon GUID, pitch, visual shot sequence, alive flag, life generation, travel epoch and optional moving-platform reference. |
 | Reject | 4 | P1 → P2 | Reason, including host loading failure/session closure feedback. |
 | Travel | 5 | P1 → P2 | Epoch, Menu/Load/Restart action, level GUID, difficulty, host-ready/paused/released/joining flags and optional join loadout. |
 | Ready | 6 | P2 → P1 | Travel epoch and readiness. |
 | World | 7 | By world kind | Typed shared-state, presentation or client-request frame described below. |
+| Save | 8 | By save command | Bounded persistence control/data pages described below. |
 
-Pose and lifecycle updates are sent on a 50 ms loop (nominal 20 Hz). Old poses are replaced rather than accumulated. The pose shot sequence is a presentation signal; authoritative attacks use world frames.
+Pose and lifecycle updates are sent on a 50 ms loop (nominal 20 Hz). Old poses are replaced rather than accumulated. The pose shot sequence is a presentation signal; authoritative attacks use world frames. The optional platform reference travels atomically with its pose: a strict presence flag, a 64-character hexadecimal authored transform key and three finite local feet coordinates, each bounded to ±256. The Unity adapter resolves only registered platform volumes and bounds the correction against the reported world position. This prevents network delay from placing a rider below a moving lift on P1.
 
 Join loadouts contain current/last weapon GUIDs, up to 64 unique item records (GUID plus quantity 0–1,000,000), and host feet position/yaw. The Unity adapter selects known weapons/ammo and clamps native capacities; host health, armor, keys and powerups are excluded.
 
@@ -40,6 +41,7 @@ Join loadouts contain current/last weapon GUIDs, up to 64 unique item records (G
 | Manifest, SnapshotBegin/End | P1 → P2 | Match authored catalogues and delimit current-state restoration. |
 | ManifestAck, SnapshotAck | P2 → P1 | Acknowledge catalogue and restored state. |
 | Enemy, ActorState/Effect | P1 → P2 | Host-owned lifecycle, health, animation/presentation and actor state. |
+| Scenery, SceneryEvent, Mechanism, Sequence, PlayerEffect | P1 → P2 | Typed scenery/motion/timing, passive timeline presentation and victim-specific world effects. |
 | Door, Encounter, UrineState, MissionState | P1 → P2 | Supported shared world/controller state and progression. |
 | Projectile, Loot, Impact, WeaponEffect | P1 → P2 | Native projectile/effect presentation and personal copies of host-selected drops. |
 | IncomingHit, InteractionResult | P1 → P2 | Victim-local damage application and requester interaction results. |
@@ -52,7 +54,7 @@ Entity identity is scoped to a travel epoch; revisions and life generations dist
 
 ## Loading, queues and authority
 
-Gameplay release waits for matching-epoch map readiness and supported world restoration. Snapshots restore current supported state; old explosions, death audio, progression callbacks and rewards are not replayed. General scripts/timelines and persistent checkpoint/save restoration remain incomplete.
+Gameplay release waits for matching-epoch map readiness and supported world restoration. Snapshots restore current supported state; old explosions, death audio, progression callbacks and rewards are not replayed. Persistent saves additionally restore a native shared baseline and per-player data before release. Unclassified arbitrary scripts/timelines remain outside complete live-sync coverage.
 
 Transport send/receive world queues are capped at 4,096 frames. A full send queue returns false so its caller retains and retries the frame. The native publisher drains at most 128 retained frames per tick; the transport sends batches of up to 512 per send loop. Receive saturation waits asynchronously rather than discarding state: TCP applies backpressure to the sender, and Steam keeps unread messages queued in its client. Main-thread capture yields between objects under its frame budget.
 
@@ -67,3 +69,66 @@ Player resource values/collection remain personal. P1 owns enemies, shared hit r
 `Special` actions 75 and 76 request supported world flame ticks and barrel hits respectively. P1 validates the target, living sender/life generation, range and bounded damage, then invokes the native target so linked explosion/progression listeners execute on the host. Barrel/burn state and linked machinery restore through the existing bounded snapshot.
 
 `Impact` flag 4 carries native material hit particles/audio and a contact normal. P1 selects flesh/armor effects after accepted NPC hits; P2 instantiates harmless presentation, including for its own attacks. Impact bursts, audio and explosions are transient and do not replay on late join.
+
+## Persistence control and disk state
+
+`SavePage` carries a command byte, uint32 travel epoch and transaction, int32 page index/count/length, and up to 4,096 bytes. Transactions are non-interleaved and strictly ordered, with a 4 MiB maximum payload. The transport copies owned bytes and enforces command direction. Native pointers and callbacks never cross the wire.
+
+| Command | Value | Direction | Purpose |
+| --- | ---: | --- | --- |
+| Identity | 1 | P2 → P1 | Steam account or persisted Direct IP player ID. |
+| GuestState | 2 | P2 → P1 | Current personal record and collection history. |
+| HoldAck | 3 | P2 → P1 | Consistent personal capture for the requested transaction. |
+| Restored | 4 | P2 → P1 | Personal restore acknowledged. |
+| Checkpoint | 5 | P2 → P1 | Bounded native checkpoint identity/pose request, validated against host trigger bounds. |
+| WorldRestored | 6 | P2 → P1 | Native shared baseline applied before the authoritative snapshot. |
+| Capture | 16 | P1 → P2 | Hold gameplay and capture personal state. Optional one-byte capture kind: 0 manual/quicksave, 1 autosave, used for the hold overlay. Empty payload means manual; other values/lengths are rejected. |
+| Resume | 17 | P1 → P2 | Release a capture hold. |
+| Restore | 18 | P1 → P2 | Personal record, host gear catch-up and restoration flags. |
+| WorldRestore | 19 | P1 → P2 | One ordered chunk of the current non-player/non-NPC native baseline. |
+| WorldRestoreBegin | 20 | P1 → P2 | Bounded byte count and SHA-256 digest for a fresh baseline transaction. |
+| WorldRestoreEnd | 21 | P1 → P2 | Finalize and verify the assembled native baseline. |
+
+Save queues hold 1,024 pages in each transport direction; the adapter retains at most 2,048 pending pages. Each send cycle includes at most 32 save pages alongside regular traffic. Epoch changes discard stale restoration work. Loading waits for native baseline acknowledgement, the shared-world snapshot and personal readiness; P2 cannot promote its own state to shared authority.
+
+Disk schema 2 is independent of wire epochs. The envelope is eight ASCII bytes `PBDMPS01`, int32 JSON byte length, 32 SHA-256 bytes and bounded UTF-8 JSON, up to 32 MiB. `CoopSaveStore` validates data-only records, schema, scalar bounds and permitted durable world kinds. The plugin checks game hashes, supported content and the authored catalogue before native loading. Atomic replacement retains a known-good `.bak`; corrupt primary files cannot replace a valid backup.
+
+[Co-op save behavior](co-op-saves.md) specifies host control, personal-resource resets, partner assignment and recovery.
+
+
+## Current-world baseline streaming
+
+`WorldBaseline` bounds the complete native baseline to 32 MiB. A begin header is at most 512 bytes; each ordered chunk is at most 1 MiB and uses the existing 4,096-byte `SavePage` framing. Each page transaction remains bounded to 4 MiB. The receiver requires begin → chunks → end, verifies length and SHA-256, and discards incomplete work on epoch changes or disconnect. The publisher retains and drains bounded chunks rather than filling transport queues with an entire baseline at once.
+
+Every ordinary join captures the current host world. Loading an older checkpoint and then changing the world does not reuse that checkpoint as the next guest's baseline. Native baseline application, typed world state and personal restoration all finish before gameplay release.
+
+## Development typed adapters
+
+Adapters resolve known authored keys and fields; payloads cannot request arbitrary component calls or native pointers. `Scenery` distinguishes glass, partial burning, partial/queued barrels, authored or pooled physical bodies, and gameplay fragments. `Sequence` carries mechanical timeline phase/play state; old signals are suppressed during restoration. Unity directors that reset their reported time after stopping retain the phase that actually played.
+
+| Mechanism flag | State |
+| ---: | --- |
+| 1 | Falling-platform remaining delay and requester. |
+| 2 | Scale phase, origin, duration and continuation. |
+| 3 | Stable shared secret discovery. |
+| 4 | TNT-gate remaining fuse. |
+| 5 | Registered native machinery loop playback/seek state. |
+| 7 | Referenced scripted angular speed and accumulated rotation. |
+| 8 | Rocket animation/head pose and pending launch continuation. |
+| 9 | COVID arena segment ordering and base position. |
+| 10 | Registered native machinery cooldown state. |
+| 11 | Native syringe animation, eligibility and passive injection presentation. |
+
+Interaction retries retain their original request ID. P1 caches the committed result, so retransmission cannot plant another TNT charge or consume another key. Personal recovery records wait while the requester has an unresolved item reservation.
+
+Schema-1 files can be inspected by the storage reader, but the 0.10 loader refuses restoration when the older format lacks required world state. Original files and backups remain untouched. The [megapass](../megapass.md) and [tracker](sync-progress.md) distinguish these development adapters from completed runtime acceptance.
+
+## World/presentation follow-up (protocol 10)
+
+Travel appends strict `HostMenuPaused` after the story fields. It implies `Paused`; capture/loading holds can pause gameplay with this flag false. P2 opens the native pause screen only after map/world/personal admission. The client closes only a screen it opened for the host, preserving an existing local menu.
+
+Shared posters use their authored native save GUIDs. `Mechanism` flag 6 carries a 0/1 collected value, a 0/1 live-notice hint and an empty values array. Snapshot/persistent capture uses a zero live-notice hint. `SceneryEvent` flag 2 carries the separate live collection sound/notice. P2 requests collection with `Special` flag 94; P1 validates current life, known identity, availability and proximity. Native distance optimization of P1's copy is not interpreted as collection.
+
+Native material impacts retain their game-selected effect and audio keys. `Special` flag 95 requests a harmless NPC surface effect: P1 validates the current player/target, bounded position and an existing solid-material asset pair. It changes no health or inventory. P1 relays `Impact` flag 4; actor 2 identifies the already-present local P2 effect, suppressing its echo on P2. Native P1 impacts are forwarded directly, rather than guessed from an arbitrary NPC child override.
+
+Urine surface flag 4 includes authored `OcclusionPortal.open` alongside renderer/collider/light/navigation bits. Legacy layouts that omit only portal bits retain their restored native portal state. All remaining lengths and boolean values are still validated. Authored prop membership is local scene-load bookkeeping; Unity instance IDs never cross the wire.

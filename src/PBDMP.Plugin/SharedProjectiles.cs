@@ -104,10 +104,14 @@ internal sealed partial class SharedWorld
     }
     private void RegisterNativeProjectile(Projectile projectile)
     {
-        if(!Active || Client || projectile==null || !projectile.gameObject.activeInHierarchy || projectile.Owner==null || _projectiles.ContainsKey(projectile.Pointer)) return;
+        if(!Active || Client || projectile==null || !projectile.gameObject.activeInHierarchy || _projectiles.ContainsKey(projectile.Pointer)) return;
         var name=projectile.name.Replace("(Clone)","",StringComparison.Ordinal);
         var prefab=_projectilePrefabs.Values.FirstOrDefault(p=>p.name==name && p.GetIl2CppType().FullName==projectile.GetIl2CppType().FullName);
-        if(prefab!=null) RegisterProjectile(projectile,prefab,0,projectile.Owner.Pointer==_remote?.Pointer?(byte)2:projectile.Owner.IsPlayer?(byte)1:(byte)0);
+        // Native scenery weapons (including Cannon) initialize with a null
+        // actor owner. They are still host-owned attacks with native collision
+        // and hit results; P2 needs the same harmless visual replica.
+        var owner=projectile.Owner;
+        if(prefab!=null) RegisterProjectile(projectile,prefab,0,owner!=null && owner.Pointer==_remote?.Pointer?(byte)2:owner?.IsPlayer==true?(byte)1:(byte)0);
     }
     internal void NativeProjectileEnabled(Projectile projectile)
     {

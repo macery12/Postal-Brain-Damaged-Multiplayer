@@ -22,10 +22,16 @@ internal sealed partial class WorldCatalogue
         "Elevator","ElevatorButton","WireWallGate","Laser","DamageTrigger","TimelineSequence","EventListener","MultiStateListener","MultiInteractListener",
         "MultiBreakListener","ExplosionListener","BreakListener","InteractListener","InteractableStateListener","ActiveStateSaveable","Explosive","FallingPlatform","GameplayVolume","TriggerWallComponent",
         "Invoker","ControlPanel","EmissionAnimator","LightAnimator","NeonSignController","AirTube","GlassObject","SpawnPointsController","SpawnPointInFight","Cannon","FuckOffCannon",
-        "ForestBridge","FerrisWheelCart","CeilingConveyor","Scaler","CovidArenaBase","DrinkFountain"};
+        "CovidArenaController","CovidArenaSegment","AntiCovidSyringeController","AntiCovidSyringe","GravityChanger","ForestBridge","FerrisWheelCart","CeilingConveyor","CeilingConveyorListener","Scaler","CovidArenaBase","DrinkFountain",
+        "PhysicalObjectSpawner","Pusher","PawShockwaveTrigger","LeonDuskSwitch","Teleporter","KillVolume","LocalRotation","RocketSequence"};
     private void BuildMissionTargets()
     {
         var all=UnityEngine.Object.FindObjectsOfType<MonoBehaviour>(true).Where(c=>c.gameObject.scene.IsValid() && SafeMotion(c.transform)).ToArray();
+        // Asset events become shared only when an authored world listener owns
+        // them. UI/local-only events must not seed a world trigger accidentally.
+        var worldEvents=new HashSet<IntPtr>();
+        foreach(var listener in all.Select(c=>c.TryCast<EventListener>()).Where(c=>c!=null))
+            if(listener!._gameEventsToListen!=null) foreach(var asset in listener._gameEventsToListen) if(asset!=null) worldEvents.Add(asset.Pointer);
         var pending=new Queue<Component>();var seen=new HashSet<IntPtr>();
         void Enqueue(Component? c)
         {
@@ -40,7 +46,7 @@ internal sealed partial class WorldCatalogue
             var seedType=c.GetIl2CppType().Name;
             // Decorative glass, lights and signs join the graph only when an
             // authored mission controller references them. Do not poll scenery.
-            if(MissionTypes.Contains(seedType) && seedType is not ("GlassObject" or "LightAnimator" or "EmissionAnimator" or "NeonSignController" or "AirTube")) Enqueue(c);
+            if(MissionTypes.Contains(seedType) && seedType is not ("GlassObject" or "LightAnimator" or "EmissionAnimator" or "NeonSignController" or "AirTube" or "LocalRotation")) Enqueue(c);
             if(c.TryCast<BreakableObject>() is {} b && (MissionHierarchy(b.transform) || b._onlyExplosion || b.GetComponent<BreakListener>()!=null)) Enqueue(b);
             if(c.TryCast<PlayerTriggerListener>() is {} listener)
             {
@@ -52,6 +58,7 @@ internal sealed partial class WorldCatalogue
                         var type=component?.GetIl2CppType().Name??target?.GetIl2CppType().Name??"<null>";
                         MissionAudit.Add($"trigger\t{DiagnosticPath(trigger!.transform)}\t{type}.{method}");
                         if(type=="LevelController" && method=="CloseLevel") {shared=true;exit=true;}
+                        if(method=="Raise" && target?.TryCast<Hyperstrange.Base.GameEvent>() is {} gameEvent && worldEvents.Contains(gameEvent.Pointer)) shared=true;
                         if(component!=null && (MissionTypes.Contains(type) || component.TryCast<Interactable>()!=null || component.TryCast<SpawnPoint>()!=null || Encounters.Contains(type))) {shared=true;Enqueue(component);}
                         if(target?.TryCast<GameObject>() is {} obj) {shared=true;RegisterUrineSurface(obj.transform);foreach(var child in obj.GetComponents<MonoBehaviour>()) Enqueue(child);}
                     }
@@ -97,6 +104,22 @@ internal sealed partial class WorldCatalogue
                 {Enqueue(child);if(child is Transform t && SafeMotion(t)) RegisterUrineSurface(t);}
                 else if(p.Name.StartsWith('_') && p.PropertyType==typeof(GameObject) && p.GetValue(actual) is GameObject obj && SafeMotion(obj.transform))
                 {RegisterUrineSurface(obj.transform);foreach(var behaviour in obj.GetComponents<MonoBehaviour>()) Enqueue(behaviour);}
+                else if(p.Name.StartsWith('_') && p.PropertyType.IsGenericType &&
+                    p.PropertyType.GetGenericTypeDefinition()==typeof(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<>) &&
+                    typeof(UnityEngine.Object).IsAssignableFrom(p.PropertyType.GetGenericArguments()[0]) && p.GetValue(actual) is {} collection)
+                {
+                    // Traverse authored typed references only; never enumerate resources
+                    // or invoke arbitrary object properties to expand the graph.
+                    var length=Convert.ToInt32(p.PropertyType.GetProperty("Length")!.GetValue(collection));
+                    if(length>4096) throw new InvalidOperationException("Mission reference collection exceeds bound: "+p.Name);
+                    var item=p.PropertyType.GetProperty("Item");
+                    for(var i=0;i<length;i++)
+                    {
+                        var value=item?.GetValue(collection,new object[]{i});
+                        if(value is Component member) {Enqueue(member);if(member.TryCast<Transform>() is {} t && SafeMotion(t)) RegisterUrineSurface(t);}
+                        else if(value is GameObject memberObject && SafeMotion(memberObject.transform)) {RegisterUrineSurface(memberObject.transform);foreach(var b in memberObject.GetComponents<MonoBehaviour>()) Enqueue(b);}
+                    }
+                }
                 else if(typeof(FMODEvent).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is FMODEvent sound) UrineAudioAssets[sound.Pointer]=sound;
             }
             if(c.TryCast<MoverController>() is {} movers && movers._movers!=null) foreach(var m in movers._movers) Enqueue(m);

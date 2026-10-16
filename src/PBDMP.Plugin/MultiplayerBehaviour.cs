@@ -19,6 +19,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     private CoopSession? _session;
     private SessionLifecycle? _lifecycle;
     private SharedWorld? _world;
+    private CoopSaveService? _saves;
     private uint _remoteLife, _remoteEpoch;
     private GameObject? _ui;
     private GameObject? _panel;
@@ -71,6 +72,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         if (_failed) return;
         try
         {
+            DiagnosticCursor.Verify();
             SessionLifecycle.TickCleanup();
             if (_view == null)
             {
@@ -99,6 +101,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 var perf=SyncPerformance.Start();_lifecycle?.Tick();SyncPerformance.Finish("lifecycle",perf);
                 _session?.Publish(_smokeLocal ?? ReadPlayer());
                 perf=SyncPerformance.Start();_world?.Tick();SyncPerformance.Finish("world",perf);
+                perf=SyncPerformance.Start();_saves?.Tick();SyncPerformance.Finish("persistence",perf);
             }
             catch (Exception ex)
             {
@@ -133,10 +136,17 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             else if (_steam.Phase == LobbyPhase.Joining) detail = "Joining a friend's Steam lobby...";
             else if (_steam.Phase == LobbyPhase.Hosting) detail = $"Steam lobby open ({(_steam.InviteOnly ? "invite only" : "friends only")}). Invite a friend, or they can use Join Game in Steam.";
             else if (snapshot.Role == SessionRole.Offline && !_steam.Available) detail = _steam.Unavailable;
+            if(!string.IsNullOrEmpty(_saves?.Status)) detail+="\n"+_saves.Status;
             if(snapshot.Connected && !string.IsNullOrEmpty(_world?.MissionStatus)) detail+="\n"+_world.MissionStatus;
             _status!.text = string.IsNullOrEmpty(_feedback) ? detail : _feedback + "\n" + detail;
             _view.Apply(Model(snapshot, local, _status.text));
             _view.Hud.Set(Badge(snapshot));
+            var hold=_saves?.HoldCaption??"";
+            if(hold.Length==0 && _lifecycle is {} holdLife && holdLife.State.Action!=TravelAction.Menu &&
+                (!holdLife.NativeReady || snapshot.Connected && !holdLife.State.Released || holdLife.IsClient && (!holdLife.WorldReady || !holdLife.PersonalReady))) hold="Loading...";
+            if(_view.Prompt.Open) hold="";
+            var hostPause=hold.Length==0 && _lifecycle?.HostPauseNotice==true;
+            _view.Hud.Hold(hostPause?"Host has paused":hold,hostPause);
             if (_lastStatus != snapshot.Status)
             {
                 _lastStatus = snapshot.Status;
@@ -146,7 +156,15 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(Environment.GetEnvironmentVariable("PBDMP_WORLD_REGRESSION")=="1") RunWorldRegression();
+                if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PATH_TEST"))) RunWorldPathTest();
+                else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PRESENTATION_TEST"))) RunReportedPresentationTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_ARENA_TEST")=="1") RunArenaTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_PROP_TEST")=="1") RunPropTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_MECHANISM_TEST")=="1") RunMechanismTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_SCENERY_TEST")=="1") RunSceneryTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_STORY_TEST")=="1") RunStoryTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_SAVE_TEST")=="1") RunSaveTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_WORLD_REGRESSION")=="1") RunWorldRegression();
                 else if(Environment.GetEnvironmentVariable("PBDMP_MISSION_EXITS_TEST")=="1") RunMissionExitTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_URINE_TEST")=="1") RunUrineTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_ACTOR_PART_TEST")=="1") RunActorPartTest();
@@ -183,7 +201,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         return new(key, _lifecycle?.NativeReady ?? true, feet.x, feet.y, feet.z, camera != null ? camera.transform.eulerAngles.y : player.Transform.eulerAngles.y,
             Mathf.Clamp(player.Height, 0.5f, 3f), player.CurrentWeapon?.WeaponId?.ID ?? "",
             camera != null ? Mathf.Clamp(Mathf.DeltaAngle(0f, camera.transform.eulerAngles.x), -90f, 90f) : 0f,
-            _weaponObserver.ShotSequence, player.IsAlive, _lifecycle?.Life ?? 0, _lifecycle?.Epoch ?? 0);
+            _weaponObserver.ShotSequence, player.IsAlive, _lifecycle?.Life ?? 0, _lifecycle?.Epoch ?? 0, _world?.CaptureCarrier());
     }
 
     [HideFromIl2Cpp]
@@ -215,7 +233,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         _avatar.SetActive(true);
         if (_remoteLife != remote!.Life || _remoteEpoch != remote.Epoch)
         { _hadRemote = false; _remoteVisual!.ResetInterpolation(); _remoteLife = remote.Life; _remoteEpoch = remote.Epoch; }
-        var target = new Vector3(remote!.X, remote.Y, remote.Z);
+        var target = _world?.ResolvePoseFeet(remote!) ?? new Vector3(remote!.X, remote.Y, remote.Z);
         var factor = 1f - Mathf.Exp(-20f * Time.unscaledDeltaTime);
         _avatar.transform.position = !_hadRemote || Vector3.Distance(_avatar.transform.position, target) > 8f
             ? target : Vector3.Lerp(_avatar.transform.position, target, factor);
@@ -288,10 +306,23 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         catch (Exception ex) { ResetSession(); _feedback = "Cannot join: " + ex.Message; }
     }
 
+    [HideFromIl2Cpp]
+    private void ConfirmPartner(string text,Action yes,Action no)
+    {
+        var opened=!_open;SetPanel(true);
+        _view!.Prompt.Ask(text,"Assign partner",()=>{if(opened) SetPanel(false);yes();},"Decline",()=>{if(opened) SetPanel(false);no();});
+    }
+
     private void StartCampaign()
     {
         if (!_smokeEnabled) _lifecycle = new(_session!, Notify, () => { if (_open) SetPanel(false); }, ResetSession);
-        if (_lifecycle != null) _world = new(_session!, _lifecycle);
+        if (_lifecycle != null)
+        {
+            _world = new(_session!, _lifecycle);
+            var id=_steamSession && _steam!.LocalId!=0?"steam:"+_steam.LocalId:CoopSaveService.DirectIdentity();
+            _saves=new(_session!,_lifecycle,_world,id,()=>_steamSession?_steam!.Partner:0,Notify,
+                ConfirmPartner);
+        }
     }
 
     private void HostSteam()
@@ -451,6 +482,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
 
     private void ResetSession()
     {
+        _saves?.Dispose();_saves=null;
         try { _world?.Dispose(); }
         catch (Exception ex) { Plugin.Logger.LogError("World cleanup: " + ex); }
         _world=null;
@@ -526,10 +558,15 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             case 1:
                 NativeUiDiagnostics.Capture(SmokeOutput());
                 CaptureUI("runtime-panel.png");
-                // Offline: Steam host, privacy (when Steam runs), Direct IP and Back are reachable; invite and leave are not.
-                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.SteamHostButton, _view.PrivacyButton, _view.DirectButton, _view.BackButton }
+                // Offline: Steam host, privacy (when Steam runs), Direct IP, saves and Back are reachable.
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.SteamHostButton, _view.PrivacyButton, _view.DirectButton, _view.SavesButton, _view.BackButton }
                     .Where(s => s.interactable).ToArray());
                 SmokeAssert(!_view.InviteButton.interactable && !_view.DisconnectButton.interactable, "invite and leave stay disabled outside a session");
+                _view.SavesButton.onClick.Invoke();
+                SmokeAssert(_view.Saves.Open,"Co-op saves opens as its own dialog");
+                NativeUiDiagnostics.AssertLayerNavigation(_view,_view.Saves.Controls);
+                CaptureUI("runtime-saves.png");
+                SmokeAssert(_view.Cancel() && !_view.Saves.Open && _open,"Escape closes Co-op Saves before the multiplayer panel");
                 _view.DirectButton.onClick.Invoke();
                 SmokeAssert(_view.DirectOpen, "Direct IP opens as its own dialog");
                 _smokeStep = 7; _smokeNext = Time.unscaledTime + 0.5f;

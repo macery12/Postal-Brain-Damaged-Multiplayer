@@ -14,6 +14,9 @@ internal sealed class NativeHud
     private readonly (GameObject Root, Image Art, TMP_Text Text, CanvasGroup Group)[] _views = new (GameObject, Image, TMP_Text, CanvasGroup)[MaxToasts];
     private readonly List<(string Text, float Until)> _toasts = new();
     private string _shown = "";
+    private readonly GameObject _hold;
+    private readonly TMP_Text _holdText;
+    internal string HoldText=>_hold.activeSelf?_holdText.text:"";
     internal TMP_Text Text { get; }
 
     internal NativeHud(NativeUiKit kit, Transform root)
@@ -25,6 +28,11 @@ internal sealed class NativeHud
         NativeUiKit.Stretch(Text.rectTransform); Text.enableWordWrapping = false; Text.overflowMode = TextOverflowModes.Ellipsis;
         Text.margin = new Vector4(26, 0, 26, 0);
         _badge.SetActive(false);
+        _hold=NativeUiKit.Rect("Shared gameplay hold",root,new Vector2(960,540),new Vector2(620,100));
+        var holdArt=_hold.AddComponent<Image>();NativeUiKit.CopyImage(kit.BadgeArt,holdArt);holdArt.raycastTarget=false;
+        _holdText=kit.TextAt(_hold.transform,"Hold reason","",new Vector2(310,50),new Vector2(580,90),34);
+        _holdText.alignment=TextAlignmentOptions.Center;_holdText.raycastTarget=false;
+        _hold.SetActive(false);
         for (var i = 0; i < MaxToasts; i++)
         {
             var toast = NativeUiKit.Rect("Notification " + i, root, new Vector2(24, 990 - i * 46), new Vector2(400, 38));
@@ -45,6 +53,14 @@ internal sealed class NativeHud
         _shown = text; Text.text = text;
         _badge.SetActive(text.Length > 0);
         if (text.Length > 0) Fit(_badge, Text, text);
+    }
+
+    internal void Hold(string text,bool hostPause=false)
+    {
+        if(_holdText.text!=text) _holdText.text=text;
+        _hold.GetComponent<RectTransform>().anchoredPosition=hostPause?new Vector2(1350,680):new Vector2(960,540);
+        if(_hold.activeSelf!=(text.Length>0)) _hold.SetActive(text.Length>0);
+        if(text.Length>0) _hold.transform.SetAsLastSibling();
     }
 
     internal void Toast(string text)

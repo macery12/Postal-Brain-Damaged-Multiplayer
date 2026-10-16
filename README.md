@@ -2,7 +2,7 @@
 
 Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign, letting you team up with a Steam friend over the internet or with someone on your LAN.
 
-Built for BepInEx 6 IL2CPP. **Current development version: 0.8.0.**
+Built for BepInEx 6 IL2CPP. **Current development version: 0.10.0.**
 
 ## Sync progress
 
@@ -22,10 +22,11 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 | Urine interactions | | | ✅ | Shared puzzles and effects. |
 | Mission triggers and machinery | | ✅ | | Broader coverage in progress. |
 | Joining an active session | | ✅ | | Some world state remains unfinished. |
-| Shared checkpoints | ✅ | | | Planned. |
-| Multiplayer saves | ✅ | | | Planned. |
+| Shared checkpoints | | | ✅ | P1 can restore the shared recovery point. |
+| Multiplayer saves | | | ✅ | Separate co-op slots, quicksave and autosaves. |
+| FPS and network performance | | ✅ | | Optimization remains a priority. |
 
-**Milestone progress: 81%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
+**Development coverage: 93%** (includes partial work); **last accepted baseline: 90%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
 
 ![Multiplayer in the native main menu](docs/images/main-menu.png)
 
@@ -86,9 +87,11 @@ Launch the game from Steam on both PCs after installation. **Multiplayer** sits 
 
 Then P1 starts a built-in campaign level, or hosts an already active one. P2 loads the same map and receives the supported current world state before play resumes. The lobby panel shows both players (Steam name, avatar and ping for Steam sessions); a badge in the corner and short notifications show session changes in game. P1 controls difficulty, starts, restarts and level changes. Walk-in exits require both living players at the exit; interactable endings require both nearby. Automatic endings wait until both are alive and loaded.
 
-P2 joins in clear space near P1, with normal-map-spawn fallback. P1's weapons and ammo are copied once on joining; health, armor, keys and powerups are not copied. Later inventories stay independent.
+P2 joins in clear space near P1, with normal-map-spawn fallback. P2 receives P1's weapons, remaining ammo and equipped weapon on each join/rejoin and save restoration, then inventories stay independent. P2 starts those events at full health, zero armor and without temporary powerups; keys and other non-ammo items remain personal.
 
 Death respawns only that player after three seconds at the map spawn with full health, zero armor, retained gear/ammo/items and cleared temporary powerups. P1's pause stops the timer. P2 opening a menu does not pause P1. P2 leaving lets P1 continue; P1 leaving ends the session and returns P2 to the main menu.
+
+P1 can open **Multiplayer → Co-op saves...** for named slots, quicksave and checkpoint restoration. To resume, host a lobby first, then load a co-op slot. Solo saves stay separate. See [co-op saves](docs/co-op-saves.md) for the recovery and partner rules.
 
 ### Development and testing
 

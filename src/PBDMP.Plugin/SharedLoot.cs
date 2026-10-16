@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Hyperstrange.PBD;
 using Hyperstrange.PBD.Contraptions;
 using PBDMP.Network;
 using UnityEngine;
@@ -16,13 +17,21 @@ internal sealed partial class SharedWorld
     private readonly List<GameObject> _ownedLoot=new();
     private static string PickupKey(Pickup pickup)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(pickup.GetIl2CppType().FullName+"/"+pickup.name.Replace("(Clone)","",StringComparison.Ordinal))));
     private void BuildLootPrefabs()
-    {foreach(var prefab in Resources.FindObjectsOfTypeAll<Pickup>()) if(!prefab.gameObject.scene.IsValid()) _pickupPrefabs[PickupKey(prefab)]=prefab;}
+    {
+        foreach(var prefab in Resources.FindObjectsOfTypeAll<Pickup>()) if(!prefab.gameObject.scene.IsValid()) _pickupPrefabs[PickupKey(prefab)]=prefab;
+        // Hosting may begin after native enemies have already dropped loot.
+        if(!Client && !_life.RestoringWorld)
+            foreach(var controller in Object.FindObjectsOfType<LootController>())
+                foreach(var pickup in controller._spawnedLoot)
+                    if(pickup!=null && !pickup._pickedUp && !_dropKeys.ContainsKey(pickup.Pointer)) PickupDropped(pickup);
+    }
     internal void PickupDropped(Pickup pickup)
     {
-        if(Client || !Active) return;
+        if(Client || !Active || _life.RestoringWorld) return;
         // Drop can precede native bag quantity setters. Capture at the end of the frame;
         // every pooled drop receives a fresh identity, including reuse of the same pointer.
-        _pendingLoot.Add((++_nextId,pickup,pickup.GetDropEndPosition(),pickup.transform.rotation));
+        _dropKeys[pickup.Pointer]=++_nextId;
+        _pendingLoot.Add((_nextId,pickup,pickup.GetDropEndPosition(),pickup.transform.rotation));
     }
     private void TickLoot()
     {
@@ -38,11 +47,8 @@ internal sealed partial class SharedWorld
     private void ApplyLoot(WorldFrame frame)
     {
         if(!_personalLoot.Add(frame.Entity)) return;
-        if(!_pickupPrefabs.TryGetValue(frame.Key,out var prefab)) throw new InvalidDataException("Unknown personal-loot prefab.");
-        var root=Object.Instantiate(prefab.gameObject,Unity(frame.Position),Quaternion.Euler(Unity(frame.Rotation)));
-        var bag=root.GetComponent<BagPickup>();if(bag!=null){bag.SetHealth(frame.Value);bag.SetArmor(frame.Value2);}
-        _ownedLoot.Add(root);
+        CreatePersonalDrop(frame);
     }
     private void ClearLoot()
-    {foreach(var root in _ownedLoot) if(root!=null) Object.Destroy(root);_ownedLoot.Clear();_pickupPrefabs.Clear();_loot.Clear();_personalLoot.Clear();_pendingLoot.Clear();}
+    {foreach(var root in _ownedLoot) if(root!=null) Object.Destroy(root);_ownedLoot.Clear();_pickupPrefabs.Clear();_loot.Clear();_personalLoot.Clear();_pendingLoot.Clear();_dropKeys.Clear();}
 }

@@ -134,8 +134,9 @@ internal sealed partial class WorldCatalogue
         }
         BuildUrineTargets();
         BuildMissionTargets();
+        BuildSceneryTargets();BuildMachineSounds();
         Manifest=Hash(string.Join("\n",Components.Keys.OrderBy(k=>k,StringComparer.Ordinal)) + "\n" +
-            string.Join("\n",DoorMotion.Keys.Concat(EncounterMotion.Keys).OrderBy(k=>k,StringComparer.Ordinal)));
+            string.Join("\n",DoorMotion.Keys.Concat(EncounterMotion.Keys).Concat(Fragments.Keys).Concat(PhysicalPrefabReferences).OrderBy(k=>k,StringComparer.Ordinal)));
         Plugin.Logger.LogInfo($"World catalogue {Manifest}: {Components.Count} authored components, {DoorKeys.Count} door/gate components, {DoorMotion.Count} motion transforms.");
         WriteListing();
     }
@@ -164,10 +165,14 @@ internal sealed partial class WorldCatalogue
         else EncounterKeys.Add(Add(component));
         foreach(var transform in component.GetComponentsInChildren<Transform>(true)) if(SafeMotion(transform)) EncounterMotion[TransformKey(transform)]=transform;
     }
-    private static bool SafeMotion(Transform transform)
+    internal static bool SafeMotion(Transform transform)
     {
         // Shared scene controllers can reference menu art. UI animation/input is
         // local; synchronizing those transforms would fight each peer's menus.
+        // Runtime corpses and pooled scenery can already exist on P1 before P2
+        // loads. They are not authored catalogue members; adapters assign IDs.
+        for(var ancestor=transform;ancestor!=null;ancestor=ancestor.parent)
+            if(ancestor.name.Contains("(Clone)",StringComparison.Ordinal) || ancestor.name.StartsWith("PBDMP ",StringComparison.Ordinal)) return false;
         if(transform.TryCast<RectTransform>()!=null || InParent<Canvas>(transform)!=null) return false;
         if(InParent<Pickup>(transform)!=null || InParent<Npc>(transform)!=null || InParent<Player>(transform)!=null) return false;
         var breaker=InParent<Hyperstrange.PBD.Contraptions.Breaker>(transform);
@@ -199,7 +204,7 @@ internal sealed partial class WorldCatalogue
     // identity must distinguish them when a peer constructs a runtime actor.
     internal static string NpcAssetKey(NpcId asset)=>asset.ID+"|"+asset.name+"|"+asset._npcPrefab?.GetComponent<Npc>()?.GetIl2CppType().Name;
     internal static string TransformKey(Transform transform) => Hash(PathOf(transform)+"|transform");
-    private static string PathOf(Transform transform)
+    internal static string PathOf(Transform transform)
     {
         var segments=new List<string>();
         for (var current=transform;current!=null;current=current.parent)

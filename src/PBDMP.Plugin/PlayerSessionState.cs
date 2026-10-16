@@ -81,7 +81,7 @@ internal sealed class PlayerSessionState
             player.WorldCamera.transform.eulerAngles.y);
     }
 
-    internal bool ApplyJoin(JoinLoadout loadout)
+    internal bool ApplyJoin(JoinLoadout loadout,bool placeBeside=true)
     {
         var player = Player.Instance;
         var component = player.GetComponent<PlayerInventoryComponent>();
@@ -108,6 +108,7 @@ internal sealed class PlayerSessionState
         local.HeldItems = merged; local.CurrentWeapon = selected;
         local.LastWeapon = HasWeapon(loadout.LastWeapon) ? loadout.LastWeapon : selected;
         component.LoadState(local);
+        if(!placeBeside) return true;
         var nearby = FindNearby(player, new(loadout.X, loadout.Y, loadout.Z), out var position);
         if (nearby) { RestoreMovement(position, new(0, loadout.Yaw, 0)); Life++; }
         Plugin.Logger.LogInfo(nearby ? "P2 placed beside P1; host weapons/ammo imported once." :

@@ -25,8 +25,8 @@ internal sealed partial class SharedWorld
     internal bool FinishMission(LevelController level)
     {
         if(!Active) return true;
-        if(!Client && _missionCompletion!=null) return false;
         if(_finishingMission) {MissionFinishesForTest++;return true;}
+        if(!Client && _missionCompletion!=null) return false;
         if(Client) return false;
         if(BothMissionPlayersReady() && !_life.Frozen) {MissionFinishesForTest++;return true;}
         _pendingMissionEnd=level;SetMissionWait("","Waiting for both players to be alive and loaded.");return false;
@@ -35,7 +35,8 @@ internal sealed partial class SharedWorld
     {
         if(!Active) return;
         if(Client) {TickMissionCompletion();if(!_life.Frozen) TickClientExitInteraction();return;}
-        if(_life.Frozen) return;
+        TickMissionCompletion();
+        if(_life.Frozen || _missionCompletion!=null) return;
         if(_pendingMissionEnd!=null)
         {
             if(!BothMissionPlayersReady()) return;
@@ -82,13 +83,15 @@ internal sealed partial class SharedWorld
         {
             if(_catalogue.MissionExitKeys.Contains(key)) continue;
             var trigger=_catalogue.Components[key].TryCast<PlayerTrigger>();if(trigger==null || !trigger._enabled || !trigger.gameObject.activeInHierarchy) continue;
-            var inside=Player.Instance.IsAlive && MissionOverlaps(key,Player.Instance.FeetPosition,Player.Instance.Height) ||
-                _session.Snapshot.Connected && pose is {Alive:true,Ready:true} && pose.Epoch==_epoch && MissionOverlaps(key,new(pose.X,pose.Y,pose.Z),pose.Height);
+            var local=Player.Instance.IsAlive && MissionOverlaps(key,Player.Instance.FeetPosition,Player.Instance.Height);
+            var remote=_session.Snapshot.Connected && pose is {Alive:true,Ready:true} && pose.Epoch==_epoch && MissionOverlaps(key,new(pose.X,pose.Y,pose.Z),pose.Height);
+            var prior=_missionOccupants.GetValueOrDefault(key);_missionOccupants[key]=(byte)((local?1:0)|(remote?2:0));
+            var inside=local || remote;
             if(inside==_missionPresence.GetValueOrDefault(key)) continue;_missionPresence[key]=inside;
             trigger._player=Player.Instance;
             if(inside && (trigger._multiUse || !trigger._triggeredOnEnter))
-            {trigger._triggeredOnEnter=true;if(trigger.TryCast<global::PlayerTriggerSpawnEnemies>() is {} spawn) spawn.SpawnEnemies();else trigger.OnPlayerEnter?.Invoke(Player.Instance);}
-            else if(!inside && (trigger._multiUse || !trigger._triggeredOnExit)) {trigger._triggeredOnExit=true;trigger.OnPlayerExit?.Invoke(Player.Instance);}
+            {trigger._triggeredOnEnter=true;InvokeWorldTrigger(trigger,true,!local && remote);}
+            else if(!inside && (trigger._multiUse || !trigger._triggeredOnExit)) {trigger._triggeredOnExit=true;InvokeWorldTrigger(trigger,false,prior==2);}
         }
     }
     private void TickMissionVolumes()
@@ -116,5 +119,5 @@ internal sealed partial class SharedWorld
         MissionStatus=frame.Value==0?"":frame.Value==1?"Waiting for partner at the exit.":"Waiting for both players to be alive and loaded.";
     }
     private void ClearMissions()
-    {ClearMissionCompletion();_missionLightState.Clear();_missionExitInteraction=null;_clientExitInteraction=null;_missionBreakState.Clear();_missionArrayFields.Clear();_missionArrays.Clear();_pendingMissionEnd=null;_finishingMission=false;_lastMissionWait=null;MissionStatus="";_missionPresence.Clear();_finishedMissionExits.Clear();_missionVolumeHitAt.Clear();_missionPollAt=0;}
+    {ClearMissionCompletion();_missionLightState.Clear();_missionExitInteraction=null;_clientExitInteraction=null;_missionBreakState.Clear();_missionArrayFields.Clear();_missionArrays.Clear();_pendingMissionEnd=null;_finishingMission=false;_lastMissionWait=null;MissionStatus="";_missionPresence.Clear();_missionOccupants.Clear();_triggerRequester=0;_finishedMissionExits.Clear();_missionVolumeHitAt.Clear();_missionPollAt=0;}
 }

@@ -63,6 +63,15 @@ public sealed partial class MultiplayerBehaviour
         foreach (var npc in Object.FindObjectsOfType<Npc>()) npc.gameObject.SetActive(false);
         _travelNpcs = Resources.FindObjectsOfTypeAll<Npc>().Where(n => n.gameObject.scene.IsValid()).Select(n => n.GetInstanceID()).OrderBy(x=>x).ToArray();
     }
+    private void EndFrozenDiagnosticSession()
+    {
+        // Fixtures intentionally skip NPC state-entry initialization. Retire
+        // those test actors before releasing the artificial AI freeze; allowing
+        // an update first would dereference an uninitialized native state cache.
+        if(SharedWorldPatches.DiagnosticFreeze)
+            foreach(var npc in Object.FindObjectsOfType<Npc>()) npc.gameObject.SetActive(false);
+        ResetSession();SharedWorldPatches.DiagnosticFreeze=false;
+    }
     private void CheckWorldUnchanged() => TravelCheck(_travelNpcs.SequenceEqual(Resources.FindObjectsOfTypeAll<Npc>()
         .Where(n=>n.gameObject.scene.IsValid()).Select(n=>n.GetInstanceID()).OrderBy(x=>x)), "player respawn retains existing NPC instances");
 

@@ -1,8 +1,32 @@
 # Multiplayer synchronization progress
 
-Updated October 14, 2026. Current development baseline: **PBDMP 0.8.0 / protocol 7**. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
+**Current handoff: partially complete.** Conveyor, gravity-contact and Hospital pusher checks are closed. Eleven acceptance areas remain; the extended restored-elevator ride still has an intermittent death/respawn failure. FPS and network performance are major priorities for the next optimization pass.
 
-**Current milestone coverage: 81% (17 / 21 points).** This is an equally weighted planning checklist for base-campaign co-op, not a stability rating, campaign completion claim, or percentage of two-PC testing completed.
+Updated October 15, 2026. Current development source: **PBDMP 0.10.0 / protocol 10**, with the [campaign world megapass](../megapass.md) still in progress. The current development playtest is build **C8C097B0726D204B**; the last fully accepted baseline remains 0.9.0. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
+
+**Development coverage: 93% (19.5 / 21 points, including partial credit). Last accepted milestone baseline: 90% (19 / 21).** The development score recognizes implemented world-sync work and focused checks while eleven acceptance areas remain. Neither score measures current-build reliability, FPS, network quality or a completed campaign playthrough. [Scoring details](#progress-score).
+
+## Current stopping point
+
+**Latest export:** development playtest **C8C097B0726D204B**, containing the physical-pose ownership fix. The preceding five-item acceptance batch was verified on **F68FE66F1FC90AA7**; the latest prop and arena follow-up is recorded below.
+
+The newer development source also adds direct carrier following and replaces recurring scene-wide stream searches with renderer registration. Native checks cover both Area69 conveyor arrays (32 referenced listeners), personal gravity contacts across save/rejoin and Hospital pusher victim attribution. Native lightning, line and urine presentation reach the peer, including active objects with disabled controller components. These source changes are newer than the unchanged C8C097B0726D204B export.
+
+**Known failures remain:** the latest extended restored-elevator run records a P2 death/respawn after its early checks. FPS/network performance complaints also remain; Area69 sweep p95 improves from about 934 ms to 199–203 ms, with some runs still over the 200 ms target. These are partial features, not completed acceptance.
+
+The first acceptance-closing batch verifies native shared secrets (discovery/counts, duplicate prevention, rollback, rediscovery, disk restoration and rejoin); pending barrel chain timing (partly elapsed capture, restored remaining delay, pause and exactly one future result); and the DeathStar teleporter's real P2 button (destination/view and nonzero transformed native momentum, with P1 unchanged).
+
+The Wall cannon now passes P1 aiming, nearest-P2 targeting, a visible native shell before impact, actual P2 damage with P1 health unchanged, and suppression of independent P2 cannon simulation. Testing found and fixed invisible scenery-fired attacks: native cannon shells have no actor owner, which registration previously rejected. The six-system cannon particle hierarchy also passed the serialized-module audit before being admitted to visual replicas.
+
+Persistent capture no longer swallows live world changes. Its state reads update replication caches, so durable records now also flow through the bounded live queue. The native barrel regression verifies that a change first observed by capture reaches P2 without another world mutation or rejoin; transient historical effects remain excluded from capture. Capture yields under queue pressure while normal publication drains, and its duplicate incremental producer waits. Diagnostic capture helpers also yield across frames rather than synchronously blocking that drain.
+
+The fresh-map sweep also reproduced Hospital Goliath leg movement running before native level readiness. Host NPC simulation ticks now wait for that callback while state-entry initialization remains enabled. The exact Hospital startup audit passes with the guard; ordinary offline behavior and client AI authority stay unchanged.
+
+Three repeated strict Prison regressions pass with exact light, activation, geometry and collision comparisons. The intermittent point-light failure compared an earlier host sample with a later frame of a deliberately flickering control-panel light. The strict fixture now holds the shared world and lets state delivery settle before comparison; no light assertion or tolerance was waived.
+
+The previous world/presentation fixes remain covered: shared posters, native blood impacts, P2's host-pause screen, exact garage structure/portals/hint retirement, strict Hospital poses, stable authored catalogues, compatible older-backup recovery and progressed-save input. The host-side capsule now follows a validated carrier transform, but the latest full restored journey still detects a P2 death/respawn. Earlier passing samples and complete runs do not close this intermittent rider failure.
+
+Remaining work is the finite [megapass closing list](../megapass.md#current-remaining-work): specialised machinery contacts/routes and hazards; interaction rejection/recovery; gameplay-fragment behavior; expanded persistent and native failure recovery; active-world performance; audio/UI and natural campaign progression. The megapass remains partially complete. Development coverage is 93%; the last accepted baseline stays at 90%.
 
 ## Reading the tables
 
@@ -37,11 +61,15 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Level-complete statistics | | | ✅ | P2 displays host counts and the exact completion time; travel remains host-controlled. |
 | Block independent P2 travel | | | ✅ | P2 cannot start, load or restart a level independently. |
 | Shared host pause | | | ✅ | P1 freezes/resumes gameplay for both players. |
+| Host-pause screen on P2 |  |  | ✅ | Real host menu pauses open the native P2 pause screen; autosave/loading holds do not open it. |
+| Host-pause caption | | | ✅ | Native-themed Host has paused notice in the pause screen's empty area. |
+| Automatic guest menu resume | | | ✅ | Host resume closes the screen opened by host pause after its native fade. |
+| Preserve P2-owned pause menus | | | ✅ | A menu P2 opened independently stays open when P1 resumes. |
 | P2 menu during gameplay | | | ✅ | P2 can open a menu without pausing P1. |
 | Wait for both players to load | | | ✅ | Gameplay waits for readiness and the current shared snapshot. |
 | Failed client load recovery | | | ✅ | P2 returns to the menu; P1 can continue. A transport timing check remains under observation. |
 | Menu/pause input release | | | ✅ | Native checks cover overlapping pause/menu locks and focus round trips. |
-| Block multiplayer campaign saving | | | ✅ | Save/load, quicksave and autosave are disabled during multiplayer. |
+| Isolate solo saves and profiles | | | ✅ | Native solo writes stay blocked; dedicated host-owned co-op slots provide multiplayer persistence. |
 
 ## Player presentation and respawn
 
@@ -110,6 +138,7 @@ Coverage is for registered base-campaign weapon paths. P1 resolves shared combat
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
+| NPC simulation during map loading | | | ✅ | Native update ticks wait for level readiness while state-entry initialization runs normally; the Hospital Goliath startup regression passes. |
 | Enemy AI authority | | | ✅ | P1 simulates NPCs; P2 suppresses competing AI/navigation/gameplay callbacks. |
 | Target either living player | | | ✅ | Includes P2's native gameplay proxy. |
 | Enemy movement | | | ✅ | Replicates movement and root motion. |
@@ -133,7 +162,9 @@ Coverage is for registered base-campaign weapon paths. P1 resolves shared combat
 | Enemy shields | | | ✅ | Shared protection state belongs to P1. |
 | Enemy status effects | | | ✅ | Shared native status state follows P1. |
 | Enemy death type/timing | | | ✅ | P1 commits deaths and kills. |
-| Blood impact particles | | | ✅ | Native flesh/armor bursts reach P2, including for P2 attacks. |
+| Blood impact particles |  |  | ✅ | Relays the actual native flesh/armor material effect, including its full emitter hierarchy; shooter effects remain immediate. |
+| Immediate P2 native impacts | | | ✅ | Local harmless flesh/armor effects play without waiting for host damage resolution. |
+| Native impact echo suppression | | | ✅ | P2 does not replay its own forwarded effect or sound. |
 | Blood decals | | | ✅ | Native NPC hit presentation projects the corresponding blood decals. |
 | Gib presentation | | | ✅ | Selected native death effects; harmless physics stays local. |
 | Ragdoll presentation | | | ✅ | Shared death presentation; harmless settling can differ. |
@@ -184,16 +215,20 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Hot-sauce urine activating electrical boxes | | | ✅ | Native powered-urine collision routes fuse activation to P1. |
 | Fire urine igniting explosive barrels | | | ✅ | P1 applies flame damage and executes native explosion/listener consequences. |
 | Fire urine burning supported objects | | | ✅ | P1 owns burn damage and persistent burned state; powerup duration stays personal. |
-| First-mission garage opening | | | ✅ | Retains the authored wall around the cutout; checks static geometry, opening collision and late join. |
+| First-mission garage opening |  |  | ✅ | Matches the permanent wall cutout and native hide/show portal state before crossing the opening; passage and rejoin checks pass. |
 | First-mission garage collision | | | ✅ | Actual solid wall collision disappears; both native player controllers traverse the same opening, including after rejoin. |
+| Explosion-linked occlusion portals | | | ✅ | Native hide/show portal bits accompany shared surfaces; older surface layouts retain native baseline portal state. |
 | First-mission urine tutorial trigger | | | ✅ | Completion/disable state follows P1. |
+| First-mission urine hint cleanup |  |  | ✅ | P2 completing the fuse retires P1's exact trigger-owned hint and preserves unrelated local notifications. |
 | Urine-activated shootable buttons | | | ✅ | Native target interactions route through P1. |
 | Urine-activated metal buttons | | | ✅ | Uses the requester's native interaction/key handshake. |
 | Fractional filler progress | | | ✅ | Preserves native incremental filling. |
 | Tank fill progress | | | ✅ | Current fill fraction follows P1. |
+| Native tank endpoint overshoot | | | ✅ | Normalizes finite native drain/fill overshoot for replication/restoration; malformed nonfinite or unbounded values remain rejected. |
 | Tank/filler completion | | | ✅ | P1 commits completion and authored consequences. |
-| Fill-driven moving objects | | | ✅ | Replicates linked object motion. |
+| Fill-driven moving objects |  |  | ✅ | P1 owns linked poses; P2 fill callbacks cannot overwrite them. Strict Hospital live/current-world rejoin comparison passes. |
 | Fill-driven scaling objects | | | ✅ | Replicates linked object scale. |
+| Replica body presentation | | | ✅ | Replicated bodies use host poses without stale local physics interpolation; original interpolation returns when ownership ends. |
 | Urine-linked material state | | | ✅ | Replicates supported native material/tiling state. |
 | Urine-linked light state | | | ✅ | Replicates supported native light state. |
 | Urine-linked laser switches | | | ✅ | Supported authored state follows P1. Full natural progression needs playtesting. |
@@ -255,6 +290,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Mission control-panel state | | | ✅ | Host execution and pressed/activation state are replicated. |
 | Mission light color | | | ✅ | Current referenced light colors are transmitted as bounded values. |
 | Mission light intensity | | | ✅ | Current referenced light intensities follow P1. |
+| Mission light enable/activation | | | ✅ | Referenced enable/activation state passes three repeated strict Prison comparisons against a settled shared pause. Deliberately flickering lights are compared at the same held state. |
 | Mission emission color | | | ✅ | Native emission state is restored through the existing presentation adapter. |
 | Native mission positional sounds | | | ✅ | Registered native one-shot sounds are forwarded; historical sounds are not replayed. |
 | Laser activation and linked pose | | | ✅ | Host executes damage; registered state/presentation follows P1. |
@@ -271,22 +307,128 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Restore referenced machinery on join | | | ✅ | Current activation/collision/poses/light state is included. Unclassified world objects remain outside coverage. |
 | Large mission snapshot delivery | | | ✅ | Ordered retry/backpressure keeps transport queues bounded without dropping state. |
 
-## Broader world coverage and future saves
+## Broader world coverage and persistence
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
 | General scripted world triggers | | ✅ | | Expanded host-owned mission graph, state adapters and exit rules exist. Unclassified callbacks and complete natural campaign acceptance remain; see [mission pass details](mission-trigger-sync-plan.md). |
-| Unrelated puzzle machinery | ✅ | | | Outside the implemented door/combat/urine chains. |
+| Unrelated puzzle machinery | | ✅ | | Expanded authored references and dedicated machinery adapters exist; remaining specialized and natural-route checks are tracked in the megapass. |
 | Moving elevator platforms | | ✅ | | Referenced platform poses and elevator state are replicated; every natural ride/attachment scenario still needs acceptance. |
-| TNT/destructible gates | | ✅ | | WireWallGate uses requester-owned item validation and host state/destruction; natural gate sequences need acceptance. |
+| Moving-platform rider positioning | | ✅ | | Direct carrier following is implemented, but the latest full restored Area69 ride still detects a P2 death/respawn. Root cause and external-obstruction checks remain open. |
+| Elevator underside-hit prevention | | ✅ | | Parenting corrects the reproduced stale-capsule path; extended restored rides still intermittently fail, so safety is not accepted. |
+| Conveyor activation | | | ✅ | Both native Area69 controllers execute on P1; P2 does not independently advance them. |
+| Conveyor listener motion | | | ✅ | Native arrays of 12 and 20 listeners follow host poses and resume after restoration. |
+| Conveyor collision geometry | | | ✅ | Solid collider bounds, enabled states and native ray contacts agree on both peers. |
+| Conveyor save restoration | | | ✅ | Every referenced listener survives disk restore and continues native movement. |
+| Conveyor current-world rejoin | | | ✅ | P2 receives current listener poses and collision after further movement. |
+| Pusher victim attribution | | | ✅ | Hospital's native pusher reaches P2's movement component without pushing P1. |
+| Pusher duplicate prevention | | | ✅ | P2's passive replica produces no independent push; one host force is received. |
+| TNT/destructible gates | | ✅ | | Native WireWallGate requester planting, remaining fuse and shared destruction pass the focused The Wall fixture. Other gate routes and negative cases remain in the megapass. |
 | Cat-paw machinery | | ✅ | | Referenced movers/rotators/switches are covered; specialised trap damage and full natural puzzle flow need validation. |
 | Shootable explosive barrels | | | ✅ | P1 owns shooting/fire damage, native explosion and linked mission results; decorative breakables remain separate. |
-| Breakable props | ✅ | | | Scenery/destructible synchronization remains future work. |
-| Shared checkpoint capture | ✅ | | | Current session snapshots do not provide persistent checkpoints. |
-| Shared checkpoint restoration | ✅ | | | Needs complete shared world restoration. |
-| Persistent co-op saves | ✅ | | | Separate host-owned multiplayer saves are the agreed design. |
-| Restore both players' saved inventories | ✅ | | | Part of future persistent co-op saves. |
+| Breakable props | | ✅ | | Host-owned destruction and current structural state exist; Neighborhood/Backyard native fixtures pass. Broader natural-route acceptance remains in progress. |
+| Decorative glass damage | | | ✅ | P2 native hits reach P1; current broken state restores without replaying old smash events. |
+| Partial explosive-barrel health | | | ✅ | Remaining health restores without refilling an unexploded barrel. |
+| Pending barrel explosion | | | ✅ | A partly elapsed native chain saves its remaining fuse; disk restoration and shared pause retain it, then one native future explosion reaches P2 without disconnecting. |
+| Live updates during save capture | | | ✅ | Durable changes first observed by capture also reach P2 through the bounded live queue; the native restored-barrel regression verifies the result without another mutation or rejoin. |
+| Physical prop restore pose ownership | | | ✅ | An active moving prop restores its physics pose despite a conflicting generic display transform; native pooling and peer rejoin also pass. |
+| Physical bodies after parent machinery | | ✅ | | Restore and publication now order parent state before physical bodies; the combined shifted-parent/body fixture remains to be expanded. |
+| Partial burnable health | | | ✅ | Remaining burn damage survives disk restore and current-world rejoin. |
+| Native live smash sounds | | | ✅ | New destruction uses native positional sources; old destruction does not replay on join/load. |
+| Native live smash particles | | | ✅ | Native presentation is isolated from gameplay callbacks. |
+| Gameplay fragment physics | | ✅ | | Shared pose, collision, velocity and sleep adapters exist; natural fragment classification and interaction checks remain. |
+| Authored movable props | | | ✅ | P2 push requests move the host body; native pose/state restoration passes. |
+| Runtime prop spawn batches | | | ✅ | Consistent capture waits for the complete native batch, including its final push. |
+| Runtime prop motion restoration | | | ✅ | Moving native props retain position, velocity, spin and sleep state. |
+| Runtime prop pool returns | | | ✅ | Tombstones remove P2 replicas; native source ownership is cleared after pooling. |
+| Runtime prop pool reuse | | | ✅ | Reused pool instances receive new lifetime IDs; current-world rejoin is covered. |
+| Falling-platform countdown | | | ✅ | Explicit remaining delay survives pause and disk restoration; natural rider coverage remains separate. |
+| Mover continuation after restore | | | ✅ | Native remaining motion resumes and its future completion runs once in machinery fixtures. |
+| Rotater continuation after restore | | | ✅ | Remaining duration and future callback restore without a duplicate door path. |
+| Elevator continuation after restore | | | ✅ | Moving native platforms resume; dormant optional helpers do not cause restore errors. |
+| Multi-step rotation restoration | | | ✅ | Native phase and future endpoint pass the train machinery fixture. |
+| Scale continuation after restore | | | ✅ | Native ComicCon fixture verifies phase, rollback and the future endpoint. Natural rider scenarios remain separate. |
+| TNT-gate remaining fuse | | | ✅ | The Wall fixture preserves a partially elapsed fuse through pause/disk restore; the future destruction callback runs once. |
+| TNT planting count | | | ✅ | Native P2 interaction plants exactly the required charges, including duplicate request delivery. |
+| TNT requester inventory cost | | | ✅ | P2 spends only planted charges; P1 items remain unchanged. Rejection/timeout coverage remains separate. |
+| TNT-gate destruction replication | | | ✅ | Both peers reach the broken gate state after the restored fuse completes. |
+| Native barrel overkill replication | | | ✅ | Below-zero native health from excessive flame damage is preserved without rejecting P2's session; the Prison regression verifies the actual overkill path. |
+| Machinery loop playback | | ✅ | | Native loop state, seek position and owned pause handling are implemented; remaining audio checks are pending. |
+| Train timeline playback | | | ✅ | Native sleeping-car bindings, peak/completed phase, future signals and current-world rejoin pass the focused fixture. Wider timeline/audio coverage remains separate. |
+| Rocket animation phase | | | ✅ | VIP native fixture verifies phase/state during launch, shared pause and both-peer disk restoration. |
+| Rocket launch continuation | | | ✅ | VIP fixture captures the native quarter-second launch, restores its remaining motion and verifies one future head-hit callback. |
+| COVID arena segment order | | | ✅ | Native shift order and base position survive disk restore on both peers. |
+| COVID syringe activation | | | ✅ | P2's native shootable button reaches the host-owned controller. |
+| COVID syringe animation | | | ✅ | Native phase and injection eligibility restore on both peers without replaying old hits. |
+| COVID syringe cooldown | | | ✅ | Remaining native cooldown survives shared pause/load and resumes to completion. |
+| COVID syringe injection particles | | | ✅ | Audited native injection particles are isolated from gameplay; the arena presentation/current-world rejoin fixture passes. |
+| Shared gravity-volume state | | ✅ | | Typed host state exists and focused contacts pass. Wider changing-volume/puzzle variants remain part of machinery acceptance. |
+| Personal gravity contacts | | | ✅ | Native Area69 entry/exit applies each player's own gravity and terminal fall speed independently. |
+| Gravity contact restoration | | | ✅ | A valid grounded save inside the AirTube restores P2's actual native gravity contact. |
+| Gravity contacts after rejoin | | | ✅ | Joining beside P1 clears old contacts; entering the volume again works. |
+| Cannon targets either player | | | ✅ | Native P1 aim and nearest-P2 targeting pass without relocating P1. |
+| Cannon projectile visibility | | | ✅ | Ownerless native scenery shots receive harmless visual replicas; the six-emitter cannon source passed its serialized particle audit. |
+| Cannon damage victim | | | ✅ | The native shell hits P2 through P1 combat authority; P1 health is unchanged and P2 cannot simulate a duplicate cannon attack. |
+| Scripted teleport attribution | | | ✅ | DeathStar's native P2 button invokes one requester teleport with correct destination/view and nonzero transformed pending momentum; P1 stays put. |
+| Shared secret discovery | | | ✅ | Either player can discover; P2 native entry and duplicate callbacks are exercised. |
+| Shared secret result count | | | ✅ | One discovered identity increments the native shared result once on both peers. |
+| Secret checkpoint/save rollback | | | ✅ | Undiscovered rollback permits rediscovery; discovered disk state restores its identity and count. |
+| Secret late-join restoration | | | ✅ | Current discovered identities/counts survive rejoin without double-credit. |
+| Shared poster collection |  |  | ✅ | Either player collects the authored poster once; P1 commits its shared state. Distance-hidden P1 copies can still be collected by a nearby P2. |
+| Poster level-result counts | | | ✅ | Shared collected count increments once, including duplicate interactions. |
+| Poster late-join restoration | | | ✅ | Current collection/count and readable entries restore without historical collection sounds. |
+| Poster save/checkpoint restoration | | | ✅ | Durable authored GUID records restore collection and counts. Earlier schema-2 personal poster histories become a shared union. |
+| Shared checkpoint capture | | | ✅ | Timed autosaves provide the host-owned recovery snapshots. Native checkpoint/interest-area requests cannot force early disk captures. |
+| Shared checkpoint restoration | | | ✅ | P1 rolls both players and supported native/shared world state back together. Deaths still respawn independently. |
+| Persistent co-op saves | | | ✅ | Separate host-owned storage; native serializers plus durable multiplayer records. |
+| Restore P1 inventory | | | ✅ | Native saved weapons, ammo and non-ammo items. |
+| P2 weapon/ammo catch-up | | | ✅ | Exact P1 owned weapons, remaining ammo and equipped weapon on every join/rejoin and restore. |
+| Restore P2 non-ammo inventory | | | ✅ | Personal saved keys/items for the current map. |
 | Explicit solo-save import | ✅ | | | Future import flow; never overwrite solo saves implicitly. |
+
+## Save and recovery details
+
+| Feature | Planned | Partially synced | Synced | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Native-themed save browser | | | ✅ | Named slots, pagination, confirmations and host-only controls. |
+| Named manual slots | | | ✅ | Create new saves and explicitly overwrite selected manual slots. |
+| Dedicated quicksave | | | ✅ | One rotating quicksave, separate from solo quicksave. |
+| Co-op quickload | | | ✅ | P1 loads the co-op quicksave; P2 cannot load independently. |
+| Three rotating autosaves | | | ✅ | Timer-based captures rotate through three slots with recovery backups. |
+| Gameplay autosave timer | | | ✅ | Five active gameplay minutes by default; pauses, loading and transactions do not count. No checkpoint-volume write storm. |
+| Autosave interval setting | | | ✅ | Host config accepts 5–10 minutes; new levels/restores and completed saves reset the interval. |
+| Autosaving overlay | | | ✅ | Both players see a native-themed capture notice; it clears on release. |
+| Manual saving overlay | | | ✅ | Distinguishes explicit save capture from autosaving. |
+| Map/world loading overlay | | | ✅ | Explains the shared loading/restoration hold. |
+| Restored gameplay input | | | ✅ | Completes the native player-load lifecycle; progressed-save replay verifies real movement and mouse-look. |
+| Partner-assignment menu cleanup | | | ✅ | Closes a panel opened only for assignment, preserving a pre-existing local panel. |
+| Pending unsafe saves | | | ✅ | Waits for loading, death/respawn and active story sequences. |
+| Shared capture pause | | | ✅ | Holds both games for consistent host/player records. |
+| Budgeted native capture | | | ✅ | Yields between serializers under a frame budget. |
+| Background disk writes | | | ✅ | Only managed snapshots reach the worker. |
+| Atomic replacement | | | ✅ | Flushes temporary files before replacing the slot. |
+| Recovery backup | | | ✅ | Preserves the previous valid generation and tries it on primary corruption. |
+| Checksum validation | | | ✅ | SHA-256 envelope rejects damaged payloads. |
+| Save format compatibility | | | ✅ | Schema, game build, authored GUIDs and catalogue checks. |
+| Authored prop catalogue stability | | | ✅ | Scene-load membership preserves map props and excludes later detached corpse chunks across restore/rehost. |
+| Compatible catalogue backup recovery | | | ✅ | Only a backup matching schema, game, map and catalogue is accepted; reports the older recovery point and preserves the primary. |
+| Preserve usable recovery generations | | | ✅ | A known incompatible same-map primary cannot displace the compatible backup during the next save. |
+| Host campaign statistics | | | ✅ | Native level/world statistics plus isolated campaign metadata. |
+| Authored pickup histories | | | ✅ | Resource copies restore separately; posters use shared records. |
+| Generated loot persistence | | | ✅ | Stable saved drop records and separate collection histories. |
+| Returning Steam partner | | | ✅ | Validates the saved slot against the connected Steam account. |
+| Returning Direct IP partner | | | ✅ | Persistent local player ID; not based on name or address. |
+| Replacement partner confirmation | | | ✅ | P1 must assign the saved partner slot before release. |
+| Resume without P2 | | | ✅ | P1 can continue while retaining the absent partner record. |
+| P2 health reset on join/restore | | | ✅ | Full health; no resource refill during ordinary play. |
+| P2 armor reset on join/restore | | | ✅ | Zero armor. |
+| P2 powerup reset on join/restore | | | ✅ | Clears temporary effects. |
+| P1 saved health/armor/powers | | | ✅ | Native personal values restore. |
+| Safe saved position | | | ✅ | Validates placement; nearby/map-spawn fallback with notice. |
+| World restoration barrier | | | ✅ | Native guest baseline, authoritative world snapshot and personal restore acknowledge before release. |
+| Clear transient attacks on load | | | ✅ | Old projectiles/effects do not replay; completed results remain. |
+
+See [co-op saves](co-op-saves.md) for controls and exact partner/resource rules.
 
 ## Intentionally local systems
 
@@ -303,8 +445,8 @@ These are agreed design choices and do not reduce the progress score. Picking so
 | Key pickup collection | ✅ | Each player collects their own copy; an accepted door unlock is shared. |
 | Powerup pickup collection | ✅ | Each player collects their own copy. |
 | Other item pickup collection | ✅ | Each player collects their own copy. |
-| Owned weapon inventory | ✅ | Independent after the one-time joining loadout copy. |
-| Remaining ammo inventory | ✅ | Independent after the one-time joining loadout copy. |
+| Owned weapon inventory | ✅ | Independent after catch-up on every join/rejoin and co-op restore. |
+| Remaining ammo inventory | ✅ | Independent after catch-up on every join/rejoin and co-op restore. |
 | Key inventory | ✅ | Only the interacting player's own keys are checked/consumed. |
 | Required-item inventory | ✅ | Only the interacting player's own required items are checked/consumed. |
 | Other item counts | ✅ | Personal quantities remain independent. |
@@ -315,11 +457,23 @@ These are agreed design choices and do not reduce the progress score. Picking so
 
 ## Progress score
 
-**81% remains the milestone score, not a percentage of rows checked above.** Splitting features into smaller rows changes the display, not implementation progress. The original 21 equally weighted milestones remain the scoring baseline: **15 synced + (4 partial × 0.5) + (2 planned × 0) = 17 / 21 = 80.95%, rounded to 81%.**
+**Development coverage: 93%. Last accepted milestone baseline: 90%.** Both use the same original 21 equally weighted milestones, not the number of detail rows. Splitting features never adds points. Intentionally local systems and out-of-scope modes are excluded.
 
-The four partial milestones are remote player model, remote player animations, general scripted world triggers and complete active-session restoration. The two planned milestones are shared checkpoints/world restoration and persistent multiplayer saves. Detail rows above explain each milestone's implemented parts and gaps. The historical urine milestone increased the baseline from 16 / 20 (80%) to 17 / 21 (81%).
+| Milestone group | Count | Development credit each | Accepted baseline credit each |
+| --- | :---: | :---: | :---: |
+| Accepted milestones | 17 | 1 | 1 |
+| Remote model and animation polish | 2 | 0.5 | 0.5 |
+| General world triggers and complete active-session restoration | 2 | 0.75 | 0.5 |
 
-Intentionally local systems are excluded. Survival, custom maps, DLC-specific content, public matchmaking and dedicated servers are outside this score.
+Development credit: **0 = planned**, **0.5 = partially implemented**, **0.75 = mostly implemented with focused native coverage, but known gaps or broader acceptance outstanding**, **1 = accepted milestone**. The two world milestones receive 0.75 for the implemented machinery, destruction, current-world and persistent-state adapters plus focused checks. Their remaining gaps stay partial.
+
+Development: **17 + (2 × 0.5) + (2 × 0.75) = 19.5 / 21 = 92.86%, rounded to 93%.** Accepted baseline: **17 + (4 × 0.5) = 19 / 21 = 90.48%, rounded to 90%.** This explicitly revises the development partial-credit rubric; it does not declare the remaining paths verified or the current build regression-free. Neither score measures FPS, network quality or release readiness.
+
+The four incompletely accepted milestones remain remote player model, remote player animations, general scripted world triggers and complete active-session restoration. Checkpoint/world restoration and persistent co-op saves are implemented; broader family/recovery checks remain listed below.
+
+## Save verification
+
+Two native game processes pass manual save/load, three-slot autosave rotation, checkpoint rollback, completed-level results/statistics, per-player resource pickup histories, generated loot and structural wall restoration. Fresh-process resume works with P1 alone, then partner join; a different partner remains held until P1 confirms assignment. Managed tests cover atomic replacement, damaged-primary recovery, unusable backups, schema/slot/event rejection, bounded paging and sender authority. See [verification](verification.md) for commands and evidence limits.
 
 ## Combat and actor coverage
 
@@ -327,33 +481,53 @@ The visual-only gun milestone was superseded by shared enemy/combat authority. P
 
 The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spawned/transformed enemies, `FakeCitizen`/`FakePostalDude` scripted reactions, `BalloonGroup`, `CovidEye`/`MiniCovidEye` and `ElonMechWeakSpotComponent`. Scripted humans retain native invulnerability where appropriate. Replicas suppress local AI, navigation, animation gameplay callbacks and competing rigidbody motion. Native boss HUD health follows P1. Cosmetic particle/light state and native positional actor sounds are also relayed.
 
-## Mission pass verification
+## Mission pass verification (historical 0.9 baseline)
 
-- Both peers need the matching 0.8.0 / protocol 7 DLL pair.
+- These historical results used matching 0.9.0 / protocol 8 DLLs. The current playtest pair and its checks are recorded at the top of this page.
 - Neighborhood's actual `OBJECTIVES/BreakableWall` failed before the adapter and passes after it: renderer/collider removal, matching native controller passage, either-player activation and rejoin without historical effects. Repeat with `Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood`.
 - Prison walk-in exits and Wallmarkt's interactable bed ending enforce partner gathering, readiness cancellation and one committed finish. Automatic endings wait for independent respawn. Use `-MissionExits -Level LEVEL_AD_Prison` or `LEVEL_AD_Wallmarkt`.
 - Native `-WorldRegression` checks P2 hit particles, powered urine, host-owned barrel damage, actual Prison pipe geometry and the formerly crashing explosion replay. Use `-Level LEVEL_AD_Prison` or `LEVEL_AD_Neighborhood`.
 - Prison's extended state fixture verifies current door/mover/mission scalar state, authoritative P2 encounter activation and group progression. Use `-State -Level LEVEL_AD_Prison`.
-- Nineteen network scenarios include 12,288 ordered mission-state frames through bounded queues with a delayed consumer. Native snapshots retain frames for retry and use TCP receive backpressure.
+- Twenty-two network scenarios include persistent-save corruption recovery, bounded save paging and authority checks, plus 12,288 ordered mission-state frames through bounded queues with a delayed consumer. Native snapshots retain frames for retry and use TCP receive backpressure.
 - The controlled 60 FPS check measures about 3.7 ms p95 world work, 150 ms p95 sweeps and 16.7 ms p95 frame time. An earlier input run encountered a shared host pause while awaiting samples; the check passed on rerun. This does not establish every intermittent focus/pause issue's cause.
 - All 15 maps were inspected with the expanded catalogue. A long sequential run hit a native NPC initialization error entering VIP; the remaining maps passed in a fresh process. Discovery/bounded serialization is not natural campaign completion.
 - Shared-combat regressions and representative Prison/Forest/ComicCon machinery catalogue/state checks passed. Use the [verification commands](verification.md#running-checks) to repeat the relevant fixtures; private run folders are not distributed.
 
 ## Evidence and practical limits
 
-- Urine regressions use two native processes in Neighborhood, Prison, Hospital and ComicCon: either-player electrical-box/tank activation, catalogued garage visibility/collision and tutorial-trigger state, fractional fill and linked motion/scale, toilet overflow/flush, fireball extinguishing and disconnect/rejoin restoration. The subsequent house-wall regression is fixed by a dedicated destruction adapter; native tests now check the actual renderer, collider and matching player-controller passage before and after joining again. An exposed native boss weak spot also accepts P2's frame-timed urine damage through the existing actor-hit authority path.
-- All 15 campaign maps pass discovery and bounded serialization with the new urine/progression catalogue. This does not establish natural completion of every urine puzzle, rail ride, rocket sequence or boss fight. The VIP live fixture stopped in a native shared pause before its test action; its natural progression remains manual acceptance work.
+- Current protocol 10 passes **31 managed acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
+
+- Urine regressions use two native processes in Neighborhood, Prison, Hospital and ComicCon: either-player electrical-box/tank activation, catalogued garage surface/collision and tutorial-trigger state (including native portal bits and exact host hint retirement), fractional fill and linked motion/scale, toilet overflow/flush, fireball extinguishing and disconnect/rejoin restoration. The subsequent house-wall regression is fixed by a dedicated destruction adapter; native tests now check the actual renderer, collider and matching player-controller passage before and after joining again. An exposed native boss weak spot also accepts P2's frame-timed urine damage through the existing actor-hit authority path.
+- All 15 campaign maps pass discovery and bounded serialization with the new urine/progression catalogue. This does not establish natural completion of every urine puzzle, rail ride, rocket sequence or boss fight. An earlier urine-only VIP fixture stopped in a native shared pause before its action. The later focused machinery fixture passes native launch/rollback/continuation; natural progression remains manual acceptance work.
 - The final urine build passes shared-combat and bedroom-door reload regressions. Its controlled 60 FPS host check measures 3.5 ms p95 world work and 100 ms p95 completed sweeps; this preserves the frame-budgeted sampling behavior while adding urine state.
-- The 15 network scenarios pass with protocol 7, including 12,288 ordered mission frames with bounded send/receive backpressure. One run of the pre-existing loading-failure-reason check failed transiently and passed on rerun; this pass does not claim that transport timing issue has been diagnosed.
+- Historical protocol 8 passed 22 network scenarios. The earlier loading-failure-reason race was fixed by allowing the receiver to retain the peer's stated reason before transport cleanup; see [verification](verification.md).
 - Network acceptance checks cover bounded actor/combat packets, event preservation, authority restrictions, travel, reconnect and build mismatch.
 - Two actual local IL2CPP processes pass native combat, door/key/reload, encounter, late-join input, travel/respawn and UI checks. P2 targeting/hit probes exercise a real native enemy attack.
 - The input regression reproduces and fixes a stranded `NONE` lock when P2 closes its menu during P1's pause. Five real window focus round trips also verify native movement and mouse-look input after returning to P2; this does not establish that every intermittent Alt-Tab failure had that same cause.
-- Host periodic state sampling now yields between actors, encounters, doors and movers under a roughly 3 ms shared capture budget. NPC spawn/enable tracking avoids repeated scene-wide NPC discovery; beam/chain/stream searches are staggered, stable animator/encounter metadata is cached, and menu/save discovery scans run periodically while cached guards remain enforced each frame. Combat events retain their immediate handling and join snapshots still complete before gameplay release.
+- Host periodic state sampling now yields between actors, encounters, doors and movers under a roughly 3 ms shared capture budget. NPC spawn/enable tracking avoids repeated scene-wide NPC discovery; native beam/line/urine renderers are seeded once and tracked as new instances appear, stable animator/encounter metadata is cached, and menu/save discovery scans run periodically while cached guards remain enforced each frame. Combat events retain their immediate handling and join snapshots still complete before gameplay release.
 - Controlled two-instance Neighborhood timings confirmed the previous periodic host hitch: frame p95 after a full sync batch was 105 ms versus 7.8 ms between batches. Host world-work p95 fell from 19.9 ms to 3.2 ms after the fixes. A separate 60 FPS check measured 83 ms p95 for completed world sweeps and the expected 16.7 ms displayed-frame p95. Median capture allocations fell from about 2.5 MB to 1.5 MB per cycle. These are stationary native diagnostic results under two-instance load, not a guarantee about every combat scene, hardware configuration or LAN setup.
 - Actor fixtures exercise **49 base-campaign NPC families** for spawning, targeting, movement, health/status/shield and death presentation. Separate fixtures exercise weak spots, balloons, scripted human reactions and the native boss HUD.
 - All **15 base-campaign maps** pass authored actor catalogue/snapshot audits: **43 distinct authored NPC families across 243 map/family rows**. These audits establish discovery and bounded serialization, not a complete combat playthrough of every map.
 - Two-PC play is verified by the maintainer. Regression testing should continue to exercise natural mission/boss sequences, LAN latency and special attacks alongside native fixtures.
 
+## Remaining megapass acceptance
+
+All rows below are **partially complete**: adapters or focused checks exist, while the stated result remains outstanding.
+
+| Feature | Planned | Partially synced | Synced | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Forest bridge progression | | ✅ | | Validate natural fall and the usable route after join/rollback. |
+| Wheel/cart progression | | ✅ | | Validate the actual driver, doors and rider through save/rejoin. |
+| Cat-paw/shockwave damage | | ✅ | | Validate runtime source, victims, cadence and pause/life gating. |
+| Laser/crush/rider safety | | ✅ | | Extended elevator death/respawn still reproduces; complete obstruction, cadence and duplicate-hit checks. |
+| Rejected/stale interactions | | ✅ | | Finish eligibility, simultaneous/stale requests, timeout and item-refund cases. |
+| Gameplay-fragment behavior | | ✅ | | Finish native fragment classification, collision and interaction checks. |
+| Cross-family persistent recovery | | ✅ | | Fresh-process restore, further progression and then rejoin for remaining families. |
+| Native interrupted recovery | | ✅ | | Missing targets, interrupted transfer/restore and peer loss must preserve files and release or fail clearly. |
+| Active-world performance | | ✅ | | FPS/network complaints remain; unchanged timing targets are not consistently met under current load. |
+| Audio/story/UI regression | | ✅ | | Finish loop seek/cleanup/pause and final story/input/UI checks; queued checks after the rider failure did not run. |
+| Natural campaign routes | | ✅ | | Complete meaningful traversal with both players, save points and rejoining. |
+
 ## Remaining work
 
-Shared checkpoints and persistent co-op saves need complete world snapshots. Supported mission triggers and referenced machinery now have shared state, while unclassified callbacks, arbitrary timeline tracks and general decorative scenery/destructibles remain outside complete coverage. Natural campaign/ride/trap acceptance and player-presentation polish remain before treating this development build as a validated release.
+Co-op persistence now combines native world saves with durable multiplayer records. Solo-save import remains planned. Supported mission triggers and referenced machinery now have shared state, while unclassified callbacks, arbitrary timeline tracks and general decorative scenery/destructibles remain outside complete coverage. Natural campaign/ride/trap acceptance and player-presentation polish remain before treating this development build as a validated release.

@@ -90,8 +90,8 @@ internal sealed partial class SharedWorld : IDisposable
             var keepHostWorld=!Client && _catalogue!=null && _life.NativeReady && _mapGeneration==_life.MapGeneration && _life.State.Action!=TravelAction.Menu;
             if(!keepHostWorld)
             {
-                ClearMissions();
-                ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine(); _catalogue=null; _assets=null; _enemies.Clear(); _enemyIds.Clear(); _lastEnemy.Clear();
+                ClearSequences();ClearScenery();ClearMechanisms();ClearMissions();
+                ClearPosters(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine(); _catalogue=null; _assets=null; _enemies.Clear(); _enemyIds.Clear(); _lastEnemy.Clear();
                 _componentIds.Clear(); _lastDoor.Clear(); _lastMotion.Clear(); _revisions.Clear(); _snapshotEnemies.Clear(); _enemyRespawns.Clear(); _nextId=0;
             }
             _epoch=_life.Epoch; _mapGeneration=_life.MapGeneration;
@@ -103,20 +103,21 @@ internal sealed partial class SharedWorld : IDisposable
         }
         if (!_life.NativeReady || _life.State.Action==TravelAction.Menu) return;
         if (_catalogue==null)
-        { _catalogue=new(); _catalogue.Build(); _assets=new(); _assets.Build(); BuildProjectilePrefabs(); BuildLootPrefabs(); BuildExplosionAssets(); BuildStreams(); BuildUrineSounds(); BuildUrineRails(); }
+        { MultiplayerBehaviour.EnsurePropSpawnerFixture();_catalogue=new(); _catalogue.Build(); _assets=new(); _assets.Build(); BuildProjectilePrefabs(); BuildLootPrefabs(); BuildExplosionAssets(); BuildStreams(); BuildUrineSounds(); BuildUrineRails(); BuildPosters(); }
         if(!Client) TickLoot();
         var snapshot=_session.Snapshot;
+        TickWorldMechanics();TickBreakDebris();TickSequences();
         TickMissionProgress();
-        TickUrinePause();
+        TickUrinePause();TickWorldAudioPause();
         if (!snapshot.Connected)
         { CancelStateCapture();ReleaseActor(); _peerMatched=false; _outbound.Clear(); return; }
         var captureDeadline=Stopwatch.GetTimestamp()+(long)(Stopwatch.Frequency*0.003);
         if (!Client)
         {
-            if (snapshot.RemotePose is {Ready:true} pose && pose.Epoch==_epoch)
+            if (!_life.RestoringWorld && snapshot.RemotePose is {Ready:true} pose && pose.Epoch==_epoch)
             {
-                _remote ??= RemoteActor.Create(SendIncomingHit,SendPlayerContact);
-                var feet=new Vector3(pose.X,pose.Y,pose.Z);var velocity=_remote.Velocity;
+                _remote ??= RemoteActor.Create(SendIncomingHit,SendPlayerContact,SendRemotePush,CurrentRemoteCarrierFeet,CurrentRemoteCarrierTransform);
+                var feet=ResolvePoseFeet(pose);var velocity=_remote.Velocity;
                 if(_remotePoseAt==0 || !pose.Alive) velocity=Vector3.zero;
                 else if(feet!=_remoteFeet) velocity=Vector3.ClampMagnitude((feet-_remoteFeet)/Mathf.Max(0.01f,Time.unscaledTime-_remotePoseAt),60);
                 else if(Time.unscaledTime-_remotePoseAt>0.15f) velocity=Vector3.zero;
@@ -134,6 +135,7 @@ internal sealed partial class SharedWorld : IDisposable
             Receive(frame);
         }
         RefreshDoorPortals();
+        if(Client) TickReplicaPlatformCarry();
         TickNativeProjectiles();
         if (!Client && _peerMatched)
         {
@@ -157,6 +159,15 @@ internal sealed partial class SharedWorld : IDisposable
     }
     private void Send(WorldFrame frame)
     {
+        if(_persistentFrames!=null)
+        {
+            if(!WorldProtocol.Durable(frame)) return;
+            _persistentFrames.Add(frame with {Epoch=1,Sequence=1});
+            // Capture updates the same delta caches as live replication. Keep
+            // publishing durable state through the bounded live queue, or a
+            // change first observed by a save becomes "already sent" forever.
+            // Historical/transient effects remain excluded from capture.
+        }
         if(!_session.Snapshot.Connected && !_validatingAuditFrames) return;
         frame=frame with {Epoch=_epoch,Sequence=++_sequence};
         WorldProtocol.Validate(frame);
@@ -192,6 +203,7 @@ internal sealed partial class SharedWorld : IDisposable
         }
         if (frame.Kind==WorldKind.ManifestAck)
         {
+            if(_life.RestoringWorld || !_life.State.HostReady || CoopSaveService.Current?.MaySendSnapshot==false) return;
             if (frame.Key!=_catalogue!.Manifest) throw new InvalidDataException("P2 world catalogue mismatch.");
             if (!_peerMatched)
             { _peerMatched=true; Send(new(WorldKind.SnapshotBegin,_epoch,1)); SendState(true); Send(new(WorldKind.SnapshotEnd,_epoch,1)); }
@@ -224,6 +236,11 @@ internal sealed partial class SharedWorld : IDisposable
                 else if (frame.Kind==WorldKind.ActorEffect) ApplyActorEffect(frame);
                 else if (frame.Kind==WorldKind.UrineState) ApplyUrineState(frame);
                 else if (frame.Kind==WorldKind.MissionState) ApplyMissionState(frame);
+                else if (frame.Kind==WorldKind.Scenery) ApplyScenery(frame);
+                else if (frame.Kind==WorldKind.Mechanism) ApplyMechanism(frame);
+                else if (frame.Kind==WorldKind.Sequence) ApplySequence(frame);
+                else if (frame.Kind==WorldKind.SceneryEvent) PlaySceneryEvent(frame);
+                else if (frame.Kind==WorldKind.PlayerEffect) ApplyPlayerEffect(frame);
             }
             finally { _applying=false; }
         }
@@ -248,6 +265,9 @@ internal sealed partial class SharedWorld : IDisposable
     { _stateCapture?.Dispose();_stateCapture=null; }
     private void TickStateCapture(long deadline)
     {
+        // The full save sweep owns the shared delta caches until it yields its
+        // final record. Do not run a second incremental producer into it.
+        if(_persistentFrames!=null) return;
         if(_stateCapture==null)
         {
             if(Time.unscaledTime<_stateAt) return;
@@ -282,6 +302,8 @@ internal sealed partial class SharedWorld : IDisposable
         foreach(var step in SendUrineWagons(complete)) yield return step;
         foreach(var pair in _catalogue.UrineSurfaces) {SendUrineSurface(pair.Key,pair.Value,complete);SendMissionLights(pair.Key,pair.Value,complete);yield return 0;}
         foreach(var key in _catalogue!.EncounterKeys) {SendEncounter(key,complete);yield return 0;}
+        foreach(var step in CaptureSequences(complete)) yield return step;
+        foreach(var step in CaptureMechanisms(complete)) yield return step;
         if(complete) foreach(var loot in _loot.Values) Send(loot);
         IEnumerable<Npc> actors=complete?Object.FindObjectsOfType<Npc>():_enemies.Values.ToArray();
         foreach (var npc in actors)
@@ -326,6 +348,9 @@ internal sealed partial class SharedWorld : IDisposable
             {Send(frame);_lastMotion[pair.Key]=frame;}
             yield return 0;
         }
+        // Parent machinery and display transforms arrive first. A physical
+        // prop's world-space body is the final authority over its own pose.
+        foreach(var step in CaptureScenery(complete)) yield return step;
     }
     private static bool SameEnemy(WorldFrame a,WorldFrame b)=>a.Flags==b.Flags && a.Position==b.Position && a.Rotation==b.Rotation && a.Value==b.Value && a.Value2==b.Value2 && (a.Values??Array.Empty<float>()).SequenceEqual(b.Values??Array.Empty<float>());
     private void ApplyEnemy(WorldFrame frame)
@@ -388,6 +413,10 @@ internal sealed partial class SharedWorld : IDisposable
             if (!_catalogue!.DoorKeys.Contains(frame.Key)) throw new InvalidDataException("Unknown authoritative door.");
             var component=_catalogue.Components[frame.Key];
             if(component==null) return;
+            // These machines also appear as doors by hierarchy name. Their
+            // typed native restore/encounter + motion adapters own continuation.
+            // Loading them again here creates a second tween and callback.
+            if(component.GetIl2CppType().Name is "Mover" or "MoverController" or "Rotater" or "Toggler" && _catalogue.EncounterKeys.Contains(frame.Key)) return;
             ReportMissingDoorReferences(component,frame);
             if(!ApplySwingDoor(component,frame.Data??Array.Empty<string>())) WorldCatalogue.Load(component,frame.Data??Array.Empty<string>());
         }
@@ -396,9 +425,13 @@ internal sealed partial class SharedWorld : IDisposable
             if (!_catalogue!.DoorMotion.TryGetValue(frame.Key,out var transform) && !_catalogue.EncounterMotion.TryGetValue(frame.Key,out transform)) throw new InvalidDataException("Unknown shared motion.");
             // A destroyed decorative handle is not a reason to end the campaign session.
             if(transform==null) return;
-            StopReplicaUrineAnimation(frame.Key,transform);
-            var body=transform.GetComponent<Rigidbody>(); if (body!=null) {if(!_doorBodies.ContainsKey(body)) _doorBodies[body]=body.isKinematic;body.isKinematic=true;}
-            transform.localPosition=Unity(frame.Position); transform.localRotation=Quaternion.Euler(Unity(frame.Rotation));
+            if(Client) StopReplicaUrineAnimation(frame.Key,transform);
+            var body=transform.GetComponent<Rigidbody>(); if (Client && body!=null) {if(!_doorBodies.ContainsKey(body)) _doorBodies[body]=body.isKinematic;body.isKinematic=true;OwnBodyPresentation(body);}
+            var physical=body?.GetComponent<Hyperstrange.PBD.Contraptions.PhysicalObject>();
+            // An interpolated Transform can lag its physics body. Keep generic
+            // activation/scale, but never replace this body's authoritative pose.
+            if(physical==null || !SharedPhysics(physical))
+            {transform.localPosition=Unity(frame.Position);transform.localRotation=Quaternion.Euler(Unity(frame.Rotation));}
             transform.localScale=Unity(frame.Velocity);
             transform.gameObject.SetActive((frame.Flags&1)!=0);
         }
@@ -479,8 +512,8 @@ internal sealed partial class SharedWorld : IDisposable
     {
         CancelStateCapture();
         RefundPendingDoorRequests();
-        ClearMissions();
-        ReleaseActor(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearWeaponAudio(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine();
+        ClearSequences();ClearScenery(preserveHost:!Client);ClearMechanisms();ClearMissions();
+        ReleaseActor(); ClearPosters(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearWeaponAudio(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine();
         foreach (var pair in _agents) if (pair.Key!=null) pair.Key.enabled=pair.Value;
         foreach (var pair in _rootMotion) if (pair.Key!=null) pair.Key.applyRootMotion=pair.Value;
         foreach (var pair in _behaviours) if (pair.Key!=null) pair.Key.enabled=pair.Value;

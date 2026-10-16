@@ -99,14 +99,15 @@ internal sealed partial class SharedWorld
         }
         var id=++_requestId;
         _doorRequests[id]=(key,consumed,Time.unscaledTime+5f);
-        Send(new(WorldKind.Interact,_epoch,1,id,Key:key,Actor:2,Life:_life.Life,Position:Net(player.FeetPosition)));
+        SendDoorRequest(new(WorldKind.Interact,_epoch,1,id,Key:key,Actor:2,Life:_life.Life,Position:Net(player.FeetPosition)));
         return true;
     }
     private void ApplyDoorRequest(WorldFrame frame)
     {
+        if(ReplayInteractionResult(frame)) return;
         if(frame.Flags==1) {ApplyMissionGate(frame);return;}
         if(_catalogue!.MissionInteractionExits.Contains(frame.Key) && !BothNearInteractionExit(frame.Key))
-        {Send(new(WorldKind.InteractionResult,_epoch,1,frame.Entity,Actor:2,Life:frame.Life,Flags:0));return;}
+        {ReplyInteraction(frame,0);return;}
         var exit=_catalogue.MissionInteractionExits.Contains(frame.Key);var before=MissionFinishesForTest;
         if(exit) _finishingMission=true;
         try { ApplyDoorRequestState(frame); }
@@ -148,13 +149,15 @@ internal sealed partial class SharedWorld
                 if (accepted) SendState(false);
             }
         }
-        Send(new(WorldKind.InteractionResult,_epoch,1,frame.Entity,Actor:2,Life:frame.Life,Flags:(accepted?1u:0)|(alreadyInteracted?2u:0)));
+        ReplyInteraction(frame,(accepted?1u:0)|(alreadyInteracted?2u:0));
         Plugin.Logger.LogInfo($"P2 door request result: key={frame.Key}, accepted={accepted}, alreadyInteracted={alreadyInteracted}, epoch={_epoch}, life={frame.Life}/{pose?.Life}, frozen={_life.Frozen}");
         if(Environment.GetEnvironmentVariable("PBDMP_DOOR_TEST")=="1") Plugin.Logger.LogInfo($"DOOR HOST accepted={accepted}; first={alreadyInteracted}");
     }
     private void CompleteDoorRequest(WorldFrame frame)
     {
+        if(!_pendingInteractionFrames.TryGetValue(frame.Entity,out var sent) || sent.Life!=frame.Life || frame.Actor!=2 || frame.Flags>3) return;
         if (!_doorRequests.Remove(frame.Entity,out var request)) return;
+        _pendingInteractionFrames.Remove(frame.Entity);_interactionRetries.Remove(frame.Entity);
         if ((frame.Flags&1)==0 || (frame.Flags&2)!=0) RefundItems(request.Items);
     }
     private void RefundItems(Dictionary<string,int> items)
@@ -166,11 +169,10 @@ internal sealed partial class SharedWorld
     private void TickDoorRequests()
     {
         if (!Client) return;
-        foreach(var pair in _doorRequests.ToArray())
-            if (Time.unscaledTime>=pair.Value.Deadline) {RefundItems(pair.Value.Items);_doorRequests.Remove(pair.Key);}
+        RetryInteractions();
     }
     private void RefundPendingDoorRequests()
-    {if(Client) foreach(var request in _doorRequests.Values) RefundItems(request.Items);_doorRequests.Clear();}
+    {if(Client) foreach(var request in _doorRequests.Values) RefundItems(request.Items);_doorRequests.Clear();ClearInteractionLedger();}
     internal bool RemoteInside(SlidingDoors door)
     {
         if (_remote?.IsAlive!=true || door._playerTrigger==null) return false;

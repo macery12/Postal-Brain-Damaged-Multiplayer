@@ -22,6 +22,17 @@ public sealed partial class MultiplayerBehaviour
     {
         if(_joinInputStep==99) return;
         File.WriteAllText(Marker(TravelRole+"-input-state.txt"),$"step={_joinInputStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, released={_lifecycle?.State.Released}, paused={_lifecycle?.State.Paused}, scale={Time.timeScale}, input={InputManager.Instance.CurrentInputState}, stack={string.Join(",",InputManager.InputStateStack.ToArray())}, panel={_open}");
+        // Drive the native tutorial dismissal only after verifying its real input
+        // map remains usable under the multiplayer hold (the original deadlock).
+        if(_lifecycle?.NativeReady==true && Player.Instance?.GetComponent<Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent>() is { _isTutorialShown:true } tutorial)
+        {
+            var input=InputManager.Instance;
+            TravelCheck(input._gameplayKeyboardMap.enabled && InputManager.CancelInput,
+                "native tutorial keeps its dismiss input available while masking gameplay");
+            tutorial.OnUseDown();
+            TravelCheck(!tutorial._isTutorialShown && !InputManager.CancelInput,"native Use dismisses the tutorial and clears its input mask");
+            return;
+        }
         if(_joinInputStep==0)
         {
             _port!.text=Environment.GetEnvironmentVariable("PBDMP_TRAVEL_PORT")!;
@@ -84,8 +95,13 @@ public sealed partial class MultiplayerBehaviour
                 GameManager.DisableMenu();
                 TravelCheck(!InputManager.Instance._gameplayKeyboardMap.enabled && !InputManager.Instance._gameplayMouseMap.enabled,"closing P2's menu preserves P1's shared pause lock");
                 TravelMark("client-input-paused");_joinInputStep=5;break;
-            case 5 when !_lifecycle!.State.Paused && !_lifecycle.Frozen:
-                CheckJoinGameplayInput("P2 after P1 resumes the shared pause");
+            case 5 when !_lifecycle!.State.Paused && !_lifecycle.Frozen && !_lifecycle.HostPauseNotice:
+                // This fixture opened P2's own menu before P1 paused. The agreed
+                // ownership rule preserves it; close it explicitly after resume
+                // and let the native fade release its input mask.
+                GameManager.DisableMenu();_joinInputAt=Time.unscaledTime+1f;_joinInputStep=50;break;
+            case 50 when Time.unscaledTime>=_joinInputAt:
+                CheckJoinGameplayInput("P2 after closing its retained menu following P1 resume");
                 SetPanel(true);SetPanel(false);CheckJoinGameplayInput("P2 after opening/closing F8");
                 GameManager.PauseGame();_joinInputAt=Time.unscaledTime+1f;_joinInputStep=6;break;
             case 6 when Time.unscaledTime>=_joinInputAt:
@@ -113,7 +129,7 @@ public sealed partial class MultiplayerBehaviour
     private void CheckJoinGameplayInput(string context)
     {
         var input=InputManager.Instance;
-        TravelCheck(input.CurrentInputState==InputManager.InputState.GAMEPLAY && input._gameplayKeyboardMap.enabled && input._gameplayMouseMap.enabled && Time.timeScale>0,
+        TravelCheck(input.CurrentInputState==InputManager.InputState.GAMEPLAY && input._gameplayKeyboardMap.enabled && input._gameplayMouseMap.enabled && !InputManager.CancelInput && Time.timeScale>0,
             context+" accepts gameplay keyboard/mouse input; actual="+input.CurrentInputState+", keyboard="+input._gameplayKeyboardMap.enabled+", mouse="+input._gameplayMouseMap.enabled+", stack="+string.Join(",",InputManager.InputStateStack.ToArray()));
     }
 }

@@ -27,6 +27,8 @@ internal sealed class NativeMultiplayerUI : IDisposable
     internal MainHyperButton DirectButton { get; }
     internal MainHyperButton DisconnectButton { get; }
     internal MainHyperButton BackButton { get; }
+    internal MainHyperButton SavesButton {get;}
+    internal NativeCoopSaves Saves {get;}
     internal MainHyperButton HostButton { get; }
     internal MainHyperButton JoinButton { get; }
     internal MainHyperButton DirectBackButton { get; }
@@ -87,10 +89,11 @@ internal sealed class NativeMultiplayerUI : IDisposable
         PrivacyButton = Action(box, "Lobby: friends only", 2, privacy);
         DirectButton = Action(box, "Direct IP...", 3, () => ShowDirect(true));
         DisconnectButton = Action(box, "Leave lobby", 4, disconnect);
-        BackButton = Action(box, "Back", 5, toggle);
+        SavesButton = Action(box,"Co-op saves...",5,()=>ShowSaves(true));
+        BackButton = Action(box, "Back", 6, toggle);
         FirstCard = new PlayerCard(_kit, box, "Player slot 1", new Vector2(960, 506), new Vector2(660, 184));
         SecondCard = new PlayerCard(_kit, box, "Player slot 2", new Vector2(960, 302), new Vector2(660, 184));
-        Status = _kit.TextAt(box, "Connection status", "Offline", new Vector2(670, 112), new Vector2(1140, 70), 23);
+        Status = _kit.TextAt(box, "Connection status", "Offline", new Vector2(670, 93), new Vector2(1140, 70), 23);
         _kit.TextAt(box, "Shortcut", "F8 / ESC", new Vector2(1160, 60), new Vector2(200, 36), 20);
 
         DirectDialog = NativeUiKit.Rect("Direct IP dialog", Panel.transform, Vector2.zero, Vector2.zero);
@@ -114,6 +117,14 @@ internal sealed class NativeMultiplayerUI : IDisposable
         DirectStatus = _kit.TextAt(direct, "Direct status", "", new Vector2(500, 72), new Vector2(880, 52), 21);
         DirectDialog.SetActive(false);
 
+        Saves=new NativeCoopSaves(_kit,Panel.transform,
+            (slot,name,overwrite)=>
+            {
+                if(CoopSaveService.Current is not {} service) return;
+                if(overwrite) Prompt!.Ask("Replace this co-op save?","Overwrite",()=>service.RequestSave(slot,name),"Cancel");
+                else service.RequestSave(slot,name);
+            },slot=>Prompt!.Ask("Load this co-op save and replace the current session progress?","Load",()=>CoopSaveService.Current?.RequestLoad(slot),"Cancel"),
+            ()=>Prompt!.Ask("Restore the latest co-op checkpoint for both players?","Restore",()=>CoopSaveService.Current?.RestoreCheckpoint(),"Cancel"),()=>ShowSaves(false));
         Prompt = new NativePrompt(_kit, Panel.transform);
         Panel.SetActive(false);
         EnsureEntries();
@@ -121,7 +132,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
 
     private MainHyperButton Action(Transform box, string label, int row, System.Action action)
     {
-        var button = _kit.ActionAt(box, label, new Vector2(310, 566 - row * 76), new Vector2(420, 62), action);
+        var button = _kit.ActionAt(box, label, new Vector2(310, 566 - row * 66), new Vector2(420, 62), action);
         // Labels change with lobby state; the longest ones shrink to stay on the button art.
         button.LabelText.enableAutoSizing = true; button.LabelText.fontSizeMin = 18; button.LabelText.fontSizeMax = 27;
         button.LabelText.margin = new Vector4(18, 0, 34, 0);
@@ -130,6 +141,9 @@ internal sealed class NativeMultiplayerUI : IDisposable
 
     internal TMP_Text TextAt(Transform parent, string name, string value, Vector2 center, Vector2 size, int fontSize) =>
         _kit.TextAt(parent, name, value, center, size, fontSize);
+
+    internal void ShowSaves(bool open)
+    {Saves.Show(open);Prompt.Root.transform.SetAsLastSibling();_navigation="";if(_modal) EventSystem.current?.SetSelectedGameObject(First()?.gameObject);}
 
     internal bool DirectOpen => DirectDialog.activeSelf;
 
@@ -147,6 +161,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
     {
         if (Time.frameCount == _cancelFrame) return true;
         if (Prompt.Open) { _cancelFrame = Time.frameCount; Prompt.Cancel(); return true; }
+        if(Saves.Open) {_cancelFrame=Time.frameCount;ShowSaves(false);return true;}
         if (DirectOpen) { _cancelFrame = Time.frameCount; ShowDirect(false); return true; }
         return false;
     }
@@ -154,20 +169,21 @@ internal sealed class NativeMultiplayerUI : IDisposable
     private Selectable[] Controls()
     {
         if (Prompt.Open) return Prompt.Controls;
+        if(Saves.Open) return Saves.Controls;
         if (DirectOpen) return new Selectable[] { Address, Port, HostButton, JoinButton, DirectBackButton }.Where(s => s.interactable).ToArray();
-        return new Selectable[] { SteamHostButton, InviteButton, PrivacyButton, DirectButton, DisconnectButton, BackButton }.Where(s => s.interactable).ToArray();
+        return new Selectable[] { SteamHostButton, InviteButton, PrivacyButton, DirectButton, DisconnectButton, SavesButton, BackButton }.Where(s => s.interactable).ToArray();
     }
 
     private Selectable? First() => Controls().FirstOrDefault();
 
-    private Transform Layer() => Prompt.Open ? Prompt.Root.transform : DirectOpen ? DirectDialog.transform : Panel.transform;
+    private Transform Layer() => Prompt.Open ? Prompt.Root.transform : Saves.Open?Saves.Root.transform : DirectOpen ? DirectDialog.transform : Panel.transform;
 
     internal void Refresh()
     {
         if (MainEntry == null || PauseEntry == null) EnsureEntries();
         RepairNavigation(MainEntry!.transform.parent);
         RepairNavigation(PauseEntry!.transform.parent);
-        Hud.Tick();
+        Hud.Tick();Saves.Tick();
         if (!_modal) return;
         _spiral.localRotation = Quaternion.Euler(0, 0, -Time.unscaledTime * 4f);
         _directSpiral.localRotation = Quaternion.Euler(0, 0, -Time.unscaledTime * 5f);
@@ -245,8 +261,9 @@ internal sealed class NativeMultiplayerUI : IDisposable
         else
         {
             // Closing the panel (F8, or campaign travel) dismisses a prompt without answering it: a join in progress continues.
-            Prompt.Hide();
+            if(Prompt.Open && !Prompt.Busy) Prompt.Cancel();else Prompt.Hide();
             DirectDialog.SetActive(false);
+            Saves.Show(false);
             Panel.SetActive(false);
             InputManager.OnMenuCancelDown = Il2CppSystem.Delegate.Remove(InputManager.OnMenuCancelDown, _cancel)?.Cast<Il2CppSystem.Action>();
             if (_blockedGroup != null) { _blockedGroup.interactable = _previousInteractable; _blockedGroup.blocksRaycasts = _previousRaycasts; }

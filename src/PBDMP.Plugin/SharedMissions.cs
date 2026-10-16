@@ -23,7 +23,7 @@ internal sealed partial class SharedWorld
     private void ApplyMissionFall(WorldFrame frame)
     {
         if(!_catalogue!.MissionKeys.Contains(frame.Key) || _catalogue.Components[frame.Key].TryCast<FallingPlatform>() is not {} c || c._fallen || Vector3.Distance(c.transform.position,_remote!.CenterOfMass)>8) return;
-        c.FallWithDelay(Player.Instance);
+        StartFall(c,2,c._destructionDelay);
     }
     private void ApplyMissionHit(WorldFrame frame)
     {
@@ -44,7 +44,7 @@ internal sealed partial class SharedWorld
         var after=new PlayerInventoryComponent.SaveData(inventory);var consumed=new Dictionary<string,int>();
         foreach(var item in before.HeldItems) {var remaining=after.HeldItems.ContainsKey(item.Key)?after.HeldItems[item.Key]:0;if(item.Value>remaining) consumed[item.Key]=item.Value-remaining;}
         var id=++_requestId;_doorRequests[id]=(key,consumed,Time.unscaledTime+5);
-        Send(new(WorldKind.Interact,_epoch,1,id,Key:key,Actor:2,Life:_life.Life,Flags:1,Position:Net(player.FeetPosition)));
+        SendDoorRequest(new(WorldKind.Interact,_epoch,1,id,Key:key,Actor:2,Life:_life.Life,Flags:1,Position:Net(player.FeetPosition)));
     }
     private void ApplyMissionGate(WorldFrame frame)
     {
@@ -55,7 +55,7 @@ internal sealed partial class SharedWorld
         {
             _remoteInteraction=true;try {gate.Interact(Player.Instance);accepted=true;} finally {_remoteInteraction=false;}
         }
-        Send(new(WorldKind.InteractionResult,_epoch,1,frame.Entity,Actor:2,Life:frame.Life,Flags:accepted?1u:0));
+        ReplyInteraction(frame,accepted?1u:0);
     }
     private void SendMissionBreak(string key,bool complete)
     {
@@ -97,7 +97,7 @@ internal sealed partial class SharedWorld
                 breaker._parts.transform.localPosition=breaker._wholeObject.transform.localPosition-breaker._localPositionOffset;
                 breaker._parts.transform.localRotation=breaker._wholeObject.transform.localRotation;
                 if(breaker._rigidbodies!=null) foreach(var body in breaker._rigidbodies)
-                    if(body!=null && body.gameObject.Pointer!=breaker._parts.Pointer) body.gameObject.SetActive(false);
+                    if(body!=null && body.gameObject.Pointer!=breaker._parts.Pointer && !_catalogue.FragmentPointers.Contains(body.Pointer)) body.gameObject.SetActive(false);
             }
             breaker._parts.SetActive(destroyed);
         }

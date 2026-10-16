@@ -141,6 +141,8 @@ internal sealed class RemotePlayerVisual : IDisposable
 
     internal void ResetInterpolation() { _hadPosition = false; _hadShot = false; _muzzle?.Stop(); }
 
+    private readonly HashSet<string> _missingGeometry=new(StringComparer.Ordinal);
+
     private void SetWeapon(string key)
     {
         if (_gun != null) Object.Destroy(_gun);
@@ -157,7 +159,7 @@ internal sealed class RemotePlayerVisual : IDisposable
                 if (candidate != null && candidate.ID == key) { id = candidate; _weapons[key] = candidate; break; }
         }
         if (id == null || id._pickupPrefab == null)
-        { Plugin.Logger.LogWarning("No local weapon pickup geometry for remote ID " + key); return; }
+        { if(_missingGeometry.Add(key)) Plugin.Logger.LogWarning("No local weapon pickup geometry for remote ID " + key+"; keeping the remote character visible. Reported once per remote avatar."); return; }
         try
         {
             _gun = new GameObject("PBDMP Gun " + id.name);

@@ -3,11 +3,11 @@ using System.Text;
 
 namespace PBDMP.Network;
 
-public enum MessageKind : byte { Hello = 1, Welcome = 2, Pose = 3, Reject = 4, Travel = 5, Ready = 6, World = 7 }
+public enum MessageKind : byte { Hello = 1, Welcome = 2, Pose = 3, Reject = 4, Travel = 5, Ready = 6, World = 7, Save = 8 }
 
 // Immutable snapshots can cross worker/main-thread boundaries without Unity objects.
 public sealed record PlayerPose(string Level, bool Ready, float X, float Y, float Z, float Yaw, float Height,
-    string Weapon = "", float Pitch = 0f, uint ShotSequence = 0, bool Alive = true, uint Life = 0, uint Epoch = 0)
+    string Weapon = "", float Pitch = 0f, uint ShotSequence = 0, bool Alive = true, uint Life = 0, uint Epoch = 0, PlayerCarrier? Carrier = null)
 {
     public static readonly PlayerPose Empty = new("", false, 0, 0, 0, 0, 1.8f);
 }
@@ -17,14 +17,14 @@ public sealed record InventoryEntry(string Id, int Quantity);
 public sealed record JoinLoadout(string CurrentWeapon, string LastWeapon, IReadOnlyList<InventoryEntry> Items,
     float X, float Y, float Z, float Yaw);
 public sealed record TravelState(uint Epoch, TravelAction Action, string Level, int Difficulty,
-    bool HostReady, bool Paused, bool Released, bool Joining, JoinLoadout? Loadout = null);
+    bool HostReady, bool Paused, bool Released, bool Joining, JoinLoadout? Loadout = null, string StoryVideo = "", float StoryTime = 0, bool StoryWaiting = false, bool StoryEnding = false, bool HostMenuPaused = false);
 public sealed record ClientReady(uint Epoch, bool Ready);
 public sealed record Packet(MessageKind Kind, int Version = Protocol.Version, string Text = "", PlayerPose? Pose = null,
-    TravelState? Travel = null, ClientReady? Ready = null, WorldFrame? World = null);
+    TravelState? Travel = null, ClientReady? Ready = null, WorldFrame? World = null, SavePage? Save = null);
 
 public static class Protocol
 {
-    public const int Version = 7;
+    public const int Version = 10;
     public const int MaxFrameBytes = 8192;
     public const int MaxInventoryItems = 64;
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -36,6 +36,9 @@ public static class Protocol
         writer.Write((byte)packet.Kind);
         switch (packet.Kind)
         {
+            case MessageKind.Save:
+                SaveProtocol.Write(writer, packet.Save ?? throw new InvalidDataException("Missing save page."));
+                break;
             case MessageKind.World:
                 WorldProtocol.Write(writer, packet.World ?? throw new InvalidDataException("Missing world frame."));
                 break;
@@ -58,6 +61,9 @@ public static class Protocol
                 writer.Write(pose.Pitch);
                 writer.Write(pose.ShotSequence);
                 writer.Write(pose.Alive); writer.Write(pose.Life); writer.Write(pose.Epoch);
+                writer.Write(pose.Carrier!=null);
+                if(pose.Carrier is {} carrier)
+                {WriteText(writer,carrier.Key);writer.Write(carrier.Offset.X);writer.Write(carrier.Offset.Y);writer.Write(carrier.Offset.Z);}
                 break;
             case MessageKind.Travel:
                 var travel = packet.Travel ?? throw new InvalidDataException("Missing travel state.");
@@ -72,6 +78,7 @@ public static class Protocol
                     foreach (var item in loadout.Items) { WriteText(writer, item.Id); writer.Write(item.Quantity); }
                     writer.Write(loadout.X); writer.Write(loadout.Y); writer.Write(loadout.Z); writer.Write(loadout.Yaw);
                 }
+                WriteText(writer,travel.StoryVideo);writer.Write(travel.StoryTime);writer.Write(travel.StoryWaiting);writer.Write(travel.StoryEnding);writer.Write(travel.HostMenuPaused);
                 break;
             case MessageKind.Ready:
                 var ready = packet.Ready ?? throw new InvalidDataException("Missing ready state.");
@@ -91,12 +98,13 @@ public static class Protocol
         var kind = (MessageKind)reader.ReadByte();
         var packet = kind switch
         {
+            MessageKind.Save => new(kind, Save: SaveProtocol.Read(reader)),
             MessageKind.World => new Packet(kind, World: WorldProtocol.Read(reader)),
             MessageKind.Hello or MessageKind.Welcome => new Packet(kind, reader.ReadInt32(), ReadText(reader)),
             MessageKind.Reject => new Packet(kind, Text: ReadText(reader)),
             MessageKind.Pose => new Packet(kind, Pose: new PlayerPose(ReadText(reader), ReadReady(reader),
                 reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
-                ReadText(reader), reader.ReadSingle(), reader.ReadUInt32(), ReadReady(reader), reader.ReadUInt32(), reader.ReadUInt32())),
+                ReadText(reader), reader.ReadSingle(), reader.ReadUInt32(), ReadReady(reader), reader.ReadUInt32(), reader.ReadUInt32(), ReadCarrier(reader))),
             MessageKind.Travel => new Packet(kind, Travel: ReadTravel(reader)),
             MessageKind.Ready => new Packet(kind, Ready: new ClientReady(reader.ReadUInt32(), ReadReady(reader))),
             _ => throw new InvalidDataException("Unknown message kind.")
@@ -106,6 +114,9 @@ public static class Protocol
         if (packet.Travel != null) Validate(packet.Travel);
         return packet;
     }
+
+    private static PlayerCarrier? ReadCarrier(BinaryReader reader) => ReadReady(reader)
+        ? new(ReadText(reader),new(reader.ReadSingle(),reader.ReadSingle(),reader.ReadSingle())) : null;
 
     private static TravelState ReadTravel(BinaryReader reader)
     {
@@ -121,11 +132,13 @@ public static class Protocol
             for (var i = 0; i < count; i++) items[i] = new(ReadText(reader), reader.ReadInt32());
             loadout = new(current, last, items, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         }
-        return new(epoch, action, level, difficulty, hostReady, paused, released, joining, loadout);
+        return new(epoch, action, level, difficulty, hostReady, paused, released, joining, loadout,ReadText(reader),reader.ReadSingle(),ReadReady(reader),ReadReady(reader),ReadReady(reader));
     }
 
     public static void Validate(TravelState state)
     {
+        if(state.HostMenuPaused && !state.Paused) throw new InvalidDataException("Host menu pause must hold shared gameplay.");
+        if(state.StoryVideo==null || state.StoryVideo.Length>128 || state.StoryVideo.Any(char.IsControl) || !float.IsFinite(state.StoryTime) || state.StoryTime<0 || state.StoryTime>86400 || state.StoryWaiting && state.StoryVideo.Length==0) throw new InvalidDataException("Invalid story state.");
         if (state.Epoch == 0 || !Enum.IsDefined(typeof(TravelAction), state.Action) || state.Difficulty is < 0 or > 15 ||
             state.Level.Length > 64 || (state.Action != TravelAction.Menu && string.IsNullOrEmpty(state.Level)) ||
             (state.Action == TravelAction.Menu && state.Level != "") || (state.Released && !state.HostReady) ||
@@ -196,6 +209,7 @@ public static class Protocol
 
     private static void Validate(PlayerPose pose)
     {
+        PlayerCarrier.Validate(pose.Carrier);
         if (!float.IsFinite(pose.X) || !float.IsFinite(pose.Y) || !float.IsFinite(pose.Z) ||
             !float.IsFinite(pose.Yaw) || !float.IsFinite(pose.Height) || !float.IsFinite(pose.Pitch) ||
             Math.Abs(pose.X) > 1_000_000 || Math.Abs(pose.Y) > 1_000_000 || Math.Abs(pose.Z) > 1_000_000 ||

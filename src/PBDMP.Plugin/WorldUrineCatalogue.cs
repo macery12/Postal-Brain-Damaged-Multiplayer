@@ -77,7 +77,7 @@ internal sealed partial class WorldCatalogue
         foreach(var t in root.GetComponentsInChildren<Transform>(true))
         {
             if(!SafeMotion(t)) continue;
-            var components=t.GetComponents<Component>().Select(c=>(Component?)c.TryCast<Renderer>()??(Component?)c.TryCast<Collider>()??(Component?)c.TryCast<Light>()??c.TryCast<UnityEngine.AI.NavMeshObstacle>()).Where(c=>c!=null).Select(c=>c!).ToArray();
+            var components=t.GetComponents<Component>().Select(c=>(Component?)c.TryCast<Renderer>()??(Component?)c.TryCast<Collider>()??(Component?)c.TryCast<Light>()??(Component?)c.TryCast<UnityEngine.AI.NavMeshObstacle>()??c.TryCast<OcclusionPortal>()).Where(c=>c!=null).Select(c=>c!).ToArray();
             if(components.Length>32) throw new InvalidOperationException("Urine surface exceeds bounded component adapter: "+t.name);
             var key=TransformKey(t);EncounterMotion[key]=t;UrineSurfaces[key]=components;
         }

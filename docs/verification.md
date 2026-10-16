@@ -1,15 +1,15 @@
 # Verification and troubleshooting
 
-Baseline: **PBDMP 0.8.0 / protocol 7**. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 10 / save schema 2**; see the current playtest section below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
 
 ## Recorded checks
 
 | Area | Recorded result | Practical limit |
 | --- | --- | --- |
-| Release compilation | Zero warnings/errors for the final mission-pass build. | Requires matching game-generated interop. |
-| Network acceptance | 19 executable scenarios pass over TCP and an in-memory message carrier, including 12,288 ordered mission frames under bounded-queue pressure on each, and a stated drop reason surviving ten consecutive closes. | The earlier transient loading-failure-reason check was a race between the closing peer's send failure and its pending Reject; the session now waits briefly for the stated reason. |
+| Release compilation | Zero warnings/errors for the 0.9.0 save-phase build. | Requires matching game-generated interop. |
+| Network acceptance | 22 executable scenarios pass over TCP and an in-memory message carrier, including 12,288 ordered mission frames under bounded-queue pressure on each, and a stated drop reason surviving ten consecutive closes. | The earlier transient loading-failure-reason check was a race between the closing peer's send failure and its pending Reject; the session now waits briefly for the stated reason. |
 | Steam (single account) | The probe passes on the real Steam client: callback tap, identity, native struct layouts, 300 ordered frames and a drop reason over a Steam socket pair, a P2P dial into the local listen socket (status callbacks, admission, accept), and private lobby create/data/leave. The game's own leaderboard call results still arrive with the tap installed. | Steam cannot relay between two sessions of one account. A first two-account session joined the friends lobby and connected over the relay twice; the rest of the checklist below is still open. |
-| Native UI/player presentation | Lobby panel, Direct IP dialog and prompt layers; main/pause entries, dialog ownership, per-layer navigation and Escape order; model rendering and native clips exercised. | Isolated renders and callback checks measure presentation; physical controller input is a separate test path. |
+| Native UI/player presentation | Lobby panel, Direct IP, Co-op Saves and prompt layers; save-dialog navigation/Escape, main/pause entries, dialog ownership, per-layer navigation and Escape order; model rendering and native clips exercised. | Isolated renders and callback checks measure presentation; physical controller input is a separate test path. |
 | Travel and input | Two game processes exercise host travel, readiness, respawn, late join and overlapping pause/menu locks. | Focus round trips cover a reproduced input lock, not every intermittent Alt-Tab failure. |
 | Combat and actors | Native attacks, host targeting/hits, personal incoming damage, actor lifecycle and special targets exercised. | All natural attack/boss sequences still need acceptance. |
 | Actor catalogue | 49 NPC families exercised in fixtures; 43 authored families across 243 map/family rows inspected. | Fixture and authored-census counts measure different coverage. |
@@ -18,7 +18,11 @@ Baseline: **PBDMP 0.8.0 / protocol 7**. This page summarizes recorded developmen
 | Neighborhood house wall | P1/P2 activation removes the actual obstruction's renderer/collider; both controllers pass through, including after rejoin. | Does not establish general decorative destruction support. |
 | Level endings | Prison walk-in and Wallmarkt interactable endings exercise gathering/cancellation/one finish; automatic endings wait for respawn. | Representative ending fixtures, not every mission ending. |
 | Campaign census | All 15 base maps inspected for supported catalogue/bounded-state serialization. | A long sequential audit hit native NPC initialization errors; remaining maps passed fresh-process checks. |
-| Host timing | Controlled 60 FPS mission fixture: about 3.7 ms p95 world work, 150 ms p95 sweep and 16.7 ms p95 frame time. | Stationary two-instance diagnostic, not a hardware-independent benchmark. |
+| Co-op save files | Atomic replacement, previous-generation recovery, corrupt primary/backup errors, schema/slot/event bounds and strictly ordered save pages pass. | Data integrity checks do not authenticate Direct IP users. |
+| Native co-op restoration | Two processes restore NPC health, host resources, door state, structural wall geometry, personal authored pickups and generated loot; three autosaves rotate with a recovery backup, and checkpoint rollback keeps the connection. | Neighborhood is the controlled native save fixture; other natural campaign save points should continue to receive regression coverage. |
+| Fresh-process resume and partner identity | P1 restores alone, retains the absent record, and restores the joining partner. A replacement guest waits for explicit native confirmation before receiving the saved personal slot. | Direct IP uses a local persisted ID; Steam uses the connected account. |
+| Completed-map saves | Both players restore native level-complete screens with matching counts and exact completion time. | Representative completion fixture. |
+| Host timing | 0.9.0 controlled 60 FPS fixture: about 3.1 ms p95 world work, 66.7 ms p95 sweep and 16.7 ms p95 frame time; persistence service p95 0.004 ms. | Stationary two-instance diagnostic, not a hardware-independent benchmark. |
 
 Fixed during 0.8.0 two-player testing: P2 loaded Neighborhood, logged `Authored enemy/door catalogue mismatch` and returned to the menu (P1 762 authored components, P2 754). The game's distance optimizer switches far pickups off shortly after a map loads. The catalogue's "never share pickups, NPCs, players or UI" exclusion used Unity's default parent lookup, which skips inactive objects, so an inactive pickup's `InteractListener` entered the catalogue. Whether it did depended on when each peer built its catalogue and where its player stood. The exclusion now includes inactive parents. Building both variants at the same moment on all 15 maps showed the only removed components are on `ItemPickup`/pickup objects (274 rows: ammo, health, weapons, keys and carried quest items such as levers and winches), plus mission-flag changes on enemy groups those listeners referenced. The earlier Prison 559/563 travel-test failure had the same cause; the default, Neighborhood, mission, combat and Prison state travel runs now pass. Each catalogue build writes `BepInEx/PBDMP/catalogue-<scene>.tsv` so two players can diff their catalogues.
 
@@ -33,6 +37,14 @@ Special explosion replay passed a null managed wrapper for IL2CPP's nullable rot
 NPC VFX callbacks previously relayed decals but omitted native material impact bursts. The host now publishes the selected flesh/armor particles and positional audio for harmless client presentation. The native regression checks accepted P2 damage and actual emitted hit particles.
 
 A host-authorized finish now publishes final level statistics after the native game gathers them. P2 runs the native completion presentation after readiness, with host result values and exact completion time. The exit regression checks the native screen, matching statistics and rejoining a completed map; P1 retains restart/next-level authority.
+
+## Co-op save regression
+
+Use `-Saves -Level LEVEL_AD_Neighborhood` to run the native persistence fixture. It uses isolated diagnostic storage, captures distinct player pickup histories and a generated drop, destroys the authored mission wall, damages an NPC, and changes a door. It then changes the live state and reloads, comparing native health/resources, collection history, loot and wall geometry on both peers. The fixture also invokes a native P2 checkpoint component, checks that the request is validated without an early capture, advances the diagnostic gameplay clock across the interval, rotates autosaves, rolls back a checkpoint and reloads a completed map's results. The isolated checkpoint component avoids invoking unrelated authored mission callbacks; natural checkpoint placement is separate campaign coverage.
+
+Run `-Saves -SaveResume` afterward to start fresh game processes against that fixture's files. P1 restores before P2 joins. Adding `-SaveReplacePartner` gives only the diagnostic guest a temporary test identity, verifies the hold before assignment, and invokes P1's native confirmation control. Production identity files are not replaced. `-SaveUi` shows the host window and captures the native save browser for visual inspection; normal test windows stay hidden.
+
+Native restoration needs the game's own asynchronous `ISaveable.SaveAsync` contract, NPC despawn before restore and the native same-map restart path. These preconditions were verified while correcting partial initialization and stale scene references. Persistent capture adds the native baseline to the existing durable world adapters; general decorative live synchronization and unclassified script callbacks retain their existing checklist status.
 
 ## Running checks
 
@@ -61,6 +73,9 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -MissionExits -Level LEVEL_AD_Prison
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -MissionExits -Level LEVEL_AD_Wallmarkt
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Performance -PerformanceFrameRate 60
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -Saves -SaveUi -Level LEVEL_AD_Neighborhood
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -Saves -SaveResume -Level LEVEL_AD_Neighborhood
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -Saves -SaveResume -SaveReplacePartner -Level LEVEL_AD_Neighborhood
 
 # Fresh-process actor/catalogue census across the 15 campaign maps.
 .\scripts\Test-ActorCampaign.ps1 -GameDir $GameDir
@@ -68,7 +83,7 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 
 Additional `Test-Travel.ps1` modes include `-Actors`, `-ActorParts`, `-UrineParts`, `-JoinInput`, `-FocusInput` and `-Audit -AuditLevels LEVEL_Name`. `Test-CombatProbe.ps1` checks a native P2 targeting/hit proxy. Inspect each script's parameter block before combining diagnostic modes.
 
-Tests create ignored output under `.local`, block profile writers with diagnostic flags, and stop only processes they own. A Steam install started directly would relaunch itself through Steam and exit, so the scripts set `SteamAppId` for the processes they start; the Steam client must be running. Travel tests create a second loader/executable directory using hardlinks/junctions to the reader's installed game; they require a compatible Windows filesystem. Most windows are hidden, while `-FocusInput` exercises real window focus. Game/platform profile access and graphics initialization must work in the environment used for testing. Hidden automation is not the normal player launch path.
+Tests create ignored output under `.local`, block profile writers with diagnostic flags, and stop only processes they own. A Steam install started directly would relaunch itself through Steam and exit, so the scripts set `SteamAppId` for the processes they start; the Steam client must be running. Travel tests create a second loader/executable directory using hardlinks/junctions to the reader's installed game; they require a compatible Windows filesystem. Most windows are hidden. Unattended travel diagnostics keep the desktop cursor unlocked and verify that it stays free; `-FocusInput` deliberately retains native cursor behavior to exercise real window focus and mouse input. Game/platform profile access and graphics initialization must work in the environment used for testing. Hidden automation is not the normal player launch path.
 
 ## Two-player Steam checklist
 
@@ -115,3 +130,127 @@ Use these scenarios to regression-test future changes.
 | An object differs between peers | Report map, object, which player activated it, fresh/reloaded/late-join state and sanitized logs. General world callbacks remain partially covered. |
 
 Logs can contain installation paths, network addresses and profile details. Review/redact them before attaching to a public issue. Do not publish game files, save data or generated interop.
+
+## October 15 save/input follow-up
+
+The native live-save test passes pause-menu restoration, per-player pickup/drop isolation, damaged NPC/door/wall restoration, three rotating autosaves plus backup, checkpoint rollback, completed-map results, and saving/loading overlay state/cleanup on both peers. Running the focus variant exposes the owned test windows for rendered-overlay inspection:
+
+```powershell
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Saves -FocusInput -Level LEVEL_AD_Neighborhood
+```
+
+Diagnostic clock advancement simulates the five-minute boundary without waiting in real time. Repeated native checkpoint and autosave calls remain idle before it. Managed `AutosaveClock` tests separately verify pause exclusion, reset, invalid inputs and no catch-up write storm.
+
+A progressed-save fixture also reproduced the native input-mask bug and passed after pairing the personal-load lifecycle callbacks. P1 resumes alone; P2 then joins, follows five real focus round trips, and physically moves/turns with real WASD/mouse input. Private fixtures, identities and captured logs remain outside source control. The standard generated live-save test above covers the same player restore adapter without requiring private fixtures.
+
+The warning/error review distinguishes unresolved presentation/loader warnings from session failures. Repeated missing remote geometry warnings are limited per avatar. Native FMOD MusicOffset and stale-target DOTween warnings, and IL2CPP warnings about unsupported diagnostic signatures, are retained for further investigation. The runtime catalogue drift was later reproduced and corrected in the world/presentation follow-up below; incompatible originals remain preserved and recovery requires a fully compatible previous backup. No global warning suppression or blanket acceptance of mismatched saves was added.
+
+## Player input after restoration
+
+The native player-spawn serializer calls `Player.OnLevelStart` even when restoring personal state into an already loaded map. Co-op restoration completes that lifecycle with `Player.OnLevelStartReady`, restoring the player view and releasing the native input mask. Multiplayer loading/capture barriers and any active personal tutorial retain their own locks until ready. Assigning a replacement partner also closes a multiplayer panel opened solely for that confirmation; an already open panel remains under the user's control.
+
+## Current world/presentation playtest
+
+Build **F68FE66F1FC90AA7**, version **0.10.0 / protocol 10 / save schema 2**, is installed and packaged as `PBDMP-0.10.0-playtest-F68FE66F1FC90AA7.zip`. Both DLLs match the installed host and diagnostic peer byte-for-byte. The ZIP contains only those DLLs, MIT LICENSE and installation notes. No commit or push is included. This supersedes the previous save/input artifact; the whole megapass remains unfinished.
+
+The first acceptance-closing batch adds native `Test-Travel -WorldPath` fixtures. `Secrets` exercises real trigger entry, shared counts, duplicate callbacks, rollback/rediscovery, discovered disk restoration and late join. `Barrel` captures an eight-second native chain after two elapsed seconds, checks the saved remaining delay, restores without an old explosion, holds its fuse through shared pause and observes one future native result. Its event observer is removed before reload so the fixture itself cannot duplicate callbacks.
+
+`Teleport` uses DeathStar's authored button and its sibling listener. P2 has actual nonzero native movement before the request. An opt-in observer compares the native destination/view and queued `VelocityToApply` with the transformed incoming momentum; `CharacterController.velocity` is the previous Move sample immediately after a warp. P1 never teleports. Native tutorial ownership remains active and the fixture dismisses it through its normal Use callback.
+
+`Cannon` covers native P1 aiming, nearest-P2 aim, visible shell before impact, actual P2 damage, unchanged P1 position/health and blocked client cannon simulation. Before the fix, the real shell hit P2 invisibly because `RegisterNativeProjectile` rejected its null actor owner. Registering known-prefab ownerless shots as host scenery attacks exposed a missing `Projectile_Cannon` visual audit. Read-only serialized inspection of its six particle systems passed collision-force/messages, trigger, internal sub-emitter and stop-action checks. The allowlist was regenerated with The Wall data while retaining every previous accepted entry. Copies still strip gameplay scripts/colliders and run only their native presentation.
+
+A final pending-barrel rerun exposed a separate live-state publishing bug: `CapturePersistent` reused the sender's delta caches while `Send` diverted all frames into the saved list. A change captured before its normal broadcast was then considered already sent and could remain missing on P2 indefinitely. Durable capture records now continue through the bounded live queue as well as the snapshot list. Transient/historical effects remain excluded from capture. The native fixture reproduces this at the barrel's future explosion and requires P2 to receive the changed state without a second mutation or rejoin; the full save suite protects personal pickup/resource isolation and native restoration.
+
+The fresh-process Hospital audit caught a separate pre-ready actor tick: `GoliathMovementComponent.OnUpdate` called `GoliathLeg.ForceMove`/`UpdatePosition` while native references were not ready. `SharedWorldPatches.BlockSimulation` defers NPC/AI update callbacks while a multiplayer level is not natively ready. State-entry/exit initialization keeps its previous authority guard, and offline updates remain native. The same Hospital audit passes without suppressing errors or freezing its normal post-ready simulation window.
+
+Three repeated strict Prison runs pass. The earlier intermittent Point Light (4) difference came from a native `ControlPanel.OnUpdate` flicker timer: the assertion compared a sampled host light against a later live frame. The strict world fixture now pauses both games, samples the settled host and allows state delivery before its unchanged exact comparisons. It resumes before the live explosion/shot assertions. There is no progression-only waiver in these runs.
+
+```powershell
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Secrets -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Barrel -Level LEVEL_AD_Prison
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Teleport -Level LEVEL_NLM_DeathStar
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Cannon -Level LEVEL_AD_TheWall
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldRegression -Level LEVEL_AD_Prison
+```
+
+These are targeted native fixtures. They do not establish full natural campaign-route, specialist hazard or failure-recovery acceptance. The remaining list in `megapass.md` remains authoritative. Raw failing/passing logs and asset-audit reports stay ignored.
+
+The authored-catalogue failure was reproduced from an affected progressed save. Seven detached native corpse pieces had become independent roots without a clone suffix or pool source, and were admitted as map props when rebuilding. Recording safe authored physical components at scene load keeps the original map catalogue across deaths, restoration and rehosting, while retaining legitimate unsaved swing bones. Scene membership is released on unload and never sent over the network.
+
+A mismatching existing primary can recover only a previous backup whose schema, game, map and full catalogue match. The user is told that this is an older recovery generation. Tests preserve both original files, reject incompatible recovery candidates and protect a compatible backup against promotion of the mismatching primary. No missing state is invented.
+
+The strict Hospital urine/live/late-join fixture now passes. Native rotation/fill callbacks no longer overwrite host-owned replica surfaces; disabling interpolation on client-owned kinematic bodies also prevents a correct physics pose from displaying an older local transform. Original interpolation is restored on cleanup. Full renderer, collision, activation and pose assertions remain in place, using a paused current host reference rather than a prop sampled earlier while settling.
+
+| Regression | Verified behavior |
+| --- | --- |
+| Preserved progressed-save replay | Compatible backup recovery, stable catalogue rebuild and same-map rehost, both-player controls, real P2 WASD/mouse movement after five focus round trips. |
+| Native Hospital urine/world fixture | Tank endpoints and completion, linked machinery, physical prop poses, toilet/flush/fireball paths and current state after rejoin; no historical effects replay. |
+| Posters | P2 collection, shared removal and result count, duplicate prevention, disk restoration and current-world rejoin. Resource pickups remain personal. |
+| P2 host pause | Native pause screen and Host has paused caption, blocked P2 resume, automatic host-owned screen closure, retained independent P2 menu and working input. Rendered output inspected. |
+| Neighborhood garage | Correct permanent cutout/collision, authored occlusion portals before crossing, native controller passage and rejoin. P2 fuse completion hides only P1's exact finished trigger hint. |
+| Native flesh impacts | Native emitter counts retained, actual native material selection reaches P2 with emitted particles, P2's local hit is immediate and its echo is ignored; damage remains host-owned. |
+| Prop lifetimes | Native pushes, spawn/pool lifetimes, save restoration and current-world rejoin in the COVID map fixture. |
+| Save/input suite | Native pause-menu save/load, timer and rotating autosaves, pickup/drop isolation, NPC/door/wall rollback, completed results, hold overlays and real focus/input regression. |
+| Area69 machinery/rider regression | Live and restored rider drift/alive samples, shared pause, native mover/rotater/elevator disk restoration, future endpoints and single completion callbacks. Natural full-route obstruction coverage remains separate. |
+| Refreshed campaign catalogue | All 15 base maps pass separate-process discovery and bounded-state serialization on the final build. This is catalogue coverage, not natural route completion. |
+
+Managed acceptance: **31 scenarios passed**. Release compilation: **zero warnings/errors**. The native tests are targeted regressions, not natural completion of every campaign route. The outstanding matrix in [megapass.md](../megapass.md) remains authoritative, including the separately recorded Prison light-only mismatch.
+
+```powershell
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Presentation Posters -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Presentation Pause -FocusInput -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Urine -Level LEVEL_Asylum_Hospital
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Props -Level LEVEL_Asylum_CoronvirusDen
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Area69
+
+# Exercise actual native blood material selection as well as progression.
+$env:PBDMP_BLOOD_AUDIT = '1'
+try {
+    ./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldRegression -Level LEVEL_AD_Neighborhood
+} finally {
+    Remove-Item Env:PBDMP_BLOOD_AUDIT
+}
+
+# Fresh-process catalogue and bounded-state audit, not a natural playthrough.
+./scripts/Test-WorldCampaign.ps1 -GameDir $GameDir
+```
+
+The native platform pause fixture samples after the current Update frame finishes: a tween can still consume that frame's already sampled delta when pause is requested inside Update. Pose, clock and callback assertions retain their original tolerances.
+
+The rider follow-up also reproduced a host-side timing problem: native elevator animation can advance after the shared world's Update has placed the remote player's hit surface. That surface now follows a validated current platform reference in LateUpdate before the next physics step. Client riders retain the final authoritative platform correction during pause, while travel/restoration rebase their caches. No native hazard is disabled. The restored-rider test waits for an actual received platform step with a finite timeout, retaining the original motion, alive and drift requirements. Full natural rides and external obstruction cases remain in the megapass closing list.
+
+The extended Area69 diagnostic can still observe an independent respawn after its bounded rider samples while the restored native scene runs. Its passing samples/endpoints do not certify uninterrupted full-route safety; the source of those later hits and natural rider/hazard obstruction coverage remain in T02/T03/T13/T36. Preserve that distinction when extending the regression.
+
+## Physical pose ownership follow-up
+
+A saved generic display transform could replace a physical prop's world-space pose with a lagging interpolation sample. Offline comparison reproduced the measured offset from the saved frame order. The native prop regression now keeps an active moving authored body and deliberately offsets its duplicate display record by three units: the original restoration fails its pose assertion, and the corrected ownership/order passes on host and peer, through pool reuse and current-world rejoin. Native shifted-arena/syringe/cooldown restoration also passes. The first general save follow-up stopped at its personal health-pickup fixture before restore. The fixture now selects an item using native eligibility after setting health, waits gameplay time, and acknowledges a native tutorial when shown. Its complete native save/restore, pickup isolation, timer/rotation/backup, checkpoint, results and input/overlay checks pass; the strict Prison follow-up also passes. The intermittent combat-pause and rider cases remain open rather than waived.
+
+
+## Contact and renderer follow-up — October 15, 2026
+
+Both native Area69 conveyor controllers pass: Citizen_Air_Tube has 12 referenced listeners, and Hangar/Ceiling_Conveyor has 20. Checks compare activation, world poses, enabled solid colliders and native ray contacts through shared pause, disk restoration, future movement and current-world rejoin. A failed early comparison captured a reference before the final sampled-delta movement step; settled P1 and P2 matched exactly. The fixture now waits for that step without relaxing assertions.
+
+Area69's gravity-zero AirTube passes personal contact entry/exit, grounded saved-position restoration, independent P1/P2 contacts and clean re-entry after joining. Hospital's actual pusher applies one native force to P2's movement, leaves P1 unchanged and does not independently simulate on P2.
+
+The elevator investigation reproduced a 5,000-damage hit from P1's stale remote capsule entering the lethal underside with zero P2 movement input. Direct carrier parenting improves that path. Earlier complete restored journeys pass, but the latest extended rerun still detects a P2 death/respawn after the early sample. Native machinery endpoints pass; uninterrupted rider safety remains partial. Its queued pause and shared-story checks did not execute after failure and must not be reported as passing this batch.
+
+Initial seeding and native renderer-instance registration replace recurring scene searches. Native beam, line and urine visuals reach the peer, including active objects with disabled controller components. Stream work drops from about 2.52 ms to 0.041–0.044 ms p95; Area69 sweep p95 improves from 934 ms to roughly 199–203 ms. Some runs still fail the unchanged 200 ms target. The maintainer reports substantial FPS/network problems; broad performance acceptance remains open.
+
+The performance/input fixture now respects the existing rule that P2's own menu survives P1's pause/resume: it closes that menu explicitly and waits for the native fade before checking input. This changes the test contract, not production mouse/input behavior. Compilation has zero warnings/errors and all 31 managed network scenarios pass. These source follow-ups are newer than the unchanged C8C097B0726D204B exported playtest.
+
+```powershell
+$env:PBDMP_CONVEYOR_INDEX = '0'
+try {
+    ./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Conveyor -Level LEVEL_Asylum_Area69
+    $env:PBDMP_CONVEYOR_INDEX = '1'
+    ./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Conveyor -Level LEVEL_Asylum_Area69
+} finally {
+    Remove-Item Env:PBDMP_CONVEYOR_INDEX
+}
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Gravity -Level LEVEL_Asylum_Area69
+./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldPath Pusher -Level LEVEL_Asylum_Hospital
+# Known intermittent failure: full restored rider survival.
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Area69
+./scripts/Test-Travel.ps1 -GameDir $GameDir -Combat -Level LEVEL_AD_Neighborhood
+```

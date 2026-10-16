@@ -8,11 +8,21 @@ namespace PBDMP.Plugin;
 public sealed partial class MultiplayerBehaviour
 {
     private sealed record MissionBreakFixture(string Key,string Path,bool Destroyed,bool Blocking,bool Visible,string[] StaticParts);
+    private PlayerTriggerNotificationComponent? _missionHint;
+    private Notification? _missionUnrelatedHint;
     private BreakableObject[] _missionBreaks=Array.Empty<BreakableObject>();
     private static bool MissionTest=>Environment.GetEnvironmentVariable("PBDMP_MISSION_TEST")=="1";
     private void BeginMissionWallFixture()
     {
         if(!MissionTest) return;
+        var fuse=UnityEngine.Object.FindObjectsOfType<FuseBox>().First();
+        var events=fuse.GetComponent<ExplosionListener>()._onExplosionEvents;
+        for(var i=0;i<events.GetPersistentEventCount();i++)
+            if(events.GetPersistentTarget(i)?.TryCast<PlayerTrigger>() is {} trigger && trigger.GetComponent<PlayerTriggerNotificationComponent>() is {} hint) _missionHint=hint;
+        TravelCheck(_missionHint!=null,"fuse callback identifies its authored urine hint owner");
+        _missionHint!.OnPlayerEnter(Player.Instance);
+        _missionUnrelatedHint=new Notification("Independent diagnostic notification",false);
+        Player.Instance.ShowNotification(_missionUnrelatedHint);
         _missionBreaks=UnityEngine.Object.FindObjectsOfType<BreakableObject>(true).Where(b=>b.gameObject.scene.IsValid() && MissionPath(b.transform)=="OBJECTIVES/BreakableWall").ToArray();
         TravelCheck(_missionBreaks.Length==1,"Neighborhood regression independently locates OBJECTIVES/BreakableWall");
         var bounds=_missionBreaks[0]._breaker._wholeObject.GetComponentsInChildren<Collider>(true).First(c=>!c.isTrigger && c.enabled).bounds;
@@ -37,6 +47,14 @@ public sealed partial class MultiplayerBehaviour
         var changed=_missionBreaks.Where(b=>b!=null && b._destroyed).Select(MissionBreakState).ToArray();
         TravelCheck(changed.Length>0,"fuse explosion destroys authored breakable geometry on P1");
         TravelCheck(changed.All(b=>!b.Blocking && !b.Visible),"P1 removes the actual mission wall collider and renderer");
+        if(name=="urine-live.json")
+        {
+            var view=Player.Instance.GetComponentInChildren<Hyperstrange.PBD.PlayerView.PlayerNotificationView>(true);
+            TravelCheck(!_missionHint!._playerIn && !view._notificationsStack.Contains(_missionHint._notification),"P2 fuse activation retires P1's exact urine hint");
+            TravelCheck(view._notificationsStack.Contains(_missionUnrelatedHint!),"retiring the urine hint preserves unrelated local notifications");
+            Player.Instance.HideNotification(_missionUnrelatedHint!);
+        }
+        CheckMissionPortal();
         if(name=="urine-live.json") ChooseMissionPassage();
         File.WriteAllText(Marker(name+"-breaks.json"),JsonSerializer.Serialize(changed));
     }
@@ -52,7 +70,20 @@ public sealed partial class MultiplayerBehaviour
             TravelCheck(actual.Destroyed==expected.Destroyed && actual.Blocking==expected.Blocking && actual.Visible==expected.Visible && actual.StaticParts.SequenceEqual(expected.StaticParts),
                 "wall opening and remaining static wall geometry match P1: "+expected.Path);
         }
+        CheckMissionPortal();
         CheckMissionWallPassage();
+    }
+    private void CheckMissionPortal()
+    {
+        if(!MissionTest) return;
+        var portals=_world!.CatalogueForTest.UrineSurfaces.SelectMany(p=>p.Value.Select(c=>c.TryCast<OcclusionPortal>())).Where(p=>p!=null).Select(p=>p!).ToArray();
+        File.AppendAllText(Marker("mission-portals.txt"),TravelRole+": "+string.Join(";",portals.Select(p=>MissionPath(p.transform)+"="+p.open))+"\n");
+        if(TravelRole=="host") File.WriteAllText(Marker("mission-portal-state.json"),JsonSerializer.Serialize(portals.ToDictionary(p=>WorldCatalogue.TransformKey(p.transform),p=>p.open)));
+        else
+        {
+            var expected=JsonSerializer.Deserialize<Dictionary<string,bool>>(File.ReadAllText(Marker("mission-portal-state.json")))!;
+            TravelCheck(portals.Length>0 && portals.All(p=>expected.TryGetValue(WorldCatalogue.TransformKey(p.transform),out var open) && p.open==open),"native authored portal state matches P1 before crossing the garage opening");
+        }
     }
     private void CheckMissionWallPassage()
     {

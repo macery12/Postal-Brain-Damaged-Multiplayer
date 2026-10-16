@@ -24,6 +24,20 @@ public sealed class CoopSession : IDisposable
     private readonly Queue<WorldFrame> _worldOut = new();
     private readonly Queue<WorldFrame> _worldIn = new();
     public const int MaxWorldQueue = 4096;
+    private readonly Queue<SavePage> _saveOut=new(), _saveIn=new();
+    public bool PublishSave(SavePage page)
+    {
+        SaveProtocol.Validate(page);
+        lock(_gate)
+        {
+            if(_snapshot.Role==SessionRole.Offline || SaveProtocol.FromClient(page.Command)!=(_snapshot.Role==SessionRole.Client)) throw new InvalidOperationException("Unauthorized save control.");
+            if(!_snapshot.Connected || _saveOut.Count>=1024) return false;
+            _saveOut.Enqueue(page with {Bytes=page.Bytes.ToArray()});return true;
+        }
+    }
+    public SavePage[] DrainSaves()
+    {lock(_gate) {var result=_saveIn.Take(128).ToArray();for(var i=0;i<result.Length;i++) _saveIn.Dequeue();return result;}}
+
 
     public bool PublishWorld(WorldFrame frame)
     {
@@ -264,7 +278,7 @@ public sealed class CoopSession : IDisposable
                 {
                     reason = _dropReason ?? reason; _dropReason = null;
                     _peer = null;
-                    _worldIn.Clear(); _worldOut.Clear();
+                    _worldIn.Clear(); _worldOut.Clear(); _saveIn.Clear(); _saveOut.Clear();
                     if (!stop.IsCancellationRequested)
                         _snapshot = new(role, false, role == SessionRole.Host ? $"P2 left: {reason}. Waiting for P2" : $"Disconnected: {reason}", null);
                 }
@@ -278,10 +292,11 @@ public sealed class CoopSession : IDisposable
         {
             PlayerPose pose;
             TravelState? travel; ClientReady? ready; string? drop;
-            WorldFrame[] world;
+            WorldFrame[] world; SavePage[] saves;
             lock (_gate)
             {
                 pose = _local; travel = _travel; ready = _ready; drop = _dropReason;
+                saves=_saveOut.Take(32).ToArray();for(var i=0;i<saves.Length;i++) _saveOut.Dequeue();
                 world = new WorldFrame[Math.Min(512,_worldOut.Count)];
                 for (var i=0;i<world.Length;i++) world[i]=_worldOut.Dequeue();
             }
@@ -297,6 +312,7 @@ public sealed class CoopSession : IDisposable
                 if (role == SessionRole.Client && ready != null)
                     await Protocol.WriteAsync(stream, new(MessageKind.Ready, Ready: ready), deadline.Token).ConfigureAwait(false);
                 await Protocol.WriteAsync(stream, new(MessageKind.Pose, Pose: pose), deadline.Token).ConfigureAwait(false);
+                foreach(var page in saves) await Protocol.WriteAsync(stream,new(MessageKind.Save,Save:page),deadline.Token).ConfigureAwait(false);
                 foreach (var frame in world)
                     await Protocol.WriteAsync(stream, new(MessageKind.World, World: frame), deadline.Token).ConfigureAwait(false);
             }
@@ -310,6 +326,13 @@ public sealed class CoopSession : IDisposable
         {
             using var deadline = Deadline(stop, 10);
             var packet = await Protocol.ReadAsync(stream, deadline.Token).ConfigureAwait(false);
+            if(packet.Kind==MessageKind.Save)
+            {
+                var page=packet.Save!;
+                if(SaveProtocol.FromClient(page.Command)!=(role==SessionRole.Host)) throw new InvalidDataException("Peer sent unauthorized save control.");
+                lock(_gate) {if(_saveIn.Count>=1024) throw new InvalidDataException("Save control queue exceeded its bound.");_saveIn.Enqueue(page);}
+                continue;
+            }
             if(packet.Kind==MessageKind.World)
             {
                 var world=packet.World!;
@@ -363,7 +386,7 @@ public sealed class CoopSession : IDisposable
             _listener?.Dispose();
             _peer?.Dispose();
             _peer = null;
-            _worldIn.Clear(); _worldOut.Clear();
+            _worldIn.Clear(); _worldOut.Clear(); _saveIn.Clear(); _saveOut.Clear();
             _snapshot = new(SessionRole.Offline, false, "Offline", null);
         }
         // CTS kept alive until async workers finish using the token; session is small and disposable.

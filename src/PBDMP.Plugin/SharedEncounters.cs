@@ -10,6 +10,7 @@ namespace PBDMP.Plugin;
 internal sealed partial class SharedWorld
 {
     private readonly Dictionary<string,string[]> _encounterState=new();
+    private readonly Dictionary<string,uint> _encounterFlags=new();
     private readonly Dictionary<Type,PropertyInfo[]> _encounterFields=new();
     private readonly Dictionary<string,object> _encounterActuals=new();
     private object EncounterActual(string key,Component component)
@@ -17,7 +18,7 @@ internal sealed partial class SharedWorld
     private PropertyInfo[] EncounterFields(Type type)
     {
         if(_encounterFields.TryGetValue(type,out var fields)) return fields;
-        fields=type.GetProperties(BindingFlags.Public|BindingFlags.Instance).Where(p=>p.DeclaringType!=typeof(Hyperstrange.Base.BaseBehaviour) && (p.Name.StartsWith('_') || p.Name is "State" or "CurrentState" && type.Name is "GenericStateable" or "GenericInteractableStateable" or "Elevator") && p.CanWrite && p.GetIndexParameters().Length==0 &&
+        fields=type.GetProperties(BindingFlags.Public|BindingFlags.Instance).Where(p=>p.DeclaringType!=typeof(Hyperstrange.Base.BaseBehaviour) && p.Name!="_cycleIndex" && (p.Name.StartsWith('_') || p.Name is "State" or "CurrentState" && type.Name is "GenericStateable" or "GenericInteractableStateable" or "Elevator") && p.CanWrite && p.GetIndexParameters().Length==0 &&
             (p.PropertyType==typeof(bool) || p.PropertyType==typeof(int) || p.PropertyType==typeof(float) || p.PropertyType.IsEnum)).OrderBy(p=>p.Name,StringComparer.Ordinal).ToArray();
         _encounterFields[type]=fields;return fields;
     }
@@ -86,19 +87,19 @@ internal sealed partial class SharedWorld
             data.Add(property.Name);data.Add(property.PropertyType.IsEnum?Convert.ToInt32(value,CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture):Convert.ToString(value,CultureInfo.InvariantCulture)!);
         }
         var state=data.ToArray();
-        if(complete || !_encounterState.TryGetValue(key,out var prior) || !state.SequenceEqual(prior))
+        var flags=component.TryCast<MonoBehaviour>()?.enabled==true?1u:0u;
+        if(complete || !_encounterState.TryGetValue(key,out var prior) || !state.SequenceEqual(prior) || !_encounterFlags.TryGetValue(key,out var oldFlags) || oldFlags!=flags)
         {
-            _encounterState[key]=state;
-            var flags=component.TryCast<MonoBehaviour>()?.enabled==true?1u:0u;
+            _encounterState[key]=state;_encounterFlags[key]=flags;
             if(state.Length==0) Send(new(WorldKind.Encounter,_epoch,1,Id(key),Key:key,Data:state,Flags:flags));
             for(var start=0;start<state.Length;start+=32) Send(new(WorldKind.Encounter,_epoch,1,Id(key),Key:key,Data:state.Skip(start).Take(32).ToArray(),Flags:flags));
         }
     }
-    private void ApplyEncounter(WorldFrame frame)
+    private void ApplyEncounter(WorldFrame frame,bool hostRestore=false)
     {
         if(!_catalogue!.EncounterKeys.Contains(frame.Key)) throw new InvalidDataException("Unknown host encounter.");
         var component=_catalogue.Components[frame.Key];var behaviour=component.TryCast<MonoBehaviour>();
-        if(behaviour!=null) {if(!_encounterBehaviours.ContainsKey(behaviour)) {_encounterBehaviours[behaviour]=behaviour.enabled;StopMissionController(component);}behaviour.enabled=component.GetIl2CppType().Name=="JumpPad" && (frame.Flags&1)!=0;}
+        if(!hostRestore && behaviour!=null && !_encounterBehaviours.ContainsKey(behaviour)) {_encounterBehaviours[behaviour]=behaviour.enabled;StopMissionController(component);}
         var actual=EncounterActual(frame.Key,component);var data=frame.Data??Array.Empty<string>();
         if(data.Length%2!=0) throw new InvalidDataException("Invalid encounter state.");
         for(var i=0;i<data.Length;i+=2)
@@ -114,7 +115,11 @@ internal sealed partial class SharedWorld
             if(value is float scalar && !float.IsFinite(scalar)) throw new InvalidDataException("Invalid encounter scalar.");
             property.SetValue(actual,value);
         }
+        if(component.TryCast<Trigger>() is {} disabled && !disabled._enabled) RetireTriggerHint(disabled);
+        // Contact-only components run locally against the shared volume. Apply
+        // their fields first so OnEnable never uses an old gravity configuration.
+        if(behaviour!=null) behaviour.enabled=(hostRestore || component.GetIl2CppType().Name is "JumpPad" or "GravityChanger") && (frame.Flags&1)!=0;
     }
     private void ClearEncounters()
-    {foreach(var pair in _encounterBehaviours) if(pair.Key!=null) pair.Key.enabled=pair.Value;_encounterBehaviours.Clear();_encounterState.Clear();_encounterFields.Clear();_encounterActuals.Clear();_insideEncounters.Clear();_remoteTriggerInside.Clear();}
+    {foreach(var pair in _encounterBehaviours) if(pair.Key!=null) pair.Key.enabled=pair.Value;_encounterBehaviours.Clear();_encounterState.Clear();_encounterFlags.Clear();_encounterFields.Clear();_encounterActuals.Clear();_insideEncounters.Clear();_remoteTriggerInside.Clear();}
 }

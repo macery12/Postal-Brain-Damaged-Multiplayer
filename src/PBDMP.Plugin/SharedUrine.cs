@@ -21,7 +21,7 @@ internal sealed partial class SharedWorld
     internal bool OwnsUrineConsequence(Component component)=>_catalogue?.Key(component) is {} key && _catalogue.UrineConsequences.Contains(key);
     private void SendUrineConsequence(string key,bool complete)
     {
-        var c=_catalogue!.Components[key];if(c==null || c.GetIl2CppType().Name is not ("EmissionAnimator" or "Laser" or "RocketSequence" or "RailSwitch")) return;
+        var c=_catalogue!.Components[key];if(c==null || c.GetIl2CppType().Name is not ("EmissionAnimator" or "Laser" or "RailSwitch")) return;
         var data=WorldCatalogue.Save(c);
         if(complete || !_urineState.TryGetValue(key,out var prior) || !data.SequenceEqual(prior)) {_urineState[key]=data;Send(new(WorldKind.UrineState,_epoch,1,Id(key),Key:key,Flags:16,Data:data));}
     }
@@ -60,15 +60,24 @@ internal sealed partial class SharedWorld
         else return;
         UrineRequestsApplied++;
     }
+    internal static string[] UrineSnapshot(Component c)
+    {
+        var data=WorldCatalogue.Save(c);
+        if(c.TryCast<PissFiller>()!=null)
+            for(var i=0;i+1<data.Length;i+=2) if(data[i]=="FillPercentage")
+                data[i+1]=NativeProgress.Unit(float.Parse(data[i+1],CultureInfo.InvariantCulture)).ToString("R",CultureInfo.InvariantCulture);
+        return data;
+    }
     private void SendUrineState(string key,bool complete)
     {
         var c=_catalogue!.Components[key];if(c==null) return;
-        var data=WorldCatalogue.Save(c);
+        var data=UrineSnapshot(c);
         if(c.TryCast<Toilet>() is {} toilet) data=data.Concat(new[]{"Flushing",toilet._isFlushing.ToString(),"Cycle",toilet._cycleIndex.ToString(CultureInfo.InvariantCulture)}).ToArray();
         var peeing=c.TryCast<Toilet>() is {} audioToilet && Time.time-audioToilet._lastHitTime<0.1f;
         if(complete || peeing || !_urineState.TryGetValue(key,out var prior) || !data.SequenceEqual(prior))
         {_urineState[key]=data;Send(new(WorldKind.UrineState,_epoch,1,Id(key),Key:key,Data:data,Value:peeing?1:0));}
     }
+    internal float[]? ReceivedSurfaceForTest(string key)=>_urineSurfaceState.GetValueOrDefault(key);
     private void SendUrineSurface(string key,Component[] components,bool complete)
     {
         var t=_catalogue!.EncounterMotion[key];if(t==null) return;
@@ -76,7 +85,7 @@ internal sealed partial class SharedWorld
         if(complete || !_urineSurfaceState.TryGetValue(key,out var prior) || !values.SequenceEqual(prior))
         {_urineSurfaceState[key]=values;Send(new(WorldKind.UrineState,_epoch,1,Id(key),Key:key,Flags:4,Values:values));}
     }
-    private static bool SurfaceEnabled(Component c)=>c!=null && c switch {Renderer r=>r.enabled,Collider col=>col.enabled,Light light=>light.enabled,UnityEngine.AI.NavMeshObstacle obstacle=>obstacle.enabled,_=>false};
+    private static bool SurfaceEnabled(Component c)=>c!=null && c switch {Renderer r=>r.enabled,Collider col=>col.enabled,Light light=>light.enabled,UnityEngine.AI.NavMeshObstacle obstacle=>obstacle.enabled,OcclusionPortal portal=>portal.open,_=>false};
     private static void SetSurfaceEnabled(Component c,bool enabled)
     {
         if(c==null) return;
@@ -84,6 +93,7 @@ internal sealed partial class SharedWorld
         else if(c is Collider collider) collider.enabled=enabled;
         else if(c is Light light) light.enabled=enabled;
         else if(c is UnityEngine.AI.NavMeshObstacle obstacle) obstacle.enabled=enabled;
+        else if(c is OcclusionPortal portal) portal.open=enabled;
     }
     private void ApplyUrineState(WorldFrame frame)
     {
@@ -108,8 +118,13 @@ internal sealed partial class SharedWorld
         }
         if(frame.Flags==4)
         {
-            if(!_catalogue!.UrineSurfaces.TryGetValue(frame.Key,out var components) || frame.Values is not {} values || values.Length!=components.Length || values.Any(v=>v is not (0 or 1))) throw new InvalidDataException("Invalid urine collision/presentation state.");
-            for(var i=0;i<values.Length;i++) SetSurfaceEnabled(components[i],values[i]!=0);
+            if(!_catalogue!.UrineSurfaces.TryGetValue(frame.Key,out var components) || frame.Values is not {} values || values.Any(v=>v is not (0 or 1))) throw new InvalidDataException("Invalid urine collision/presentation state.");
+            // Legacy development frames omitted portal bits. Native baseline
+            // restoration supplies those; preserve exact ordering of old bits.
+            var targets=values.Length==components.Length?components:components.Where(c=>c.TryCast<OcclusionPortal>()==null).ToArray();
+            if(values.Length!=targets.Length) throw new InvalidDataException("Invalid urine surface layout.");
+            if(Environment.GetEnvironmentVariable("PBDMP_WORLD_REGRESSION")=="1") _urineSurfaceState[frame.Key]=values.ToArray();
+            for(var i=0;i<values.Length;i++) SetSurfaceEnabled(targets[i],values[i]!=0);
             return;
         }
         if(frame.Flags!=0 || !_catalogue!.UrineKeys.Contains(frame.Key)) throw new InvalidDataException("Unknown urine target state.");
@@ -133,7 +148,7 @@ internal sealed partial class SharedWorld
                 var tank=filler.TryCast<PissTank>();
                 if(fields.Count!=(tank!=null?3:2) || !fields.ContainsKey("_filled") || !fields.ContainsKey("FillPercentage") || tank!=null && !fields.ContainsKey("_activeState")) throw new InvalidDataException("Unknown urine fill fields.");
                 var filled=bool.Parse(fields["_filled"]);var percent=float.Parse(fields["FillPercentage"],CultureInfo.InvariantCulture);
-                if(!float.IsFinite(percent) || percent is <0 or >1) throw new InvalidDataException("Invalid urine fill percentage.");
+                percent=NativeProgress.Unit(percent);
                 var changed=filler._filled!=filled;filler._filled=filled;filler.FillPercentage=percent;
                 filler.OnFillChanged?.Invoke(percent);
                 if(tank!=null)
@@ -145,6 +160,7 @@ internal sealed partial class SharedWorld
                     // them to endpoints and can overwrite an unchanged pose.
                 }
             }
+            else if(c.TryCast<ExplosiveBarrel>()!=null || c.TryCast<BurnableObject>()!=null) return;
             else if(c.TryCast<ISaveable>()!=null)
             {
                 WorldCatalogue.Load(c,data);
@@ -153,9 +169,10 @@ internal sealed partial class SharedWorld
         }
         catch(Exception error) {Plugin.Logger.LogError($"Urine state failed: target={c.name}, type={c.GetIl2CppType().Name}, key={frame.Key}, epoch={frame.Epoch}, state=[{string.Join(';',data)}]\n{error}");throw;}
     }
+    internal bool PermitWorldOneShot(FMODEvent sound)=>!RestoringNative || !_urineSounds.Contains(sound.Pointer);
     internal void UrineSound(FMODEvent sound,Vector3 position)
     {
-        if(!Active || Client || Applying || _catalogue==null) return;
+        if(!Active || Client || Applying || RestoringNative || _catalogue==null) return;
         if(!_urineSounds.Contains(sound.Pointer)) return;
         var key=EffectKey("audio",sound.name);_effectSounds[key]=sound;
         Send(new(WorldKind.UrineState,_epoch,1,Asset:key,Position:Net(position),Flags:2));
