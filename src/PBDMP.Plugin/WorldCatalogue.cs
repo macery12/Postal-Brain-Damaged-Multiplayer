@@ -23,6 +23,8 @@ internal sealed partial class WorldCatalogue
     internal readonly HashSet<string> EncounterKeys = new();
     internal readonly HashSet<string> HookableKeys = new();
     internal string Manifest = "";
+    internal KeyValuePair<string,Component>[] ScriptedActors=Array.Empty<KeyValuePair<string,Component>>();
+    internal KeyValuePair<string,Transform>[] AuthoredMotion=Array.Empty<KeyValuePair<string,Transform>>();
     private static readonly HashSet<string> Doors = new(StringComparer.Ordinal)
         { "Door", "DoubleDoor", "SlidingDoors", "ElevatorDoors", "ToiletDoor", "Vault" };
     private static readonly HashSet<string> Encounters = new(StringComparer.Ordinal)
@@ -135,6 +137,10 @@ internal sealed partial class WorldCatalogue
         BuildUrineTargets();
         BuildMissionTargets();
         BuildSceneryTargets();BuildMachineSounds();
+        // These authored sets change only when a new map catalogue is built.
+        // Preserve the original door-first ordering/duplicate precedence.
+        ScriptedActors=Components.Where(p=>p.Value!=null && p.Value.GetIl2CppType().Name is "FakeCitizen" or "FakePostalDude").ToArray();
+        AuthoredMotion=DoorMotion.Concat(EncounterMotion).GroupBy(p=>p.Key).Select(g=>g.First()).ToArray();
         Manifest=Hash(string.Join("\n",Components.Keys.OrderBy(k=>k,StringComparer.Ordinal)) + "\n" +
             string.Join("\n",DoorMotion.Keys.Concat(EncounterMotion.Keys).Concat(Fragments.Keys).Concat(PhysicalPrefabReferences).OrderBy(k=>k,StringComparer.Ordinal)));
         Plugin.Logger.LogInfo($"World catalogue {Manifest}: {Components.Count} authored components, {DoorKeys.Count} door/gate components, {DoorMotion.Count} motion transforms.");

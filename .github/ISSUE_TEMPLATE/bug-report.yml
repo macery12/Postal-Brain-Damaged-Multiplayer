@@ -1,0 +1,68 @@
+name: Bug or sync issue
+description: Report something broken or out of sync in PBDMP.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve PBDMP! Give your report a short, descriptive title above.
+        Reports are public. Review the prefilled details and remove personal information from any screenshots or logs you attach.
+        The in-game button fills software details and available last-session context. Nothing is submitted or attached automatically.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong?
+      description: Describe the bug or what behaved differently between the two players.
+      placeholder: Tell us what happened and what you were doing.
+    validations:
+      required: true
+  - type: textarea
+    id: software
+    attributes:
+      label: Software details
+      description: Prefilled by the in-game button. Review or correct these details; if reporting from GitHub, add your mod version if known.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: session
+    attributes:
+      label: Last multiplayer session
+      description: The last session from this game launch, not necessarily the issue you are reporting. Correct it if needed. Unavailable means the mod did not observe that information.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Optional. Leave this blank if you do not know how to make it happen again.
+      placeholder: |
+        1. Start or join a game...
+        2. Go to...
+        3. The issue happens when...
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: false
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Not sure
+        - Happened once
+        - Sometimes
+        - Every time
+    validations:
+      required: false
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or relevant logs
+      description: Optional. Attach files here yourself. Remove usernames, local paths, Steam IDs, IP addresses and other personal information first.
+    validations:
+      required: false

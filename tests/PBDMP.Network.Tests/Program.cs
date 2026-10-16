@@ -2,7 +2,24 @@ using System.Net;
 using System.Net.Sockets;
 using PBDMP.Network;
 
+Environment.SetEnvironmentVariable("PBDMP_PERF_BASELINE","1");
 var passed = 0;
+await Test("diagnostic traffic counts completed framed writes and reads, excluding failed reads",async()=>
+{
+    var before=ProtocolTraffic.Read();
+    var packet=new Packet(MessageKind.Pose,Pose:PlayerPose.Empty);
+    using var stream=new MemoryStream();
+    await Protocol.WriteAsync(stream,packet,CancellationToken.None);
+    var sent=ProtocolTraffic.Read();
+    Check(sent.SentBytes-before.SentBytes==Protocol.Encode(packet).Length+4 && sent.SentFrames-before.SentFrames==1);
+    stream.Position=0;
+    Check((await Protocol.ReadAsync(stream,CancellationToken.None)).Kind==MessageKind.Pose);
+    var read=ProtocolTraffic.Read();
+    Check(read.ReceivedBytes-before.ReceivedBytes==stream.Length && read.ReceivedFrames-before.ReceivedFrames==1);
+    try {await Protocol.ReadAsync(stream,CancellationToken.None);throw new InvalidOperationException("Expected EOF.");}
+    catch(EndOfStreamException) { }
+    Check(ProtocolTraffic.Read().ReceivedBytes==read.ReceivedBytes);
+});
 await Test("catalogue recovery reads only a fully compatible backup and preserves the primary", () =>
 {
     var folder=Path.Combine(Path.GetTempPath(),"pbdmp-compat-"+Guid.NewGuid().ToString("N"));

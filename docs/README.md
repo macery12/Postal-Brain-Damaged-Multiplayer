@@ -7,6 +7,7 @@ Start with the [project README](../README.md) for installation and play instruct
 | Document | Purpose |
 | --- | --- |
 | [Sync progress](sync-progress.md) | Individual shared/local feature status, development credit, accepted baseline and remaining gaps. |
+| [Performance baseline](performance.md) | Initial connected/disconnected FPS, stalls and repeatable budget checks. |
 | [Verification](verification.md) | Recorded checks, repeatable commands, troubleshooting and manual acceptance. |
 | [Co-op saves](co-op-saves.md) | Save controls, checkpoint restoration, personal progress and recovery. |
 | [Roadmap](roadmap.md) | Current session rules and remaining work. |

@@ -295,9 +295,9 @@ internal sealed partial class SharedWorld
     }
     private void SendScriptedActors(bool complete)
     {
-        foreach(var pair in _catalogue!.Components.Where(p=>p.Value!=null && p.Value.GetIl2CppType().Name is "FakeCitizen" or "FakePostalDude"))
+        foreach(var pair in _catalogue!.ScriptedActors)
         {
-            var actor=pair.Value;_scriptActors[pair.Key]=actor;var id=ScriptId(pair.Key);
+            var actor=pair.Value;if(actor==null) continue;_scriptActors[pair.Key]=actor;var id=ScriptId(pair.Key);
             ObserveActorSounds(actor);
             SendActorFrame(new(WorldKind.ActorState,_epoch,1,Asset:pair.Key,Flags:5,Value:actor.gameObject.activeSelf?1:0,
                 Position:Net(actor.transform.position),Rotation:Net(actor.transform.eulerAngles)),complete);

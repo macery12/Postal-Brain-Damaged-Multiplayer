@@ -17,9 +17,10 @@ internal static class SyncPerformance
     private static readonly Dictionary<string,List<double>> Samples=new();
     private static int _warmup;
     private static bool _previousSync,_thisSync;
-    internal static long Start()=>Enabled?Stopwatch.GetTimestamp():0;
+    internal static long Start()=>Enabled || PerformanceBaseline.Enabled?Stopwatch.GetTimestamp():0;
     internal static void Finish(string name,long start)
     {
+        if(start!=0) PerformanceBaseline.Section(name,(Stopwatch.GetTimestamp()-start)*1000d/Stopwatch.Frequency);
         if(!Enabled || start==0 || SharedWorld.Current?.ReadyForPerformance!=true || Samples.GetValueOrDefault("sync")?.Count>=80) return;
         if(!Samples.TryGetValue(name,out var values)) Samples[name]=values=new();
         values.Add((Stopwatch.GetTimestamp()-start)*1000d/Stopwatch.Frequency);

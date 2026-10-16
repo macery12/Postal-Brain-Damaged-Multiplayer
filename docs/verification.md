@@ -254,3 +254,40 @@ try {
 ./scripts/Test-Travel.ps1 -GameDir $GameDir -Mechanisms -Level LEVEL_Asylum_Area69
 ./scripts/Test-Travel.ps1 -GameDir $GameDir -Combat -Level LEVEL_AD_Neighborhood
 ```
+
+
+## Main-menu news panel — October 16, 2026
+
+Earlier build **7523135E5315F9B5** introduced the native-themed, main-menu-only news/reporting panel and was packaged as `PBDMP-0.10.0-news-7523135E5315F9B5.zip`. The structured-form follow-up below supersedes that installation; the existing eleven megapass acceptance areas remain open, and the progress score is unchanged.
+
+Native checks cover text fit and non-overlapping menu bounds at 1280×720, 1920×1080, 1280×1024 and 2560×1080. The final wording explains the prefilled report. A subsequent 65%-scale adjustment passes the same native checks at 1920×1080; the other layout checks preceded this uniform size reduction. Pointer/controller callbacks select the intended URLs, an intercepted browser action verifies the editable issue draft, and navigation reaches both buttons and returns to the native menu. Settings, the multiplayer dialog and native loading hide the panel; final 720p/1080p checks also cover the exit confirmation prompt. Main-menu reentry restores one panel. No report is submitted or log uploaded by these checks.
+
+Run the opt-in fixture against an installation with the current DLL pair, with other game instances closed:
+
+```powershell
+./scripts/Test-News.ps1 -GameDir $GameDir -Width 1920 -Height 1080
+```
+
+The fixture writes private screenshots/logs under ignored `.local`, intercepts browser launches, and stops its own process. The release build does not fetch a news feed. Compile checks report zero warnings/errors. Existing loader/interop warnings remain; no new PBDMP error occurs in the passing panel runs. These checks do not close the separate gameplay or performance acceptance gaps.
+
+
+## Structured bug-report form — October 16, 2026
+
+Current installed/package build: **5748151ED9710F76**, `PBDMP-0.10.0-reporting-5748151ED9710F76.zip`. The tested DLL pair matches the normal installation. The panel retains its 65% scale and now explains software/session prefill. No commit or push is included.
+
+The local YAML form parses successfully, uses unique field IDs and valid field types, and matches the URL's `software` and `session` keys. Only the problem-description field is required by the form; GitHub requires the title. Eight managed reporting checks cover unavailable context, map replacement, new-session clearing, path/multiline rejection and encoded URL round trips. The normal build runs these alongside all 31 passing network scenarios; compilation has zero warnings/errors.
+
+The native UI fixture verifies current software versions/build identifiers, bounded software-only prefill, fresh-launch unavailable context and native button/navigation/menu visibility. Browser launch is intercepted; no issue is submitted. A two-process Direct IP travel regression separately verifies real P1/P2 map/role/transport capture, replacement after next-level travel, retention at title and retention through P1 disconnect/P2 host-loss cleanup. A subsequent fresh-process news check confirms prior context is not persisted between launches.
+
+**Publication dependency:** `.github/ISSUE_TEMPLATE/bug-report.yml` must reach the repository's default branch before the installed button's template URL can work on GitHub. Local validation does not verify the unpublished form in GitHub's live UI. The maintainer explicitly chose local installation before publication. No API credentials, automatic submissions or attachment uploads are used. Existing world/performance acceptance gaps and scores are unchanged.
+
+
+## Focused FPS and stall hardening — October 16, 2026
+
+The [brief performance report](../preformence_report.md) and [measurement method](performance.md) record the controlled before/after comparison. Initial timing build `7106890D0DCAD31A` drops from approximately 120 FPS offline to 71.3 FPS on connected P1, with 72 frames above 50 ms in 25 seconds. Final timing build `8C014EA539801E69` measures 117.9 FPS on P1 and 118.9 FPS on P2, with 0/1 frames above 50 ms. The fixed FPS, p99, stall and host-work budget check passes; an earlier fixed repeat still shows occasional outliers, so broad performance acceptance remains open.
+
+Microsoft runtime allocation traces identify repeated authored surface path/hash lookups and full actor/motion catalogue scans. Map-lifetime caches preserve the original native membership, actor identities and door-first motion ordering. The catalogue hash is unchanged. Framed application-byte counters are opt-in and tested; network framing/protocol version is unchanged. CPU/allocation savings do not imply lower bandwidth.
+
+Native cache/reference checks pass on both peers. Area69 urine/machinery, toilets, fireball extinguishing and late join pass. Area69 world p95 is 3.077 ms and sweep p95 is 47.058 ms, under the unchanged 4/200 ms budgets, followed by passing join/pause/input checks. The last two checks use `0742FFD62A637F2B`, whose only changes after the timing build are diagnostic tutorial dismissal and settled-pause sampling. No production pause behavior or comparison tolerance changes. Builds report zero warnings/errors; 32 managed network scenarios and eight reporting checks pass.
+
+Steam closed during profiling and later native startup attempts failed before the menu with Steamworks uninitialized. After the maintainer reopened the game through Steam, tracing/tests resumed successfully. A separate already-loaded Prison join calibration failed on missing authored breakable geometry; that path remains recorded for follow-up. No private trace or raw game log is included in the repository.

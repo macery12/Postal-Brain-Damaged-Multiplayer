@@ -40,6 +40,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
     internal PlayerCard SecondCard { get; }
     internal NativePrompt Prompt { get; }
     internal NativeHud Hud { get; }
+    internal NativeNewsPanel News { get; }
     internal GameObject DirectDialog { get; }
     internal MainMenu MainMenu { get; private set; } = null!;
     private readonly NativeUiKit _kit;
@@ -73,6 +74,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
         Root.AddComponent<GraphicRaycaster>();
         _kit = new NativeUiKit(nativeCanvas, Root.transform);
         Hud = new NativeHud(_kit, Root.transform);
+        News = new NativeNewsPanel(_kit, Root.transform);
 
         Panel = NativeUiKit.Rect("Multiplayer overlay", Root.transform, new Vector2(960, 540), new Vector2(1920, 1080));
         NativeUiKit.Stretch(Panel.GetComponent<RectTransform>());
@@ -184,6 +186,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
         RepairNavigation(MainEntry!.transform.parent);
         RepairNavigation(PauseEntry!.transform.parent);
         Hud.Tick();Saves.Tick();
+        News.Tick(MainMenu, MainEntry, _modal);
         if (!_modal) return;
         _spiral.localRotation = Quaternion.Euler(0, 0, -Time.unscaledTime * 4f);
         _directSpiral.localRotation = Quaternion.Euler(0, 0, -Time.unscaledTime * 5f);
@@ -242,6 +245,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
     {
         if (_modal == open) return;
         _modal = open;
+        News.Tick(MainMenu, MainEntry, _modal);
         if (open)
         {
             _previousSelected = EventSystem.current?.currentSelectedGameObject;

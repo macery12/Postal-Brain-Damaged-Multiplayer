@@ -1,8 +1,8 @@
 # Multiplayer synchronization progress
 
-**Current handoff: partially complete.** Conveyor, gravity-contact and Hospital pusher checks are closed. Eleven acceptance areas remain; the extended restored-elevator ride still has an intermittent death/respawn failure. FPS and network performance are major priorities for the next optimization pass.
+**Current handoff: partially complete.** Conveyor, gravity-contact and Hospital pusher checks are closed. Eleven broad acceptance areas remain, including active-world performance and the intermittent restored-elevator failure. The first focused performance pass improves controlled connected P1 FPS from 71.3 to 117.9; see the [brief before/after report](../preformence_report.md). This does not close broad combat/world performance acceptance.
 
-Updated October 15, 2026. Current development source: **PBDMP 0.10.0 / protocol 10**, with the [campaign world megapass](../megapass.md) still in progress. The current development playtest is build **C8C097B0726D204B**; the last fully accepted baseline remains 0.9.0. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
+Updated October 16, 2026. Current development source: **PBDMP 0.10.0 / protocol 10**, with the [campaign world megapass](../megapass.md) still in progress. The current development playtest is build **0742FFD62A637F2B** (issue-form reporting update); the last fully accepted baseline remains 0.9.0. This describes implemented behavior and its limits. Both players need the same current plugin and network DLLs. See [verification](verification.md) for recorded checks, reproduction commands and remaining acceptance work.
 
 **Development coverage: 93% (19.5 / 21 points, including partial credit). Last accepted milestone baseline: 90% (19 / 21).** The development score recognizes implemented world-sync work and focused checks while eleven acceptance areas remain. Neither score measures current-build reliability, FPS, network quality or a completed campaign playthrough. [Scoring details](#progress-score).
 
@@ -12,7 +12,7 @@ Updated October 15, 2026. Current development source: **PBDMP 0.10.0 / protocol 
 
 The newer development source also adds direct carrier following and replaces recurring scene-wide stream searches with renderer registration. Native checks cover both Area69 conveyor arrays (32 referenced listeners), personal gravity contacts across save/rejoin and Hospital pusher victim attribution. Native lightning, line and urine presentation reach the peer, including active objects with disabled controller components. These source changes are newer than the unchanged C8C097B0726D204B export.
 
-**Known failures remain:** the latest extended restored-elevator run records a P2 death/respawn after its early checks. FPS/network performance complaints also remain; Area69 sweep p95 improves from about 934 ms to 199–203 ms, with some runs still over the 200 ms target. These are partial features, not completed acceptance.
+**Known failures remain:** the latest extended restored-elevator run records a P2 death/respawn after its early checks. Earlier Area69 sweep p95 runs reached 199–203 ms after the first stream fix. The new controlled 120 FPS check reaches 47.1 ms and passes its unchanged 200 ms target; active-combat performance and residual rare stalls still need broader work. These are partial features, not completed acceptance.
 
 The first acceptance-closing batch verifies native shared secrets (discovery/counts, duplicate prevention, rollback, rediscovery, disk restoration and rejoin); pending barrel chain timing (partly elapsed capture, restored remaining delay, pause and exactly one future result); and the DeathStar teleporter's real P2 button (destination/view and nonzero transformed native momentum, with P1 unchanged).
 
@@ -51,6 +51,9 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | P2 disconnect | | | ✅ | P1 continues playing. |
 | P1 departure | | | ✅ | Ends the session and returns P2 to the main menu. |
 | Main-menu multiplayer controls | | | ✅ | Native-themed lobby, player cards, Steam/Direct IP controls and session status. |
+| Main-menu news panel | | | ✅ | Local information panel uses native artwork/fonts; hidden behind menus/dialogs and during gameplay. |
+| Bug-report shortcut | | | ✅ | Opens the structured issue form with software versions/build IDs and in-memory last-session context; attachments remain manual. Template must be published on GitHub. |
+| Last-session report context | | | ✅ | Local-only map, host/joining role and transport survive title/disconnect; cleared by a new game launch. |
 | Pause-menu multiplayer controls | | | ✅ | Native-themed entry and F8 shortcut. |
 | Start campaign level | | | ✅ | P1 starts; P2 follows. Built-in campaign only. |
 | Restart current level | | | ✅ | P1 restarts both players' level. |
@@ -495,7 +498,7 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Evidence and practical limits
 
-- Current protocol 10 passes **31 managed acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
+- Current protocol 10 passes **32 managed acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
 
 - Urine regressions use two native processes in Neighborhood, Prison, Hospital and ComicCon: either-player electrical-box/tank activation, catalogued garage surface/collision and tutorial-trigger state (including native portal bits and exact host hint retirement), fractional fill and linked motion/scale, toilet overflow/flush, fireball extinguishing and disconnect/rejoin restoration. The subsequent house-wall regression is fixed by a dedicated destruction adapter; native tests now check the actual renderer, collider and matching player-controller passage before and after joining again. An exposed native boss weak spot also accepts P2's frame-timed urine damage through the existing actor-hit authority path.
 - All 15 campaign maps pass discovery and bounded serialization with the new urine/progression catalogue. This does not establish natural completion of every urine puzzle, rail ride, rocket sequence or boss fight. An earlier urine-only VIP fixture stopped in a native shared pause before its action. The later focused machinery fixture passes native launch/rollback/continuation; natural progression remains manual acceptance work.

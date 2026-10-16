@@ -44,6 +44,8 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     private float _nextMenuScan;
     private string _feedback = "";
     private string _lastStatus = "";
+    private CoopSession? _reportSession;
+    private string _reportLevel = "";
     private bool _failed;
     private bool _buttonVisibleLogged;
     private readonly bool _smokeEnabled = Environment.GetEnvironmentVariable("PBDMP_SMOKE_TEST") == "1";
@@ -70,6 +72,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     public void Update()
     {
         if (_failed) return;
+        var baselineStart=PerformanceBaseline.BeginUpdate();
         try
         {
             DiagnosticCursor.Verify();
@@ -124,6 +127,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 if (snapshot.Connected) _view.Hud.Toast(snapshot.Role == SessionRole.Host ? PartnerName(snapshot) + " joined." : "Connected to " + PartnerName(snapshot) + ".");
             }
             UpdateAvatar(snapshot, local);
+            RememberReportContext(snapshot);
             var detail = snapshot.Status;
             if (snapshot.Connected)
             {
@@ -153,10 +157,12 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 Plugin.Logger.LogInfo(snapshot.Status);
             }
             if (_smokeEnabled) RunSmoke();
+            if (Environment.GetEnvironmentVariable("PBDMP_NEWS_TEST") == "1") RunNewsTest();
             if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PATH_TEST"))) RunWorldPathTest();
+                if(PerformanceBaseline.Enabled) RunPerformanceBaseline();
+                else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PATH_TEST"))) RunWorldPathTest();
                 else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PRESENTATION_TEST"))) RunReportedPresentationTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_ARENA_TEST")=="1") RunArenaTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_PROP_TEST")=="1") RunPropTest();
@@ -180,6 +186,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             if (Environment.GetEnvironmentVariable("PBDMP_COMBAT_PROBE") == "1") RunCombatProbe();
         }
         catch (Exception ex) { Fail(ex); }
+        finally {PerformanceBaseline.EndUpdate(baselineStart);}
     }
 
     public void LateUpdate()
@@ -480,6 +487,24 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         return true;
     }
 
+    [HideFromIl2Cpp]
+    private void RememberReportContext(SessionSnapshot snapshot)
+    {
+        var life = _lifecycle;
+        var playing = life != null && life.NativeReady && life.State.Action != TravelAction.Menu;
+        if (_session == null || snapshot.Role == SessionRole.Offline || (!snapshot.Connected && !playing)) return;
+        if (!ReferenceEquals(_reportSession, _session))
+        {
+            _reportSession = _session; _reportLevel = "";
+            IssueReport.LastSession.Begin(snapshot.Role == SessionRole.Host, _steamSession);
+        }
+        if (!playing || life!.State.Level == _reportLevel) return;
+        var level = SessionLifecycle.FindLevel(life.State.Level);
+        if (!SessionLifecycle.Supported(level)) return;
+        IssueReport.LastSession.RememberLevel(level!.name);
+        _reportLevel = life.State.Level;
+    }
+
     private void ResetSession()
     {
         _saves?.Dispose();_saves=null;
@@ -490,6 +515,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         catch (Exception ex) { Plugin.Logger.LogError("Campaign cleanup: " + ex); }
         _lifecycle = null;
         _session?.Dispose(); _session = null;
+        _reportSession = null; _reportLevel = ""; // Keep the sanitized last-session report until the game closes.
         // The session owned the listener; leaving releases the lobby place for the partner too.
         _steam?.Leave(); _steamSession = false;
         _remoteVisual?.Dispose(); _remoteVisual = null;

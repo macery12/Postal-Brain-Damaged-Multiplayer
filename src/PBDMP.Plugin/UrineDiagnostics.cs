@@ -20,9 +20,14 @@ public sealed partial class MultiplayerBehaviour
     private void RunUrineTest()
     {
         if(_urineStep==99) return;
-        File.WriteAllText(Marker(TravelRole+"-urine-state.txt"),$"step={_urineStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, released={_lifecycle?.State.Released}, frozen={_lifecycle?.Frozen}, requests={_world?.UrineRequestsApplied}");
+        File.WriteAllText(Marker(TravelRole+"-urine-state.txt"),$"step={_urineStep}, ready={_lifecycle?.NativeReady}, world={_lifecycle?.WorldReady}, released={_lifecycle?.State.Released}, frozen={_lifecycle?.Frozen}, paused={_lifecycle?.State.Paused}, tutorial={_lifecycle?.LocalTutorialActive}, requests={_world?.UrineRequestsApplied}");
         if(_urineStep==0) {_port!.text=Environment.GetEnvironmentVariable("PBDMP_TRAVEL_PORT")!;if(TravelRole=="host") {Host();GameManager.LoadLevel(TestLevel(),true);} else {_address!.text="127.0.0.1";Join();}_urineStep=1;return;}
         if(_lifecycle is {NativeReady:false}) {_lifecycle.AutoContinue();return;}
+        if(_lifecycle?.NativeReady==true && Player.Instance?.GetComponent<Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent>() is {_isTutorialShown:true} tutorial)
+        {
+            TravelCheck(InputManager.Instance._gameplayKeyboardMap.enabled && InputManager.CancelInput,"urine fixture preserves native tutorial Use input during its gameplay hold");
+            tutorial.OnUseDown();return;
+        }
         if(TravelRole=="host") UrineHostTest();else UrineClientTest();
     }
     private void UrineHostTest()
@@ -54,7 +59,10 @@ public sealed partial class MultiplayerBehaviour
                 }
                 // Compare one stable physical-world instant, not a prop pose
                 // sampled before it continued settling during the peer's load.
-                GameManager.PauseGame();
+                GameManager.PauseGame();_urineAt=Time.unscaledTime+.2f;_urineStep=40;break;
+            case 40 when _lifecycle!.Frozen && Time.timeScale==0 && Time.unscaledTime>=_urineAt:
+                // Native moving listeners can finish the current sampled-delta
+                // frame after pause. Compare the settled world on both peers.
                 WriteUrineFixture("urine-live.json");TravelMark("host-urine-shared");_urineStep=5;break;
             case 5 when Marked("client-live-checked"):
                 GameManager.DisableMenu();
@@ -102,7 +110,9 @@ public sealed partial class MultiplayerBehaviour
                 if(_urineTarget!.TryCast<PissTank>() is {} tank) {for(var i=0;i<3;i++) tank.OnPiss(new PissData(Player.Instance.Cast<IAiActor>()));}
                 else _urineTarget.Cast<IPissable>().Piss(new PissData(Player.Instance.Cast<IAiActor>()));
                 TravelMark("client-urinated");_urineStep=4;break;
-            case 4 when Marked("host-urine-shared"):
+            case 4 when Marked("host-urine-shared") && _lifecycle!.State.Paused:
+                _urineAt=Time.unscaledTime+1f;_urineStep=40;break;
+            case 40 when _lifecycle!.Frozen && Time.unscaledTime>=_urineAt:
                 CheckUrineFixture("urine-live.json");TravelMark("client-live-checked");_urineStep=5;break;
             case 5 when Marked("host-urine-late"):
                 ResetSession();_urineStep=6;break;

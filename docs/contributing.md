@@ -34,3 +34,12 @@ Before staging, inspect the exact candidate files for secrets, absolute workstat
 ## Reports and verification
 
 Include the mod version/protocol, map, host/client role, fresh/reload/late-join sequence, expected result and actual result. Attach only sanitized log excerpts. State whether the check used synthetic/native diagnostics or natural two-PC gameplay. Do not mark a planned/partial feature complete without the relevant implementation and evidence.
+
+
+### In-game bug reports
+
+The main-menu **Report a Bug** button opens the [Bug or sync issue form](../.github/ISSUE_TEMPLATE/bug-report.yml). Only a title and problem description are required. Software versions/build identifiers and available last-multiplayer-session context are prefilled; users can review and edit them. Hardware specifications, usernames, file paths, Steam IDs, IP addresses and raw logs are excluded. Screenshots and sanitized logs are attached manually by the reporter.
+
+Last-session context is held only in memory for the current game launch. It records the most recently played supported campaign map, host/joining role and Steam/Direct IP connection type, and survives returning to the title or disconnecting. Starting another session clears the previous session's map until the new map is ready. Reports from a fresh launch use unavailable values. The game compatibility identifier is a binary hash, not a Steam release/build number.
+
+Maintainers must publish `.github/ISSUE_TEMPLATE/bug-report.yml` on the repository's default branch before the button's form link works. Keep the `software` and `session` field IDs aligned with `ReportDraft.cs`; no GitHub token or API integration is used. The template, URL and cache have focused managed checks included in `Build.ps1`; `Test-News.ps1` checks native menu actions/software prefill, while `Test-Travel.ps1` checks actual session context through travel and disconnect.

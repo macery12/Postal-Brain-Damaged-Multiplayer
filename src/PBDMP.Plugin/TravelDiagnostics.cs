@@ -121,6 +121,9 @@ public sealed partial class MultiplayerBehaviour
                 GameManager.LoadLevel(TestLevel(), true); _travelStep = 1; break;
             case 1:
                 if (!_lifecycle!.NativeReady) return;
+                TravelCheck(IssueReport.LastSession.Describe().Contains("Role: Host (P1)") &&
+                    IssueReport.LastSession.Describe().Contains("Level: " + LevelManager.CurrentLevel.name) &&
+                    IssueReport.LastSession.Describe().Contains("Connection: Direct IP"), "live P1 report captures built-in map, role and transport");
                 QuietNpcs();
                 var noWeapon = Player.Instance.GetComponent<PlayerInventoryComponent>()._weaponsController._noWeapon;
                 var initial = _lifecycle.PlayerState.CaptureJoin();
@@ -164,6 +167,8 @@ public sealed partial class MultiplayerBehaviour
             case 6:
                 if (!Marked("client-followed-menu")) return;
                 TravelCheck(!SessionManager.SessionActive, "P1 returns to title through native game flow");
+                TravelCheck(IssueReport.LastSession.Describe().Contains("Level: " + SessionLifecycle.FindLevel(_nextMap)!.name),
+                    "return to title retains the latest map in the report, not the original map or menu");
                 GameManager.LoadLevel(TestLevel(), true); _travelStep = 7; break;
             case 7:
                 if (!_lifecycle!.NativeReady || !_lifecycle.State.Released || !Marked("client-reentered")) return;
@@ -171,6 +176,8 @@ public sealed partial class MultiplayerBehaviour
             case 8:
                 if (!Marked("client-host-left")) return;
                 TravelCheck(SessionLifecycle.Current == null, "P1 disconnect restores offline session guards");
+                TravelCheck(IssueReport.LastSession.Describe().Contains("Level: " + TestLevel().name) &&
+                    IssueReport.LastSession.Describe().Contains("Role: Host (P1)"), "P1 disconnect retains report context");
                 TravelMark("host-pass"); _travelStep = 99; break;
         }
     }
@@ -186,6 +193,8 @@ public sealed partial class MultiplayerBehaviour
                 Join(); _travelStep = 1; break;
             case 1:
                 if (!_lifecycle!.NativeReady || !_lifecycle.State.Released) return;
+                TravelCheck(IssueReport.LastSession.Describe().Contains("Role: Joining player (P2)") &&
+                    IssueReport.LastSession.Describe().Contains("Level: " + LevelManager.CurrentLevel.name), "live P2 report captures joining role and map");
                 QuietNpcs();
                 TravelCheck(Player.Instance.CurrentWeapon.WeaponId.name == "WEAPON_Shotgun", "late join copies P1 equipped shotgun");
                 var host = _lifecycle.State.Loadout!;
@@ -227,6 +236,8 @@ public sealed partial class MultiplayerBehaviour
                 if (_lifecycle != null || SessionLifecycle.Current != null) return;
                 TravelCheck(!SessionManager.SessionActive && SessionLifecycle.Current == null, "P1 disconnect returns P2 to title and restores offline guards");
                 TravelCheck(DifficultyManager.CurrentDifficulty.Pointer == _originalTestDifficulty, "P2 original difficulty restored after disconnect");
+                TravelCheck(IssueReport.LastSession.Describe().Contains("Level: " + TestLevel().name) &&
+                    IssueReport.LastSession.Describe().Contains("Role: Joining player (P2)"), "P2 host-loss cleanup retains report context");
                 TravelMark("client-host-left"); TravelMark("client-pass"); _travelStep = 99; break;
         }
     }

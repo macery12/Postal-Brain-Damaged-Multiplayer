@@ -339,7 +339,7 @@ internal sealed partial class SharedWorld : IDisposable
             { _lastDoor[key]=data; Send(new(WorldKind.Door,_epoch,1,Id(key),Key:key,Data:data,Flags:2)); }
             yield return 0;
         }
-        foreach (var pair in _catalogue.DoorMotion.Concat(_catalogue.EncounterMotion).GroupBy(p=>p.Key).Select(g=>g.First()))
+        foreach (var pair in _catalogue.AuthoredMotion)
         {
             var t=pair.Value;
             if(t==null) continue;

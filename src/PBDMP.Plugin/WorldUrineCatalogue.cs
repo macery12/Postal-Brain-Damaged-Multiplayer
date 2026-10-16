@@ -12,6 +12,9 @@ internal sealed partial class WorldCatalogue
     internal readonly HashSet<string> UrineConsequences=new();
     internal readonly Dictionary<IntPtr,FMODEvent> UrineAudioAssets=new();
     internal readonly Dictionary<string,Component[]> UrineSurfaces=new();
+    // Authored membership lasts exactly as long as this map catalogue. Native
+    // update guards must not rebuild hierarchy paths or enumerate scene roots.
+    internal readonly HashSet<IntPtr> UrineSurfacePointers=new();
     private static readonly HashSet<string> UrineTypes=new(StringComparer.Ordinal)
         {"ExplosiveBarrel","BurnableObject","FuseBox","ButtonShootable","MetalButton","Toilet","PissListener","PissFiller","PissTank","PissFillListenerMovingObject","PissFillListenerScalingObject"};
     private void BuildUrineTargets()
@@ -79,7 +82,7 @@ internal sealed partial class WorldCatalogue
             if(!SafeMotion(t)) continue;
             var components=t.GetComponents<Component>().Select(c=>(Component?)c.TryCast<Renderer>()??(Component?)c.TryCast<Collider>()??(Component?)c.TryCast<Light>()??(Component?)c.TryCast<UnityEngine.AI.NavMeshObstacle>()??c.TryCast<OcclusionPortal>()).Where(c=>c!=null).Select(c=>c!).ToArray();
             if(components.Length>32) throw new InvalidOperationException("Urine surface exceeds bounded component adapter: "+t.name);
-            var key=TransformKey(t);EncounterMotion[key]=t;UrineSurfaces[key]=components;
+            var key=TransformKey(t);EncounterMotion[key]=t;UrineSurfaces[key]=components;UrineSurfacePointers.Add(t.Pointer);
         }
     }
 }

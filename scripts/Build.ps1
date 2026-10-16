@@ -18,6 +18,10 @@ try {
         if ($LASTEXITCODE) { throw 'Test restore failed.' }
         dotnet run --project tests/PBDMP.Network.Tests/PBDMP.Network.Tests.csproj -c Release --no-restore
         if ($LASTEXITCODE) { throw 'Network acceptance tests failed.' }
+        dotnet restore tests/PBDMP.Reporting.Tests/PBDMP.Reporting.Tests.csproj --configfile NuGet.Config --nologo
+        if ($LASTEXITCODE) { throw 'Reporting test restore failed.' }
+        dotnet run --project tests/PBDMP.Reporting.Tests/PBDMP.Reporting.Tests.csproj -c Release --no-restore
+        if ($LASTEXITCODE) { throw 'Reporting tests failed.' }
     }
     $package = Join-Path $repo 'artifacts\PBDMP\BepInEx\plugins\PBDMP'
     New-Item -ItemType Directory -Force -Path $package | Out-Null

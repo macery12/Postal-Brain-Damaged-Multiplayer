@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$GameDir = (Join-Path $PSScriptRoot '..\..\Game'),[ValidateSet("Posters","Pause")][string]$Presentation,[ValidateSet("Secrets","Barrel","Teleport","Cannon","Conveyor","Pusher","Gravity")][string]$WorldPath,[switch]$Arena,[switch]$Props,[switch]$Mechanisms,[switch]$Scenery,[switch]$Stories,[switch]$Saves,[switch]$SaveResume,[switch]$SaveReplacePartner,[switch]$SaveUi,[switch]$WorldRegression,[switch]$ProgressionOnly,[switch]$Mission,[switch]$MissionExits,[switch]$Urine,[switch]$UrineParts,[switch]$Performance,[ValidateRange(0,360)][int]$PerformanceFrameRate=0,[switch]$FocusInput,[switch]$ActorParts,[switch]$Actors,[switch]$JoinInput,[switch]$Combat,[switch]$Doors,[switch]$DoorReload,[switch]$MissingHandle,[switch]$State,[switch]$Audit,[string[]]$AuditLevels,[string]$Level)
+param([string]$GameDir = (Join-Path $PSScriptRoot '..\..\Game'),[ValidateSet("Posters","Pause")][string]$Presentation,[ValidateSet("Secrets","Barrel","Teleport","Cannon","Conveyor","Pusher","Gravity")][string]$WorldPath,[switch]$Arena,[switch]$Props,[switch]$Mechanisms,[switch]$Scenery,[switch]$Stories,[switch]$Saves,[switch]$SaveResume,[switch]$SaveReplacePartner,[switch]$SaveUi,[switch]$WorldRegression,[switch]$ProgressionOnly,[switch]$Mission,[switch]$MissionExits,[switch]$Urine,[switch]$UrineParts,[switch]$PerformanceBaseline,[switch]$Performance,[ValidateRange(0,360)][int]$PerformanceFrameRate=0,[switch]$FocusInput,[switch]$ActorParts,[switch]$Actors,[switch]$JoinInput,[switch]$Combat,[switch]$Doors,[switch]$DoorReload,[switch]$MissingHandle,[switch]$State,[switch]$Audit,[string[]]$AuditLevels,[string]$Level)
 $ErrorActionPreference = 'Stop'
 $previousWorldPath=$env:PBDMP_PATH_TEST
 $env:PBDMP_PATH_TEST=if($WorldPath){$WorldPath.ToLowerInvariant()}else{$null}
@@ -96,11 +96,13 @@ $env:PBDMP_SCENERY_TEST=if($Scenery){'1'}else{$null}
 $previousStory=$env:PBDMP_STORY_TEST
 $env:PBDMP_STORY_TEST=if($Stories){'1'}else{$null}
 $players = @()
+$previousBaseline=$env:PBDMP_PERF_BASELINE
+$env:PBDMP_PERF_BASELINE=if($PerformanceBaseline){'1'}else{$null}
 $previousPerf=$env:PBDMP_SYNC_PERF_TEST
 $previousPerfFrameRate=$env:PBDMP_SYNC_PERF_RATE
 $env:PBDMP_SYNC_PERF_RATE=if($Performance -and $PerformanceFrameRate){[string]$PerformanceFrameRate}else{$null}
 $env:PBDMP_SYNC_PERF_TEST=if($Performance){'1'}else{$null}
-if($Performance){$env:PBDMP_JOIN_INPUT_TEST='1'}
+if($Performance -or $PerformanceBaseline){$env:PBDMP_JOIN_INPUT_TEST='1'}
 $previousFocusInput=$env:PBDMP_FOCUS_INPUT_TEST
 $env:PBDMP_FOCUS_INPUT_TEST=if($FocusInput){'1'}else{$null}
 if($FocusInput) {
@@ -143,6 +145,7 @@ public static class PbdmpFocusProbe {
 '@
     }
 }
+$perfTracer=$null
 $focusTestDone=$false
 try {
     $roles = if($Audit) { @('host') } else { @('host','client') }
@@ -169,6 +172,12 @@ try {
     }
     $watch = [Diagnostics.Stopwatch]::StartNew()
     while (!(Test-Path -LiteralPath (Join-Path $output 'host-pass')) -or (!$Audit -and !(Test-Path -LiteralPath (Join-Path $output 'client-pass')))) {
+        if($env:PBDMP_PERF_TRACE -eq '1' -and !$perfTracer -and (Test-Path -LiteralPath (Join-Path $output 'connected-sample'))) {
+            $tracer=Join-Path $repo '.local\perf-tools\dotnet-trace.exe'
+            if(!(Test-Path -LiteralPath $tracer)) {throw 'Install the private diagnostic tracer before trace mode.'}
+            $traceFile=Join-Path $output 'host-connected.nettrace'
+            $perfTracer=Start-Process -FilePath $tracer -WindowStyle Hidden -PassThru -ArgumentList 'collect','--process-id',$players[0].Id,'--profile','gc-verbose,dotnet-sampled-thread-time','--duration','00:00:00:20','--output',('"'+$traceFile+'"') -RedirectStandardOutput (Join-Path $output 'trace-collection.log') -RedirectStandardError (Join-Path $output 'trace-error.log')
+        }
         if($FocusInput -and !$focusTestDone -and (Test-Path -LiteralPath (Join-Path $output 'client-focus-ready'))) {
             $focusTestDone=$true
             [PbdmpFocusProbe]::Activate($players[1].Id)
@@ -194,7 +203,7 @@ try {
             } finally {[PbdmpFocusProbe]::keybd_event(0x57,0,2,[UIntPtr]::Zero)}
             'pass'|Set-Content -LiteralPath (Join-Path $output 'focus-switches-done')
         }
-        $limit = if($Audit) { 1800 } elseif($Actors -or $ActorParts -or $Saves -or $Scenery -or $Mechanisms -or $Props -or $Arena) {600} else { 150 }
+        $limit = if($Audit) { 1800 } elseif($PerformanceBaseline -or $Actors -or $ActorParts -or $Saves -or $Scenery -or $Mechanisms -or $Props -or $Arena) {600} else { 150 }
         if ($watch.Elapsed.TotalSeconds -gt $limit) { throw "Native game test timed out; inspect $output" }
         foreach ($game in $players) { $game.Refresh(); if ($game.HasExited) { throw "Owned test process exited: $($game.ExitCode)" } }
         $activeLogs = if($Audit) { @((Join-Path $GameDir 'BepInEx\LogOutput.log')) } else { @((Join-Path $GameDir 'BepInEx\LogOutput.log'),(Join-Path $clientBep 'LogOutput.log')) }
@@ -210,9 +219,13 @@ try {
             throw "Native teardown failure; inspect $logPath and $output"
         }
     }
-    $description = if($WorldPath) {switch($WorldPath) {Gravity {"native personal gravity contacts, save restoration, independent host contacts and clean rejoin"} Pusher {"native Hospital pusher force reaches P2 once without pushing P1 or simulating on P2"} Conveyor {"native conveyor listener movement, physical collision, pause, disk restoration and rejoin"} Secrets {"native shared secret discovery, deduplication, disk rollback, rediscovery and late join"} Barrel {"native pending barrel fuse capture/restore, pause and one future result"} Teleport {"native P2 button teleportation, destination/view/momentum and unchanged P1"} Cannon {"native cannon targeting, real projectile presentation and actual victim damage"}}} elseif($env:PBDMP_PRESENTATION_TEST -eq 'posters') {'shared poster collection, native result count, duplicate prevention, disk restoration and current-world rejoin'} elseif($env:PBDMP_PRESENTATION_TEST -eq 'pause') {'native host-pause screen/caption, automatic resume, retained P2 menu and gameplay input'} elseif($Saves -and $env:PBDMP_SAVE_REPLAY -eq '1') {'preserved-save recovery/rebuild replay and both-player controls'} elseif($Urine -and $env:PBDMP_TANK_REPLAY -eq '1') {'tank endpoint replay: native underflow, fill completion, directly linked machinery and late join; unrelated map scenery is outside this focused check'} elseif($Urine) {'native urine targets, linked state, toilets, fireball extinguishing and late join'} elseif($Arena) {'native arena shifts, P2 syringe activation, cooldown persistence and peer restoration'} elseif($Props) {'native prop pushes, spawning/pooling lifetimes, disk restore and current-world rejoin'} elseif($Mechanisms) {'native machinery clocks, pause, disk restore, future callbacks and peer pose'} elseif($Scenery) {'authored scenery, partial damage, persistence and current late join'} elseif($Stories) {'native shared story, host-only skip, pending admission and ending'} elseif($Saves) {'persistent co-op capture, native restore and player isolation'} elseif ($WorldRegression -and $ProgressionOnly) {'progression-only: native hits, powered urine, barrel/pipe geometry and explosion connection; light-only differences recorded separately'} elseif ($WorldRegression) {'native hit particles, powered urine, barrel-linked geometry and special explosion replay'} elseif ($MissionExits) {'both-player exits and deferred automatic story endings'} elseif($Mission) {'actual Neighborhood wall destruction, native passage and late join'} elseif ($Audit) {'campaign catalogue/state coverage'} elseif($ActorParts) {'native boss weak spots, balloon targets and scripted shoot-reactive humans'} elseif($Actors) {'native campaign actor family spawn/status/damage/death lifecycles'} elseif($Performance) {'steady host state-capture frame budget and native join/pause input'} elseif($FocusInput) {'overlapping pause locks, real window focus changes and native keyboard/mouse input'} elseif($JoinInput) {'immediate main-menu join controls, shared pause/resume and modal input cleanup'} elseif ($DoorReload) {'solo start, host/join, reload and both-player bedroom door interactions'} elseif ($State) {'native doors and encounter late-join state'} elseif ($Doors) {'requester-owned keys and shared unlock'} elseif ($Combat) { 'shared enemy authority and personal damage' } else { 'campaign travel/respawn' }
+    if($perfTracer) {
+        if(!$perfTracer.WaitForExit(1000) -or $perfTracer.ExitCode -ne 0) {throw "Performance trace collection failed; inspect $output"}
+    }
+    $description = if($PerformanceBaseline) {'four-phase FPS/frame-stall baseline (trace mode collects connected-only)'} elseif($WorldPath) {switch($WorldPath) {Gravity {"native personal gravity contacts, save restoration, independent host contacts and clean rejoin"} Pusher {"native Hospital pusher force reaches P2 once without pushing P1 or simulating on P2"} Conveyor {"native conveyor listener movement, physical collision, pause, disk restoration and rejoin"} Secrets {"native shared secret discovery, deduplication, disk rollback, rediscovery and late join"} Barrel {"native pending barrel fuse capture/restore, pause and one future result"} Teleport {"native P2 button teleportation, destination/view/momentum and unchanged P1"} Cannon {"native cannon targeting, real projectile presentation and actual victim damage"}}} elseif($env:PBDMP_PRESENTATION_TEST -eq 'posters') {'shared poster collection, native result count, duplicate prevention, disk restoration and current-world rejoin'} elseif($env:PBDMP_PRESENTATION_TEST -eq 'pause') {'native host-pause screen/caption, automatic resume, retained P2 menu and gameplay input'} elseif($Saves -and $env:PBDMP_SAVE_REPLAY -eq '1') {'preserved-save recovery/rebuild replay and both-player controls'} elseif($Urine -and $env:PBDMP_TANK_REPLAY -eq '1') {'tank endpoint replay: native underflow, fill completion, directly linked machinery and late join; unrelated map scenery is outside this focused check'} elseif($Urine) {'native urine targets, linked state, toilets, fireball extinguishing and late join'} elseif($Arena) {'native arena shifts, P2 syringe activation, cooldown persistence and peer restoration'} elseif($Props) {'native prop pushes, spawning/pooling lifetimes, disk restore and current-world rejoin'} elseif($Mechanisms) {'native machinery clocks, pause, disk restore, future callbacks and peer pose'} elseif($Scenery) {'authored scenery, partial damage, persistence and current late join'} elseif($Stories) {'native shared story, host-only skip, pending admission and ending'} elseif($Saves) {'persistent co-op capture, native restore and player isolation'} elseif ($WorldRegression -and $ProgressionOnly) {'progression-only: native hits, powered urine, barrel/pipe geometry and explosion connection; light-only differences recorded separately'} elseif ($WorldRegression) {'native hit particles, powered urine, barrel-linked geometry and special explosion replay'} elseif ($MissionExits) {'both-player exits and deferred automatic story endings'} elseif($Mission) {'actual Neighborhood wall destruction, native passage and late join'} elseif ($Audit) {'campaign catalogue/state coverage'} elseif($ActorParts) {'native boss weak spots, balloon targets and scripted shoot-reactive humans'} elseif($Actors) {'native campaign actor family spawn/status/damage/death lifecycles'} elseif($Performance) {'steady host state-capture frame budget and native join/pause input'} elseif($FocusInput) {'overlapping pause locks, real window focus changes and native keyboard/mouse input'} elseif($JoinInput) {'immediate main-menu join controls, shared pause/resume and modal input cleanup'} elseif ($DoorReload) {'solo start, host/join, reload and both-player bedroom door interactions'} elseif ($State) {'native doors and encounter late-join state'} elseif ($Doors) {'requester-owned keys and shared unlock'} elseif ($Combat) { 'shared enemy authority and personal damage' } else { 'campaign travel/respawn' }
     Write-Host "Native game diagnostics passed: $description; $output"
 } finally {
+    if($perfTracer) {$perfTracer.Refresh();if(!$perfTracer.HasExited){Stop-Process -Id $perfTracer.Id}}
     $env:PBDMP_PATH_TEST=$previousWorldPath
     $env:PBDMP_PRESENTATION_TEST=$previousPresentation
     $env:PBDMP_ARENA_TEST=$previousArena
@@ -233,6 +246,7 @@ try {
     $env:PBDMP_URINE_PARTS_TEST=$previousUrineParts
     $env:PBDMP_DOOR_TEST = $previousDoors
     $env:PBDMP_JOIN_INPUT_TEST = $previousJoinInput
+    $env:PBDMP_PERF_BASELINE=$previousBaseline
     $env:PBDMP_SYNC_PERF_TEST=$previousPerf
     $env:PBDMP_SYNC_PERF_RATE=$previousPerfFrameRate
     $env:PBDMP_FOCUS_INPUT_TEST=$previousFocusInput

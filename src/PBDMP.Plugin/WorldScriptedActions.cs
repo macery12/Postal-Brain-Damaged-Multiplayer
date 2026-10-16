@@ -66,7 +66,7 @@ internal sealed partial class SharedWorld
     internal bool PermitScriptedRotation(LocalRotation rotation)
     {
         if(!Active) return true;
-        var replicated=OwnsMission(rotation) || _catalogue!.UrineSurfaces.ContainsKey(WorldCatalogue.TransformKey(rotation.transform));
+        var replicated=OwnsMission(rotation) || _catalogue!.UrineSurfacePointers.Contains(rotation.transform.Pointer);
         if(!replicated) return true;
         if(SharedUrinePatches.DiagnosticHoldTankMotion && Environment.GetEnvironmentVariable("PBDMP_URINE_TEST")=="1") return false;
         return !Client && !_life.Frozen && !RestoringNative;
@@ -78,7 +78,7 @@ internal sealed partial class SharedWorld
             listener.TryCast<Hyperstrange.PBD.Contraptions.PissFillListenerScalingObject>()?._scaleTransform;
         // Fill values still update the local tank view; authored moving/scaling
         // machinery receives its exact host pose and must not recalculate it.
-        return target==null || !_catalogue!.UrineSurfaces.ContainsKey(WorldCatalogue.TransformKey(target));
+        return target==null || !_catalogue!.UrineSurfacePointers.Contains(target.Pointer);
     }
 }
 

@@ -161,6 +161,7 @@ public static class Protocol
         BinaryPrimitives.WriteInt32LittleEndian(frame, bytes.Length);
         bytes.CopyTo(frame, 4);
         await stream.WriteAsync(frame.AsMemory(), token).ConfigureAwait(false);
+        ProtocolTraffic.Sent(frame.Length);
     }
 
     public static async Task<Packet> ReadAsync(Stream stream, CancellationToken token)
@@ -171,7 +172,9 @@ public static class Protocol
         if (length is < 1 or > MaxFrameBytes) throw new InvalidDataException("Invalid frame size.");
         var bytes = new byte[length];
         await ReadExactly(stream, bytes, token).ConfigureAwait(false);
-        return Decode(bytes);
+        var packet=Decode(bytes);
+        ProtocolTraffic.Received(length+4);
+        return packet;
     }
 
     private static async Task ReadExactly(Stream stream, byte[] bytes, CancellationToken token)
