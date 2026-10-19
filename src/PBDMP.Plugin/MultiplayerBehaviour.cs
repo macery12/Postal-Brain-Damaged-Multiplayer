@@ -84,10 +84,11 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 if (MenuManager.MainCanvas.transform.Find("MainCanvasGroup/PROMPT_Input") == null) return;
                 BuildUI();
             }
-            if (Input.GetKeyDown(KeyCode.F8)) TogglePanel();
+            if (Input.GetKeyDown(KeyCode.F8)) { if (_session == null && InMainMenu) OpenCoopMenu(); else TogglePanel(); }
             else if (_open && Input.GetKeyDown(KeyCode.Escape) && !_view!.Cancel()) SetPanel(false);
             _view!.Refresh();
             _steam!.Tick();
+            TickAfterHost();
             if (Time.unscaledTime >= _nextMenuScan)
             {
                 _nextMenuScan = Time.unscaledTime + 0.5f;
@@ -162,6 +163,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 Plugin.Logger.LogInfo(snapshot.Status);
             }
             if (Environment.GetEnvironmentVariable("PBDMP_POSE_CAPTURE") == "1") RunPoseCapture();
+            else if (_smokeEnabled && CoopMenuTestEnabled) RunCoopMenuTest();
             else if (_smokeEnabled) RunSmoke();
             if (Environment.GetEnvironmentVariable("PBDMP_NEWS_TEST") == "1") RunNewsTest();
             if (SurvivalInventory.Enabled) RunSurvivalInventory();
@@ -352,7 +354,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
 
     private void StartCampaign()
     {
-        if (!_smokeEnabled) _lifecycle = new(_session!, Notify, () => { if (_open) SetPanel(false); }, ResetSession);
+        if (!_smokeEnabled || CoopMenuTestEnabled) _lifecycle = new(_session!, Notify, () => { if (_open) SetPanel(false); }, ResetSession);
         if (_lifecycle != null)
         {
             _world = new(_session!, _lifecycle);
@@ -568,6 +570,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         _address = _view.Address; _port = _view.Port; _status = _view.Status;
         _hostButton = _view.HostButton; _joinButton = _view.JoinButton; _disconnectButton = _view.DisconnectButton;
         Plugin.Logger.LogInfo("PBDMP native UI constructed: main/pause entries, lobby panel with player cards, Direct IP dialog, prompt and session badge.");
+        BuildCoopMenu();
     }
 
     [HideFromIl2Cpp]
@@ -612,7 +615,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 MeshMaterialRegression.Run();
                 NativeUiDiagnostics.AssertControls(_view!);
                 _view!.MainEntry.OnPointerClick(new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left });
-                SmokeAssert(_open && _inputPushed, "menu button opens panel and blocks game input");
+                SmokeAssert(_coopMenu!.Menu.gameObject.activeInHierarchy && !_open, "main-menu Multiplayer opens the native-style co-op menu");
+                MenuManager.Close(); TogglePanel();
+                SmokeAssert(_open && _inputPushed, "the lobby panel opens and blocks game input");
                 NativeUiDiagnostics.AssertModal(_view, true);
                 NativeUiDiagnostics.AssertViewport(_view);
                 _smokeStep = 1; _smokeNext = Time.unscaledTime + 2f;
@@ -761,9 +766,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 SmokeAssert(!_open && !_inputPushed, "close button restores game input");
                 NativeUiDiagnostics.AssertModal(_view, false);
                 NativeUiDiagnostics.SubmitController(_view.MainEntry);
-                SmokeAssert(_open && _inputPushed, "native controller submit opens multiplayer dialog");
+                SmokeAssert(_coopMenu!.Menu.gameObject.activeInHierarchy && !_open, "native controller submit opens the co-op menu");
                 InputManager.OnMenuCancelDown?.Invoke();
-                SmokeAssert(!_open && !_inputPushed, "controller cancel restores the previous native menu");
+                SmokeAssert(!_open && !_inputPushed && _view.MainMenu.gameObject.activeInHierarchy, "controller cancel returns to the native main menu");
                 _view.PauseEntry.onClick.Invoke();
                 SmokeAssert(_open && _inputPushed, "pause entry opens the same native dialog");
                 InputManager.OnMenuCancelDown?.Invoke();

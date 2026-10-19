@@ -44,6 +44,7 @@ internal sealed class NativeMultiplayerUI : IDisposable
     internal GameObject DirectDialog { get; }
     internal MainMenu MainMenu { get; private set; } = null!;
     private readonly NativeUiKit _kit;
+    internal NativeUiKit Kit => _kit;
     private readonly RectTransform _spiral, _directSpiral;
     private readonly System.Action _toggle;
     private readonly List<(Selectable Button, Navigation Original)> _nativeNavigation = new();

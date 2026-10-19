@@ -2,7 +2,7 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–3 are complete; Phase 4 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–4 are complete; Phase 5 is next.**
 
 | Phase | State |
 | --- | --- |
@@ -10,7 +10,7 @@ Updated October 18, 2026.
 | 1 Shared items core | Complete |
 | 2 Keys, joins and saved inventory | Complete (schema change moved to Phase 3) |
 | 3 Co-op campaigns (save model) | Complete |
-| 4 Multiplayer menu and entry flows | Pending |
+| 4 Multiplayer menu and entry flows | Complete (Join a friend opens Direct IP until Phase 6) |
 | 5 In-session pause menu and P2 view | Pending |
 | 6 Join a friend | Pending |
 | 7 Hardening, docs and handoff | Pending |
@@ -188,6 +188,41 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
 - The map-based campaign name ("Prison (co-op)") is formatted in Phase 4's UI from the newest save's level.
 - Deleting from the UI is Phase 4.
 
+## Phase 4 handoff (October 19, 2026)
+
+**Source**
+- `NativeCoopMenu`: a copy of `MENU_Main`.
+  - Its `MainMenu` is replaced by a plain `Menu`, configured like `MENU_Settings_General`, so native fades, Escape/Back and controller navigation apply.
+  - The logo area becomes the MULTIPLAYER title, and the six native buttons are relabelled and wired.
+  - A Continue preview shows the newest campaign: thumbnail, map name in the `HEADER_Load` lettering, difficulty, Players and time. The main-menu display font lacks punctuation glyphs, so it can't be used for names.
+- `NativeCoopLoadMenu`: a copy of `MENU_Load`.
+  - Two columns of the game's own `SaveHyperButton` entries.
+  - Load, Delete and Back, with the native confirmation prompt.
+  - Delete removes the focused save or the whole campaign.
+- `MultiplayerCoopMenu`:
+  - On-demand hosting: a Steam lobby, else Direct IP; the offline fixture uses Direct IP on its own port. A follow-up step runs once P1's save service exists.
+  - The flows: Continue co-op, New co-op game, Load co-op game and Survival co-op (native `MENU_Horde`).
+  - The main-menu entry and F8 open the menu.
+- `CoopMenuPatches`: prefix on `LevelSelectionMenu.StartLevel` for co-op level select. It opens the native `PROMPT_Confirmation` with "LOAD THIS MAP AS A MULTIPLAYER GAME?"; Confirm hosts, starts a new campaign and runs native `StartLevel` (the difficulty prompt). A `MainMenu.Enable` postfix leaves co-op level select.
+- `Test-Runtime -CoopMenu` (`CoopMenuDiagnostics`): a single-game fixture with real-frame captures (scene cameras plus the canvas) in an isolated diagnostic save root. The runner now moves the previous log aside, because a stale PASS line could be counted before the new process truncated the log.
+
+**Checks**
+- `-CoopMenu`, 22 checks covering:
+  - menu, labels, Continue state, the preview title rendering;
+  - Load lists, first selection, delete prompt and result, Back;
+  - Survival co-op hosting the native Survival menu;
+  - New co-op game: prompt, Cancel, Confirm hosting before the native difficulty prompt, a new campaign, the level loading;
+  - a real save with its thumbnail in that campaign;
+  - title, preview of that campaign, then Continue co-op hosting and loading its newest save.
+- Original runtime smoke: passes, updated for the new entry and controller submit/cancel.
+- Two-player: travel 54, `-SharedItems` 17, `-Saves` 45, `-JoinInput` 10.
+
+**Limits**
+- Join a friend opens the Direct IP dialog until Phase 6.
+- The old lobby panel still opens from the pause menu and F8 in game until Phase 5 replaces it with Players & invite.
+- Steam hosting from the menu was not exercised; the fixture uses Direct IP.
+- Controller navigation inside the Load columns is configured, but only fixture clicks were exercised.
+
 ## Current handoff
 
-Next step: Phase 4, the native-style Multiplayer menu and entry flows.
+Next step: Phase 5, the pause menu (native Save/Load to co-op, Players & invite) and P2's read-only view.
