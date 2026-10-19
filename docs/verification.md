@@ -156,7 +156,8 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 # Native UI/model smoke test; does not enter gameplay.
 .\scripts\Test-Runtime.ps1 -GameDir $GameDir
 
-# Steam path on one account; needs the Steam client running. Creates and leaves a private lobby.
+# Steam path on one account; needs the Steam client running. Creates and leaves a private lobby, and checks
+# Join a friend against it (lobby data, the friend scan, the list, Join's prompt, Direct IP...).
 .\scripts\Test-Steam.ps1 -GameDir $GameDir
 
 # Two-process campaign lifecycle and focused regressions.
@@ -202,6 +203,8 @@ Use the same `Package.ps1` zip on both PCs and two Steam accounts that are frien
 
 - P1 hosts from the main menu; the lobby panel shows P1's name and avatar. **Invite friend** opens the Steam overlay; P2 accepts from the main menu and joins without a question.
 - P2 instead uses **Join Game** on P1's name; with the lobby set to invite only, Join Game is not offered.
+- P2 opens **Multiplayer → Join a friend**. P1 is listed with P1's avatar, where P1 is (menu, map or Survival) and "1 of 2 players". **Join** connects. An invite-only lobby is not listed.
+- With P2's game closed, **Join Game** on P1's name starts the game and joins once the main menu appears.
 - P1 hosts from a level's pause menu; P2 accepts while inside their own level, sees the confirmation, chooses **Stay** once (nothing changes) and **Join** the second time.
 - Both cards show names, avatars, roles and a plausible ping; the in-game badge, notifications and P2's nameplate show the partner's Steam name.
 - Play a level through an exit together. P2 quits and rejoins; P1 quits (P2 returns to the menu and the lobby is gone).

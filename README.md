@@ -10,7 +10,7 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| Steam Host / Invite / Join | | | ✅ | Friends lobby, overlay invites, Join Game; Steam relays the connection. |
+| Steam Host / Invite / Join | | | ✅ | Friends lobby, overlay invites, Join Game and an in-game Join a friend list; Steam relays the connection. |
 | LAN Host / Join | | | ✅ | Direct IP for LAN or a forwarded port. |
 | Player movement and aim | | | ✅ | See each other in-game. |
 | Player model and animations | | ✅ | | Improved weapon grips and movement; further animation polish planned. |
@@ -76,23 +76,29 @@ Always pass `-GameDir` to build/install/runtime-test scripts. Their legacy defau
 
 ### Play together
 
-Launch the game from Steam on both PCs after installation. **Multiplayer** sits below Survival Mode in the main menu and in the pause menu; **F8** opens it anywhere.
+Launch the game from Steam on both PCs after installation. **Multiplayer** sits below Survival Mode in the main menu; **F8** opens it from the menus. It is laid out like the main menu:
+
+- **Continue co-op** loads the newest save of the most recently played co-op game.
+- **New co-op game** opens the game's own level select. Start asks *Load this map as a multiplayer game?*, then the game's difficulty prompt, and the map loads.
+- **Load co-op game** lists co-op games on the left and the selected game's saves on the right.
+- **Survival co-op** opens the game's own arena and difficulty menu.
+- **Join a friend** lists Steam friends who are hosting PBDMP, with where they are and how many players are in. Select one and **Join**. **Refresh** checks again, and **Direct IP...** joins by address.
 
 **Through Steam (recommended):** no IP addresses, port forwarding or firewall rules.
 
-1. P1 selects **Host Steam game**. The lobby is friends-only by default; **Lobby: friends only / invite only** switches it.
-2. P1 selects **Invite friend** to pick a friend in the Steam overlay. Alternatively the friend uses **Join Game** on P1's name in their Steam friends list.
-3. P2 accepts while the game is running. From the menus the join starts at once; from inside a level P2 is asked first, because unsaved progress is lost. A different PBDMP build or version is reported before connecting.
+1. P1 picks any of the first four entries. P1 hosts a friends-only Steam lobby at that moment.
+2. In game, P1 opens the pause menu's **Players & invite** (or presses F8). It holds **Invite friend** (the Steam overlay), **Lobby: friends only / invite only**, **Direct IP** hosting and **Leave session**.
+3. P2 joins through **Join a friend**, accepts an invite, or uses **Join Game** on P1's name in their Steam friends list. If P2's game is closed, Join Game starts it and joins. Invite-only lobbies are not listed in Join a friend; use an invite. From the menus the join starts at once. From inside a level, P2 is asked first, because unsaved progress is lost. A different PBDMP build or version is reported before connecting.
 
-**Direct IP (LAN or a forwarded TCP port):** select **Direct IP...**. P1 chooses a port (default `7777`) and selects **Host (P1)**. P2 enters P1's IPv4 address (`ipconfig` on P1's PC) and port, then selects **Join (P2)**. `127.0.0.1` only reaches the same PC. Allow the game/TCP port on your private network if Windows Firewall prompts.
+**Direct IP (LAN or a forwarded TCP port):** while nobody has joined, P1 switches **Direct IP** on in Players & invite. It hosts on the configured port (default `7777`). P2 opens **Join a friend → Direct IP...**, enters P1's IPv4 address (`ipconfig` on P1's PC) and port, then selects **Join (P2)**. `127.0.0.1` only reaches the same PC. Allow the game/TCP port on your private network if Windows Firewall prompts. Without Steam, the Multiplayer entries host over Direct IP directly.
 
-Then P1 starts a built-in campaign level, or hosts an already active one. P2 loads the same map and receives the supported current world state before play resumes. The lobby panel shows both players (Steam name, avatar and ping for Steam sessions); a badge in the corner and short notifications show session changes in game. P1 controls difficulty, starts, restarts and level changes. Walk-in exits require both living players at the exit; interactable endings require both nearby. Automatic endings wait until both are alive and loaded.
+P1 can also host an already active level from the pause menu's **Players & invite → Host co-op game**. P2 loads the same map and receives the supported current world state before play resumes. The lobby panel shows both players (Steam name, avatar and ping for Steam sessions); a badge in the corner and short notifications show session changes in game. P1 controls difficulty, starts, restarts and level changes. Walk-in exits require both living players at the exit; interactable endings require both nearby. Automatic endings wait until both are alive and loaded.
 
 P2 joins in clear space near P1, with normal-map-spawn fallback. In the campaign, both players have **identical weapons, keys and mission items**. When either player picks up a gun, key or mission item, it disappears for both and both receive it. A gun new to the team also brings its native starting ammo for the partner. A dead partner receives it at once and keeps it through the respawn. Each player fires and spends their own ammo, and ammo, health, armor and powerup pickups stay personal. Either player can open a key door, which uses the key for both. P2 also receives P1's remaining ammo and equipped weapon on each join/rejoin and save restoration, at full health, zero armor and without temporary powerups. Anyone can join a co-op game; there is no partner-assignment prompt.
 
 Death respawns only that player after three seconds at the map spawn with full health, zero armor, retained gear/ammo/items and cleared temporary powerups. P1's pause stops the timer. P2 opening a menu does not pause P1. P2 leaving lets P1 continue; P1 leaving ends the session and returns P2 to the main menu.
 
-P1 can open **Multiplayer → Co-op saves...** for named slots, quicksave and checkpoint restoration. To resume, host a lobby first, then load a co-op slot. Solo saves stay separate. See [co-op saves](docs/co-op-saves.md) for the recovery and partner rules.
+During a session, P1's pause **Save** and **Load** open the co-op save screens: named saves with thumbnails, and **Load latest autosave**. Each co-op game keeps its own quicksave, autosaves and manual saves. P2's Save and Load are greyed out, and P2's Multiplayer menu shows a read-only *Playing with [host]* view. Solo saves stay separate. See [co-op saves](docs/co-op-saves.md) for the recovery and partner rules.
 
 #### Survival co-op
 

@@ -123,6 +123,22 @@ public sealed partial class MultiplayerBehaviour
                 MenuManager.Close(); _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 13; break;
             case 13:
                 SmokeAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from Load co-op game returns to the co-op menu");
+                // Join a friend runs the real Steam friend scan when Steam is up; it never joins or hosts here.
+                _coopMenu!.JoinFriend.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 17; break;
+            case 17:
+            {
+                var join = _coopJoin!;
+                SmokeAssert(Shown("MENU_PBDMP_CoopJoin") && join.DirectButton.LabelText.text == "Direct IP..." && join.RefreshButton.LabelText.text == "Refresh" &&
+                    (join.EntryCount > 0 || join.EmptyText.Length > 0), "Join a friend opens the friends list with Refresh and Direct IP...");
+                Plugin.Logger.LogInfo($"PBDMP SMOKE: Join a friend lists {join.EntryCount} games; Steam {(_steam?.Available == true ? "available" : "unavailable")}.");
+                Shot("coop-join-friend.png");
+                join.DirectButton.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 0.8f; _coopMenuStep = 18; break;
+            }
+            case 18:
+                SmokeAssert(_open && _view != null && _view.DirectOpen && _session == null, "Direct IP... opens the Direct IP join dialog without hosting");
+                _view!.ShowDirect(false); SetPanel(false); _coopJoin!.BackButton.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 19; break;
+            case 19:
+                SmokeAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from Join a friend returns to the co-op menu");
                 _coopMenuAt = Time.unscaledTime + 0.5f; _coopMenuStep = 2; break;
             case 2:
                 _coopMenu!.NewGame.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 2.5f; _coopMenuStep = 3; break;
@@ -148,6 +164,7 @@ public sealed partial class MultiplayerBehaviour
                 OpenCoopMenu(); _coopMenu!.Survival.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 2f; _coopMenuStep = 15; break;
             case 15:
                 SmokeAssert(Shown("MENU_Horde") && _session?.Snapshot.Role == PBDMP.Network.SessionRole.Host, "Survival co-op hosts and opens the game's own Survival menu");
+                SmokeAssert(_coopMenu!.Load.interactable && _coopJoin!.RefreshButton.interactable, "the session's native-load guard leaves the co-op menu's own buttons usable");
                 Shot("coop-survival.png");
                 MenuManager.Close(); ResetSession(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 16; break;
             case 16:
@@ -188,11 +205,18 @@ public sealed partial class MultiplayerBehaviour
                 // The native pause menu's Save during the session opens the co-op save screen.
                 GameManager.PauseGame(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 30; break;
             case 30:
-                Group.Find("MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+            {
+                var pauseSave = Group.Find("MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>();
+                var pauseLoad = Group.Find("MENU_Pause/ButtonsLayout/BUTTON_Load").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>();
+                SmokeAssert(pauseSave.interactable && pauseSave._state == ButtonState.INTERACTABLE && pauseLoad.interactable && pauseLoad._state == ButtonState.INTERACTABLE,
+                    "P1's pause Save and Load can be pressed during the session");
+                pauseSave.onClick.Invoke();
                 _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 31; break;
+            }
             case 31:
                 SmokeAssert(Shown("MENU_PBDMP_CoopSave") && !Shown("MENU_Save") && _coopSave!.EntryCount == 2, "pause Save opens the co-op save screen with New save and the campaign's manual save");
                 SmokeAssert(Group.Find("MENU_Pause/ButtonsLayout/BUTTON_PBDMP_Multiplayer").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().LabelText.text == "Players & invite", "the pause entry is Players & invite");
+                SmokeAssert(_coopSave!.SaveButton.interactable && _coopSave.SaveButton._state == ButtonState.INTERACTABLE, "the co-op Save screen's Save can be pressed");
                 Shot("coop-pause-save.png");
                 _coopWrites = _saves!.CompletedWritesForTest;
                 _coopSave!.SaveButton.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 32; break;
@@ -210,6 +234,7 @@ public sealed partial class MultiplayerBehaviour
             case 35:
                 SmokeAssert(Shown("MENU_PBDMP_CoopLoad") && !Shown("MENU_Load") && _coopLoad!.LatestAutosaveButton.gameObject.activeInHierarchy && _coopLoad.SelectedCampaign?.Id == _coopCampaign,
                     "pause Load opens co-op Load on the current campaign with Load latest autosave");
+                SmokeAssert(_coopLoad!.LoadButton.interactable && _coopLoad.LoadButton._state == ButtonState.INTERACTABLE, "the co-op Load screen's Load can be pressed");
                 Shot("coop-pause-load.png");
                 MenuManager.Close(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 36; break;
             case 36:

@@ -97,6 +97,7 @@ public sealed partial class MultiplayerBehaviour
                 GameManager.PauseGame();_saveStageAt=Time.unscaledTime+.5f;_saveStep=30;break;
             case 30 when Time.unscaledTime>=_saveStageAt:
                 // The native pause menu's Save opens the co-op save screen during the session.
+                TravelCheck(MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().interactable && MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Load").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().interactable,"P1's pause Save and Load can be pressed during the session");
                 MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
                 _saveStageAt=Time.unscaledTime+.8f;_saveStep=31;break;
             case 31 when Time.unscaledTime>=_saveStageAt:
@@ -235,6 +236,7 @@ public sealed partial class MultiplayerBehaviour
                 TravelCheck(JsonSerializer.Serialize(MissionBreakState(wall))==File.ReadAllText(Marker("saved-wall-after-restore.json")),"P2 restores the same structural wall cutout and collision as P1");
                 // P2 cannot save or load: the pause menu's Save opens neither the co-op nor the native screen.
                 GameManager.PauseGame();
+                TravelCheck(!MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().interactable && !MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Load").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().interactable,"P2's pause Save and Load are greyed out");
                 MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
                 TravelCheck(!MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_PBDMP_CoopSave").gameObject.activeInHierarchy && !MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Save").gameObject.activeInHierarchy,"P2's pause Save is refused during the co-op session");
                 MenuManager.Instance.Unpause();

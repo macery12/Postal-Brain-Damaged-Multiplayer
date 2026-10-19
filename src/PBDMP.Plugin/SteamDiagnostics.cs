@@ -1,3 +1,5 @@
+using Hyperstrange.PBD;
+using Hyperstrange.PBD.UI.Menus;
 using PBDMP.Network;
 using PBDMP.Network.Steam;
 using UnityEngine;
@@ -9,7 +11,8 @@ namespace PBDMP.Plugin;
 public sealed partial class MultiplayerBehaviour
 {
     private readonly bool _steamProbe = Environment.GetEnvironmentVariable("PBDMP_STEAM_PROBE") == "1";
-    private int _steamStep;
+    private int _steamStep, _probeUpdates;
+    private FriendHost? _probeOwn;
     private float _steamDeadline, _steamNext;
     private CoopSession? _probeHost, _probeClient;
     private SteamP2PPipe? _probePipe;
@@ -21,7 +24,7 @@ public sealed partial class MultiplayerBehaviour
         if (_steamStep == 0)
         {
             if (!_buttonVisibleLogged) return;
-            _steamDeadline = Time.unscaledTime + 90f; _steamStep = 1;
+            _steamDeadline = Time.unscaledTime + 120f; _steamStep = 1;
         }
         if (Time.unscaledTime > _steamDeadline) throw new TimeoutException($"Steam probe step {_steamStep} timed out. {_steam?.Unavailable}");
         if (Time.unscaledTime < _steamNext) return;
@@ -105,10 +108,76 @@ public sealed partial class MultiplayerBehaviour
                 break;
             case 8:
                 CaptureUI("steam-hud.png");
+                _steamNext = Time.unscaledTime + 0.5f; _steamStep = 20;
+                break;
+            case 20:
+                // Join a friend, on one account: this lobby read the way a friend's copy reads it.
+                if (SteamNative.GetLobbyData(steam.Lobby, SteamService.ModeKey) != LobbyAdvert.ModeMenu) return;
+                SteamAssert(SteamNative.GetLobbyData(steam.Lobby, SteamService.PlayersKey) == "1", "the lobby advertises where the host is (menu) and its player count");
+                _probeUpdates = steam.LobbyDataUpdates; steam.ForgetLobbyData();
+                SteamAssert(SteamNative.RequestLobbyData(steam.Lobby), "Steam accepts a lobby data request");
+                _steamStep = 21;
+                break;
+            case 21:
+            {
+                if (steam.LobbyDataUpdates <= _probeUpdates) return;
+                var own = steam.Describe(steam.LocalId, steam.Lobby);
+                SteamAssert(own?.Advert is { Mode: LobbyAdvert.ModeMenu, Players: 1 } advert && advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) == null,
+                    "lobby data arrives through the tap's LobbyDataUpdate and reads as a compatible PBDMP game");
+                SteamAssert(SteamNative.AppId == 1359980u, "the friend scan matches friends' games against this app id");
+                var hosting = steam.FriendsHosting();
+                Plugin.Logger.LogInfo($"STEAM PROBE: {SteamNative.FriendCount} friends listed; {hosting.Count} in a joinable PBDMP lobby.");
+                _probeOwn = own;
+                OpenCoopMenu();
+                _coopJoin!.TestHosts = new[] { own!, own! with { Friend = 1, Lobby = 2, Name = "Older friend", Advert = own.Advert! with { Version = "0.0.1" } } };
+                _coopMenu!.JoinFriend.onClick.Invoke();
+                _steamNext = Time.unscaledTime + 1.5f; _steamStep = 22;
+                break;
+            }
+            case 22:
+            {
+                var own = _probeOwn!; var name = own.Name.Length > 0 ? own.Name : "Steam friend"; var join = _coopJoin!;
+                SteamAssert(Shown("MENU_PBDMP_CoopJoin") && join.EntryCount == 2, "Join a friend lists friends' PBDMP games as the game's own entries");
+                SteamAssert(join.EntryTextForTest(0) == name + " | In the Multiplayer menu | 1 of 2 players" &&
+                    join.EntryTextForTest(1) == "Older friend | In the Multiplayer menu | Different PBDMP version (0.0.1)", "entries show the friend, where they are, players or why they cannot be joined");
+                SteamAssert(join.Selected?.Lobby == steam.Lobby && join.JoinButton.interactable, "the joinable game is listed and selected first");
+                join.Select(join.TestHosts![1]);
+                SteamAssert(!join.JoinButton.interactable, "Join is disabled for a different PBDMP version");
+                join.Select(own);
+                Shot("steam-join-friend.png");
+                join.JoinButton.onClick.Invoke();
+                _steamNext = Time.unscaledTime + 0.8f; _steamStep = 23;
+                break;
+            }
+            case 23:
+                SteamAssert(_view!.Prompt.Open && _view.Prompt.Message.StartsWith("Join ", StringComparison.Ordinal) && steam.Phase == LobbyPhase.Hosting,
+                    "Join while hosting asks first, through the same path as a Steam invite");
+                Shot("steam-join-prompt.png");
+                _view.Prompt.CancelButton.onClick.Invoke();
+                _steamNext = Time.unscaledTime + 0.8f; _steamStep = 24;
+                break;
+            case 24:
+                SteamAssert(!_view!.Prompt.Open && steam.Phase == LobbyPhase.Hosting && _session?.Snapshot.Role == SessionRole.Host, "Stay keeps hosting");
+                _coopJoin!.TestHosts = Array.Empty<FriendHost>(); _coopJoin.RefreshButton.onClick.Invoke();
+                SteamAssert(_coopJoin.EntryCount == 0 && _coopJoin.EmptyText.StartsWith("No friends are hosting", StringComparison.Ordinal), "an empty list says nobody is hosting");
+                _coopJoin.TestHosts = null; _coopJoin.RefreshButton.onClick.Invoke();
+                Plugin.Logger.LogInfo($"STEAM PROBE: the real friend scan through the screen lists {_coopJoin.EntryCount} games.");
+                _coopJoin.DirectButton.onClick.Invoke();
+                SteamAssert(_open && _view.DirectOpen, "Direct IP... opens the Direct IP join dialog");
+                _view.ShowDirect(false); SetPanel(false);
+                _coopJoin.BackButton.onClick.Invoke();
+                _steamNext = Time.unscaledTime + 1.2f; _steamStep = 25;
+                break;
+            case 25:
+                SteamAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from Join a friend returns to the co-op menu");
+                MenuManager.Close();
+                _steamNext = Time.unscaledTime + 1f; _steamStep = 30;
+                break;
+            case 30:
                 ResetSession();
                 steam.PrivateOnly = false;
                 SteamAssert(steam.Phase == LobbyPhase.None && steam.Lobby == 0 && _session == null, "leaving releases the lobby and the P2P listener");
-                Plugin.Logger.LogInfo("PBDMP STEAM PROBE PASS: callback tap, identity, carrier layouts and ordering, drop reason, P2P dial/admit/accept, lobby create/data/leave. Cross-account relay untested.");
+                Plugin.Logger.LogInfo("PBDMP STEAM PROBE PASS: callback tap, identity, carrier layouts and ordering, drop reason, P2P dial/admit/accept, lobby create/data/leave, Join a friend. Cross-account relay and joining untested.");
                 _steamStep = 99;
                 break;
         }

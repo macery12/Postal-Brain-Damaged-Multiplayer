@@ -14,8 +14,9 @@ public static class SteamNative
 {
     private const string Library = "steam_api64";
 
-    public const int LobbyJoinRequestedCallback = 333, LobbyEnterCallback = 504, LobbyCreatedCallback = 513,
+    public const int LobbyJoinRequestedCallback = 333, LobbyEnterCallback = 504, LobbyDataUpdateCallback = 505, LobbyCreatedCallback = 513,
         ConnectionStatusChangedCallback = 1221;
+    public const int FriendFlagImmediate = 4;
     public const int ResultOk = 1, ResultLimitExceeded = 25;
     public const int LobbyPrivate = 0, LobbyFriendsOnly = 1;
     public const int EnterSuccess = 1;
@@ -26,6 +27,8 @@ public static class SteamNative
 
     // Native sizes from the SDK 1.51 headers. Buffers are allocated larger than needed.
     private const int IdentityBytes = 136, ConnectionInfoBytes = 696, OptionBytes = 16;
+    // FriendGameInfo_t: game id @0, lobby id @16; 24 bytes.
+    private const int FriendGameBytes = 24, FriendGameLobby = 16;
     private const int InfoListenSocket = 144, InfoState = 176, InfoEndReason = 180, InfoEndDebug = 184, InfoEndDebugBytes = 128;
 
     private static IntPtr _module, _user, _friends, _utils, _matchmaking, _sockets, _networkingUtils;
@@ -54,6 +57,24 @@ public static class SteamNative
     public static string NameOf(ulong id) => Text(SteamAPI_ISteamFriends_GetFriendPersonaName(Friends, id));
     public static bool OverlayEnabled => SteamAPI_ISteamUtils_IsOverlayEnabled(Utils);
     public static void OpenInviteDialog(ulong lobby) => SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog(Friends, lobby);
+    public static uint AppId => SteamAPI_ISteamUtils_GetAppID(Utils);
+    public static int FriendCount => Math.Max(SteamAPI_ISteamFriends_GetFriendCount(Friends, FriendFlagImmediate), 0);
+    public static ulong FriendAt(int index) => SteamAPI_ISteamFriends_GetFriendByIndex(Friends, index, FriendFlagImmediate);
+
+    /// <summary>The game a friend is playing, and the joinable lobby they are in (0 for none, or an invite-only one).</summary>
+    public static bool FriendGame(ulong friend, out ulong game, out ulong lobby)
+    {
+        var buffer = Zeroed(FriendGameBytes);
+        try
+        {
+            game = lobby = 0;
+            if (!SteamAPI_ISteamFriends_GetFriendGamePlayed(Friends, friend, buffer)) return false;
+            game = (ulong)Marshal.ReadInt64(buffer, 0); lobby = (ulong)Marshal.ReadInt64(buffer, FriendGameLobby);
+            return true;
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
+    }
+
     public static void WarmRelay() => SteamAPI_ISteamNetworkingUtils_InitRelayNetworkAccess(NetworkingUtils);
 
     /// <summary>Medium avatar as top-down RGBA, or null while Steam has not loaded it.</summary>
@@ -74,6 +95,8 @@ public static class SteamNative
     public static bool SetLobbyType(ulong lobby, int type) => SteamAPI_ISteamMatchmaking_SetLobbyType(Matchmaking, lobby, type);
     public static bool SetLobbyData(ulong lobby, string key, string value) => SteamAPI_ISteamMatchmaking_SetLobbyData(Matchmaking, lobby, key, value);
     public static string GetLobbyData(ulong lobby, string key) => Text(SteamAPI_ISteamMatchmaking_GetLobbyData(Matchmaking, lobby, key));
+    /// <summary>Asks Steam for a lobby's data; LobbyDataUpdate (505) reports when it has arrived.</summary>
+    public static bool RequestLobbyData(ulong lobby) => SteamAPI_ISteamMatchmaking_RequestLobbyData(Matchmaking, lobby);
     public static ulong LobbyOwner(ulong lobby) => SteamAPI_ISteamMatchmaking_GetLobbyOwner(Matchmaking, lobby);
 
     public static ulong[] LobbyMembers(ulong lobby)
@@ -89,6 +112,8 @@ public static class SteamNative
         (BinaryPrimitives.ReadUInt64LittleEndian(data), BinaryPrimitives.ReadInt32LittleEndian(data[16..]));
     public static (ulong Lobby, ulong Friend) ReadLobbyJoinRequested(ReadOnlySpan<byte> data) =>
         (BinaryPrimitives.ReadUInt64LittleEndian(data), BinaryPrimitives.ReadUInt64LittleEndian(data[8..]));
+    public static (ulong Lobby, ulong Member, bool Success) ReadLobbyDataUpdate(ReadOnlySpan<byte> data) =>
+        (BinaryPrimitives.ReadUInt64LittleEndian(data), BinaryPrimitives.ReadUInt64LittleEndian(data[8..]), data[16] != 0);
     public static uint ReadStatusChangedConnection(ReadOnlySpan<byte> data) => BinaryPrimitives.ReadUInt32LittleEndian(data);
 
     public static uint CreateListenSocket(params SteamOption[] options)
@@ -207,6 +232,10 @@ public static class SteamNative
     [DllImport(Library)] private static extern IntPtr SteamAPI_ISteamFriends_GetFriendPersonaName(IntPtr self, ulong friend);
     [DllImport(Library)] private static extern int SteamAPI_ISteamFriends_GetMediumFriendAvatar(IntPtr self, ulong friend);
     [DllImport(Library)] private static extern void SteamAPI_ISteamFriends_ActivateGameOverlayInviteDialog(IntPtr self, ulong lobby);
+    [DllImport(Library)] private static extern int SteamAPI_ISteamFriends_GetFriendCount(IntPtr self, int flags);
+    [DllImport(Library)] private static extern ulong SteamAPI_ISteamFriends_GetFriendByIndex(IntPtr self, int index, int flags);
+    [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamFriends_GetFriendGamePlayed(IntPtr self, ulong friend, IntPtr info);
+    [DllImport(Library)] private static extern uint SteamAPI_ISteamUtils_GetAppID(IntPtr self);
     [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamUtils_IsOverlayEnabled(IntPtr self);
     [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamUtils_GetImageSize(IntPtr self, int image, out uint width, out uint height);
     [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamUtils_GetImageRGBA(IntPtr self, int image, [Out] byte[] destination, int size);
@@ -217,6 +246,7 @@ public static class SteamNative
     [DllImport(Library)] private static extern int SteamAPI_ISteamMatchmaking_GetNumLobbyMembers(IntPtr self, ulong lobby);
     [DllImport(Library)] private static extern ulong SteamAPI_ISteamMatchmaking_GetLobbyMemberByIndex(IntPtr self, ulong lobby, int member);
     [DllImport(Library)] private static extern ulong SteamAPI_ISteamMatchmaking_GetLobbyOwner(IntPtr self, ulong lobby);
+    [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamMatchmaking_RequestLobbyData(IntPtr self, ulong lobby);
     [DllImport(Library)] private static extern IntPtr SteamAPI_ISteamMatchmaking_GetLobbyData(IntPtr self, ulong lobby, [MarshalAs(UnmanagedType.LPUTF8Str)] string key);
     [DllImport(Library)] [return: MarshalAs(UnmanagedType.I1)] private static extern bool SteamAPI_ISteamMatchmaking_SetLobbyData(IntPtr self, ulong lobby,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string key, [MarshalAs(UnmanagedType.LPUTF8Str)] string value);

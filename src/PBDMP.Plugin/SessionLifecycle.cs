@@ -186,7 +186,7 @@ internal sealed partial class SessionLifecycle : IDisposable
                     // P1 selects Survival arenas and difficulty through the native menu; P2 follows.
                     var blocked = name is "BUTTON_Load" or "BUTTON_Save" or "BUTTON_Mods" or "BUTTON_LoadMods" or "BUTTON_SaveMods" ||
                         IsClient && name is "BUTTON_Start" or "BUTTON_Horde" or "BUTTON_Restart" or "BUTTON_NextLevel" or "BUTTON_LastLevel";
-                    if (!blocked) continue;
+                    if (!blocked || CoopRouted(button)) continue;
                     if (!_buttons.ContainsKey(button)) _buttons[button] = button.interactable;
                 }
             foreach (var saving in Object.FindObjectsOfType<SaveController>())
@@ -420,6 +420,18 @@ internal sealed partial class SessionLifecycle : IDisposable
         if (!removed) return;
         InputManager.InputStateStack = stack;
         Plugin.Logger.LogInfo("Cleared an interrupted loading input barrier after leaving the session.");
+    }
+
+    // PBDMP's copies of native screens keep the native button names, and P1's pause Save/Load open the
+    // co-op screens (P2's are disabled by the pause menu patch), so the native-load guard leaves them alone.
+    private bool CoopRouted(UnityEngine.UI.Button button)
+    {
+        for (var parent = button.transform.parent; parent != null; parent = parent.parent)
+        {
+            if (parent.name.StartsWith("MENU_PBDMP_", StringComparison.Ordinal)) return true;
+            if (parent.name == "MENU_Pause") return !IsClient && button.gameObject.name is "BUTTON_Save" or "BUTTON_Load";
+        }
+        return false;
     }
 
     private void RestoreOffline()

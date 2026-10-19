@@ -89,6 +89,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             _view!.Refresh();
             _steam!.Tick();
             TickAfterHost();
+            TickJoinFriend();
             if (Time.unscaledTime >= _nextMenuScan)
             {
                 _nextMenuScan = Time.unscaledTime + 0.5f;

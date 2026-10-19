@@ -9,7 +9,7 @@ PBDMP 0.10.0 development source carries protocol 13 over either of two links, wi
 | Steam P2P | P1's two-slot Steam lobby; P2 dials the lobby owner with `ConnectP2P` on virtual port 0. | Relayed and encrypted by Steam; the host admits only lobby members. Each protocol frame travels as one reliable Steam message. 2 MB send buffer, 512 KB/s send rate, 60-second connect allowance. Details: [Steam research](steam-research.md). |
 | Direct TCP | IPv4 address and port (default `7777`). | Unencrypted and unauthenticated; intended for a trusted LAN or a deliberately forwarded port. |
 
-`CoopSession` sees both as an ordered reliable byte stream (`IPeerConnection`), so framing, deadlines and queues below are identical. Steam lobbies additionally advertise `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (the first 16 hex characters of SHA-256 over the fingerprint) so a joiner can report a mismatch before dialling; the handshake below remains the authoritative check.
+`CoopSession` sees both as an ordered reliable byte stream (`IPeerConnection`), so framing, deadlines and queues below are identical. Steam lobbies additionally advertise `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (the first 16 hex characters of SHA-256 over the fingerprint) so a joiner can report a mismatch before dialling. They also advertise `pbdmp_level` (the host's level asset), `pbdmp_mode` (`menu`, `story` or `survival`) and `pbdmp_players` for friends' Join a friend lists; the handshake below remains the authoritative check.
 
 ## Compatibility and framing
 

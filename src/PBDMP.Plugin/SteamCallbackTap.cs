@@ -56,7 +56,7 @@ internal static class SteamCallbackTap
         {
             // CallbackMsg_t: user @0, callback id @4, payload pointer @8, payload size @16.
             var id = Marshal.ReadInt32(message, 4);
-            if (id is SteamNative.LobbyJoinRequestedCallback or SteamNative.LobbyEnterCallback or SteamNative.ConnectionStatusChangedCallback)
+            if (id is SteamNative.LobbyJoinRequestedCallback or SteamNative.LobbyEnterCallback or SteamNative.LobbyDataUpdateCallback or SteamNative.ConnectionStatusChangedCallback)
                 Copy(id, Marshal.ReadIntPtr(message, 8), Marshal.ReadInt32(message, 16), false);
         }
         catch (Exception ex) { Report(ex); }

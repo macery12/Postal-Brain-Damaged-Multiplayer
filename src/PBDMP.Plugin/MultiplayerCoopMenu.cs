@@ -17,7 +17,9 @@ public sealed partial class MultiplayerBehaviour
     private NativeCoopMenu? _coopMenu;
     private NativeCoopLoadMenu? _coopLoad;
     private NativeCoopSaveMenu? _coopSave;
+    private NativeCoopJoinMenu? _coopJoin;
     private System.Action? _afterHost;
+    private bool _launchJoinChecked;
     internal static bool CoopLevelSelect { get; private set; }
     internal static bool StartingCoopLevel { get; private set; }
     internal static MultiplayerBehaviour? Instance { get; private set; }
@@ -30,6 +32,9 @@ public sealed partial class MultiplayerBehaviour
         _coopMenu = new NativeCoopMenu(group, _view!.Kit, ContinueCoop, NewCoopGame, LoadCoopGame, SurvivalCoop, JoinFriend, () => { ResetSession(); MenuManager.Close(); });
         _coopLoad = new NativeCoopLoadMenu(group, _view.Kit, LoadFromMenu);
         _coopSave = new NativeCoopSaveMenu(group, _view.Kit);
+        _coopJoin = new NativeCoopJoinMenu(group, _view.Kit, () => _steam!.FriendsHosting(),
+            () => _steam?.Available == true ? "" : _steam?.Unavailable ?? "Steam is not available. Use Direct IP.", id => _steam?.Avatar(id),
+            host => OnJoinRequested(host.Lobby, host.Friend), () => _steam?.ForgetLobbyData(), () => { SetPanel(true); _view!.ShowDirect(true); });
         NativeUiKit.SetLabel(_view.PauseEntry, "Players & invite");
         _view.DirectSwitch = SwitchDirectHosting;
         _view.MainEntry.onClick = new UnityEngine.UI.Button.ButtonClickedEvent();
@@ -158,7 +163,23 @@ public sealed partial class MultiplayerBehaviour
         if (_open) SetPanel(true);
     }
 
-    private void JoinFriend() { SetPanel(true); _view!.ShowDirect(true); }
+    private void JoinFriend() => _coopJoin?.Open();
+
+    private void TickJoinFriend()
+    {
+        _coopJoin?.Tick();
+        // What friends' Join a friend lists show for this host.
+        if (_steamSession && _steam?.Phase == LobbyPhase.Hosting)
+            _steam.Advertise(_lifecycle?.State.Level ?? "", _lifecycle == null || _lifecycle.State.Action == TravelAction.Menu ? LobbyAdvert.ModeMenu
+                : _lifecycle.InSurvival ? LobbyAdvert.ModeSurvival : LobbyAdvert.ModeStory);
+        // Join Game in Steam while this game was closed launches it with +connect_lobby.
+        if (_launchJoinChecked || !_buttonVisibleLogged || _steam?.Available != true) return;
+        _launchJoinChecked = true;
+        var lobby = LobbyAdvert.LaunchLobby(Environment.GetCommandLineArgs());
+        if (lobby == 0) return;
+        Plugin.Logger.LogInfo("Steam started the game to join a friend's lobby.");
+        OnJoinRequested(lobby, 0);
+    }
 
     // Native Start on the skull level select, reached through New co-op game.
     internal bool BeforeStartLevel(LevelSelectionMenu menu)
@@ -198,10 +219,12 @@ internal static class CoopMenuPatches
     private static bool StartLevel(LevelSelectionMenu __instance) => MultiplayerBehaviour.Instance?.BeforeStartLevel(__instance) != false;
     private static void MainMenuShown() => MultiplayerBehaviour.LeftCoopLevelSelect();
     private static bool Open(Menu window) => MultiplayerBehaviour.Instance?.RoutePauseMenu(window) != true;
-    // P2 cannot save or load during a co-op session.
+    // In a co-op level the pause menu's Save and Load open P1's co-op screens; the game's own state for them
+    // (single-player saving allowed, single-player saves present) does not apply. P2 cannot save or load.
     private static void PauseShown(PauseMenu __instance)
     {
-        if (SessionLifecycle.Current is not { IsClient: true } || __instance._saveButton == null) return;
-        __instance._saveButton.SetDisabled(); __instance._loadButton.SetDisabled();
+        if (SessionLifecycle.Current is not { } life || life.State.Action == TravelAction.Menu || life.InSurvival || __instance._saveButton == null) return;
+        NativeUiKit.SetButtonState(__instance._saveButton, !life.IsClient);
+        NativeUiKit.SetButtonState(__instance._loadButton, !life.IsClient);
     }
 }

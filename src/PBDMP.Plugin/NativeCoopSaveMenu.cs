@@ -69,6 +69,7 @@ internal sealed class NativeCoopSaveMenu
             foreach (var save in store.List().Where(s => s.Error == null && s.Slot.StartsWith("manual-", StringComparison.Ordinal)))
                 Add(save, save.Name, MultiplayerBehaviour.MapName(save.Level), save.Created.ToLocalTime().ToString("MMM d, yyyy  HH:mm", System.Globalization.CultureInfo.InvariantCulture), store.Thumbnail(save.Slot));
         Select(null);
+        NativeUiKit.SetButtonState(SaveButton, true);
         for (var i = 0; i < _entries.Count; i++)
         {
             var navigation = _entries[i].Button.navigation; navigation.mode = Navigation.Mode.Explicit;

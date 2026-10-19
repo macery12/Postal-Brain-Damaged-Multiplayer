@@ -1,6 +1,6 @@
 # Multiplayer synchronization progress
 
-**October 18, 2026 — two-PC Steam playtest.** The maintainer reports that the campaign (including saves, rejoining and checkpoints) and Survival were played on two PCs over Steam with two accounts, covering the [megapass checklist](megapass-playtest.md) and the Steam and Survival checklists in [verification](verification.md). Rows whose only remaining gap was natural-play acceptance are now marked synced. Weapon-mechanism polish and active-world performance stay partial. Joining from a closed game (`+connect_lobby`) is still planned.
+**October 18, 2026 — two-PC Steam playtest.** The maintainer reports that the campaign (including saves, rejoining and checkpoints) and Survival were played on two PCs over Steam with two accounts, covering the [megapass checklist](megapass-playtest.md) and the Steam and Survival checklists in [verification](verification.md). Rows whose only remaining gap was natural-play acceptance are now marked synced. Weapon-mechanism polish and active-world performance stay partial. Joining from a closed game (`+connect_lobby`) is implemented as of October 19, 2026 and awaits a two-account check.
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
@@ -29,7 +29,7 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
 | Host a Steam lobby | | | ✅ | P1 creates the session through Steam. |
-| Join a Steam friend | | | ✅ | Friends can join the host through the multiplayer menu. |
+| Join a Steam friend | | | ✅ | Friends join through invites and Join Game (two-PC tested). The in-game **Join a friend** list passes one-account checks; joining through it with two accounts is a maintainer check. |
 | Steam invitations | | | ✅ | Native Steam overlay invitations and accepted invites connect to the lobby. |
 | Steam relay transport | | | ✅ | Steam networking carries the same host-authoritative session state. |
 | Steam player cards | | | ✅ | Multiplayer UI displays connected player names and avatars. |

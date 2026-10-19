@@ -2,7 +2,7 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–5 are complete; Phase 6 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–6 are complete; Phase 7 is next.**
 
 | Phase | State |
 | --- | --- |
@@ -12,7 +12,7 @@ Updated October 18, 2026.
 | 3 Co-op campaigns (save model) | Complete |
 | 4 Multiplayer menu and entry flows | Complete (Join a friend opens Direct IP until Phase 6) |
 | 5 In-session pause menu and P2 view | Complete |
-| 6 Join a friend | Pending |
+| 6 Join a friend | Complete (two-account join is a maintainer check) |
 | 7 Hardening, docs and handoff | Pending |
 
 ## Start here
@@ -263,6 +263,49 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
 - Steam hosting from the menus is a maintainer check.
 - The old `NativeCoopSaves` dialog class remains unreachable from the UI. Remove it in Phase 7.
 
+## Phase 6 handoff (October 19, 2026)
+
+**Source**
+- `NativeCoopJoinMenu`: a copy of `MENU_Load` titled "Join a friend".
+  - One column of the game's own `SaveHyperButton` entries: Steam avatar, friend name, where they are ("Prison (co-op)", "Survival co-op", "In the Multiplayer menu") and "1 of 2 players", "Full" or why it cannot be joined.
+  - Join, Refresh, Direct IP... (opens the existing Direct IP join dialog) and Back.
+  - Rescans every 3 s while open and rebuilds only when something changed, keeping the selection and controller focus.
+- `SteamService`:
+  - `FriendsHosting`: immediate friends whose `GetFriendGamePlayed` is this app with a lobby. Lobby data is fetched with `RequestLobbyData` at most every 10 s.
+  - The host advertises `pbdmp_level`, `pbdmp_mode` and `pbdmp_players` when they change.
+  - The callback tap also queues `LobbyDataUpdate_t` (505).
+- `LobbyAdvert` (PBDMP.Network): reads the advert, gives the short "cannot join" reason, and parses Steam's `+connect_lobby` launch argument.
+- Join goes through `OnJoinRequested`, the same path as an accepted invite, so leaving a session or a level asks first.
+- Join Game while P2's game is closed: once Steam and the main menu are ready, the `+connect_lobby` lobby is joined.
+- Fix found by this phase's checks: the session's native-load guard disabled every button named `BUTTON_Load`/`BUTTON_Save`. That included PBDMP's copied screens (co-op Load, co-op Save, Load co-op game, Join) and P1's pause Save and Load, so those could not be pressed with a mouse or controller during a session (fixtures had clicked them through `onClick`).
+  - The guard now skips `MENU_PBDMP_*` screens and P1's pause Save/Load.
+  - `PauseMenu.Enable` sets those two buttons for P1, and greys them for P2, in a co-op level.
+  - `NativeUiKit.SetButtonState` also compares the native button state, so a copied button cannot keep its source's disabled look.
+
+**Checks**
+- `Test-Steam` (one account, real Steam client, private lobby):
+  - the advert;
+  - `RequestLobbyData` → `LobbyDataUpdate` through the tap → a compatible advert;
+  - the app id;
+  - the real friend scan (68 friends, none hosting);
+  - the list with a compatible and a different-version entry, Join disabled for the second;
+  - Join while hosting asks first, and Stay keeps hosting;
+  - the empty list, the real scan through the screen, Direct IP..., Back.
+- `-CoopMenu`: 36 checks. They add Join a friend (real scan, Direct IP..., Back) and real interactability of P1's pause Save/Load, the co-op Save/Load buttons and the co-op menu while hosting.
+- Original runtime smoke passes. Managed tests pass with 0 warnings, including the advert and launch-argument test.
+- Two-player:
+  - `-Saves` 49 (adds P1's pause Save/Load pressable and P2's greyed out);
+  - `-SaveResume` 23, `-SaveReplacePartner` 24;
+  - `-SharedItems` 19, `-JoinInput` 10, default travel 54, `-SurvivalPrep` 47.
+
+**Limits**
+- Two-account checks for the maintainer:
+  - a friend listed and joined through Join a friend;
+  - "Full" after joining;
+  - an invite-only lobby not listed;
+  - Join Game with P2's game closed (`+connect_lobby`).
+- Steam hides invite-only lobbies from `GetFriendGamePlayed`, so they only arrive as invites.
+
 ## Current handoff
 
-Next step: Phase 6, Join a friend (an in-game list of Steam friends hosting PBDMP, plus Direct IP).
+Next step: Phase 7, hardening, the full campaign and Survival regressions, removing the unreachable `NativeCoopSaves` dialog, docs (`co-op-saves.md`, sync rows), package, install when the game is closed, handoff.

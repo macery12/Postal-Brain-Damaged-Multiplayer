@@ -9,15 +9,24 @@ namespace PBDMP.Plugin;
 
 internal enum LobbyPhase { None, Creating, Hosting, Joining, Joined }
 
+/// <summary>A friend in a joinable lobby of this game. Advert is null while Steam is still fetching its data.</summary>
+internal sealed record FriendHost(ulong Friend, ulong Lobby, string Name, LobbyAdvert? Advert);
+
 /// <summary>Main-thread Steam lobby and identity state. Reads the callback tap; never pumps Steam itself.</summary>
 internal sealed class SteamService : IDisposable
 {
-    internal const string VersionKey = "pbdmp_version", ProtocolKey = "pbdmp_proto", BuildKey = "pbdmp_build";
+    internal const string VersionKey = "pbdmp_version", ProtocolKey = "pbdmp_proto", BuildKey = "pbdmp_build",
+        LevelKey = "pbdmp_level", ModeKey = "pbdmp_mode", PlayersKey = "pbdmp_players";
     private readonly Action _hosted;
     private readonly Action<ulong> _entered;
     private readonly Action<ulong, ulong> _joinRequested;
     private readonly Action<string> _failed, _notice;
     private readonly Dictionary<ulong, (Texture2D? Texture, float Retry, int Tries)> _avatars = new();
+    // Friends' lobbies: when their data was last requested, and whether Steam answered (false: the lobby is gone).
+    private readonly Dictionary<ulong, float> _requested = new();
+    private readonly Dictionary<ulong, bool> _answered = new();
+    private (string Level, string Mode) _advert = ("", LobbyAdvert.ModeMenu);
+    private (string Level, string Mode, int Players)? _advertised;
     private ulong _pending;
     private float _deadline, _nextStart, _nextMembers;
     private volatile SteamP2PPipe? _pipe;
@@ -33,6 +42,7 @@ internal sealed class SteamService : IDisposable
     internal bool PrivateOnly { get; set; }
     internal SteamP2PListener? Listener { get; set; }
     internal int Ping => _pipe?.Ping ?? -1;
+    internal int LobbyDataUpdates { get; private set; }
 
     internal SteamService(Action hosted, Action<ulong> entered, Action<ulong, ulong> joinRequested, Action<string> failed, Action<string> notice)
     { _hosted = hosted; _entered = entered; _joinRequested = joinRequested; _failed = failed; _notice = notice; }
@@ -110,6 +120,12 @@ internal sealed class SteamService : IDisposable
                 if (lobby != 0 && lobby != Lobby) _joinRequested(lobby, friend);
                 return;
             }
+            case SteamNative.LobbyDataUpdateCallback:
+            {
+                var (lobby, member, success) = SteamNative.ReadLobbyDataUpdate(steamEvent.Data);
+                if (member == lobby || member == 0) { _answered[lobby] = success; LobbyDataUpdates++; }
+                return;
+            }
             case SteamNative.ConnectionStatusChangedCallback:
                 Listener?.OnStatusChanged(SteamNative.ReadStatusChangedConnection(steamEvent.Data));
                 return;
@@ -136,7 +152,7 @@ internal sealed class SteamService : IDisposable
     internal void Leave()
     {
         if (Lobby != 0) SteamNative.LeaveLobby(Lobby);
-        Lobby = 0; Partner = 0; _pending = 0; Phase = LobbyPhase.None;
+        Lobby = 0; Partner = 0; _pending = 0; Phase = LobbyPhase.None; _advertised = null;
         Listener = null; _pipe = null;
     }
 
@@ -152,6 +168,60 @@ internal sealed class SteamService : IDisposable
     {
         Plugin.InviteOnly.Value = !Plugin.InviteOnly.Value;
         if (Phase == LobbyPhase.Hosting) SteamNative.SetLobbyType(Lobby, InviteOnly ? SteamNative.LobbyPrivate : SteamNative.LobbyFriendsOnly);
+    }
+
+    /// <summary>What the hosted lobby tells friends' Join a friend lists; written on the member tick when it changes.</summary>
+    internal void Advertise(string level, string mode) => _advert = (level, mode);
+
+    private void WriteAdvert(int players)
+    {
+        if (Phase != LobbyPhase.Hosting) return;
+        var next = (_advert.Level, _advert.Mode, players);
+        if (_advertised == next) return;
+        SteamNative.SetLobbyData(Lobby, LevelKey, next.Level);
+        SteamNative.SetLobbyData(Lobby, ModeKey, next.Mode);
+        SteamNative.SetLobbyData(Lobby, PlayersKey, players.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _advertised = next;
+    }
+
+    /// <summary>
+    /// Friends playing this game in a joinable lobby. Steam lists a friends-only lobby here and hides an
+    /// invite-only one. Each lobby's data is requested at most every 10 s, and lobbies without PBDMP's
+    /// data are left out once it has arrived.
+    /// </summary>
+    internal IReadOnlyList<FriendHost> FriendsHosting()
+    {
+        var found = new List<FriendHost>();
+        if (!Available) return found;
+        var app = SteamNative.AppId; var count = SteamNative.FriendCount;
+        for (var i = 0; i < count; i++)
+        {
+            var friend = SteamNative.FriendAt(i);
+            if (!SteamNative.FriendGame(friend, out var game, out var lobby) || (game & 0xFFFFFF) != app || lobby == 0) continue;
+            if (Describe(friend, lobby) is { } host) found.Add(host);
+        }
+        return found;
+    }
+
+    internal FriendHost? Describe(ulong friend, ulong lobby)
+    {
+        if (_answered.TryGetValue(lobby, out var exists) && !exists) return null;
+        if (!_requested.TryGetValue(lobby, out var at) || Time.unscaledTime - at > 10f)
+        { _requested[lobby] = Time.unscaledTime; SteamNative.RequestLobbyData(lobby); }
+        var advert = Advert(lobby);
+        if (advert == null && _answered.ContainsKey(lobby)) return null;
+        return new(friend, lobby, Name(friend), advert);
+    }
+
+    /// <summary>Forgets fetched lobby data so Refresh asks Steam again.</summary>
+    internal void ForgetLobbyData() { _requested.Clear(); _answered.Clear(); }
+
+    internal static LobbyAdvert? Advert(ulong lobby)
+    {
+        var version = SteamNative.GetLobbyData(lobby, VersionKey);
+        if (version.Length == 0) return null;
+        return new(version, SteamNative.GetLobbyData(lobby, ProtocolKey), SteamNative.GetLobbyData(lobby, BuildKey),
+            SteamNative.GetLobbyData(lobby, LevelKey), SteamNative.GetLobbyData(lobby, ModeKey), LobbyAdvert.ParsePlayers(SteamNative.GetLobbyData(lobby, PlayersKey)));
     }
 
     internal bool IsMember(ulong id) => Lobby != 0 && SteamNative.LobbyMembers(Lobby).Contains(id);
@@ -185,6 +255,7 @@ internal sealed class SteamService : IDisposable
     private void TrackMembers()
     {
         var members = SteamNative.LobbyMembers(Lobby);
+        WriteAdvert(Math.Max(members.Length, 1));
         var partner = members.FirstOrDefault(id => id != LocalId);
         if (partner == Partner) return;
         if (Partner != 0) _notice(Name(Partner) + " left the lobby.");

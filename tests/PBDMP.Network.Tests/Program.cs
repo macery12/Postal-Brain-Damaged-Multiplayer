@@ -69,6 +69,19 @@ await Test("shared item and team inventory frames are bounded, exact and directi
     return Task.CompletedTask;
 });
 
+await Test("Join a friend reads a host's lobby advert and Steam's launch join request",()=>
+{
+    var advert=new LobbyAdvert("1.0.0","13","build","LEVEL_AD_Prison",LobbyAdvert.ModeStory,1);
+    Check(advert.Problem("1.0.0",13,"build")==null && !advert.Full);
+    Check(advert.Problem("1.0.1",13,"build")=="Different PBDMP version (1.0.0)" && advert.Problem("1.0.0",12,"build")=="Different PBDMP version (1.0.0)");
+    Check(advert.Problem("1.0.0",13,"other")=="Different PBDMP files" && (advert with {Players=2}).Problem("1.0.0",13,"build")=="Full");
+    Check((advert with {Version=""}).Problem("1.0.0",13,"build")=="Not a PBDMP game");
+    Check(LobbyAdvert.ParsePlayers("2")==2 && LobbyAdvert.ParsePlayers("")==1 && LobbyAdvert.ParsePlayers("-3")==1 && LobbyAdvert.ParsePlayers("99")==16);
+    Check(LobbyAdvert.LaunchLobby(new[]{"game.exe","-screen-fullscreen","0","+connect_lobby","109775241234567890"})==109775241234567890UL);
+    Check(LobbyAdvert.LaunchLobby(new[]{"game.exe","+connect_lobby"})==0 && LobbyAdvert.LaunchLobby(new[]{"+connect_lobby","x1"})==0 && LobbyAdvert.LaunchLobby(Array.Empty<string>())==0);
+    return Task.CompletedTask;
+});
+
 await Test("Survival long-run extremes stay exact and inside the frame and record limits",()=>
 {
     // The largest legal values of a very long run: score/damage, waves, kills, enemies, timer, offers and result fields.

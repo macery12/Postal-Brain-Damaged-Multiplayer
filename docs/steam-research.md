@@ -24,6 +24,7 @@ The ISIL for `RunFrame` (`<Decompiled>/Cpp2IL/Native-ISIL/IsilDump/Steamworks.NE
 | --- | ---: | --- |
 | `GameLobbyJoinRequested_t` | 333 | Callback (invite accepted / Join Game while running) |
 | `LobbyEnter_t` | 504 | Call result of `JoinLobby`, and also a callback |
+| `LobbyDataUpdate_t` | 505 | Callback (a lobby's data arrived after `RequestLobbyData`, or changed) |
 | `LobbyCreated_t` | 513 | Call result of `CreateLobby` |
 | `SteamNetConnectionStatusChangedCallback_t` | 1221 | Callback (incoming connection requests and state changes) |
 
@@ -35,7 +36,9 @@ Blittable callback structs match the IL2CPP field offsets in `<Decompiled>/CShar
 
 ## Transport choices
 
-- **Lobby**: two-slot, friends-only by default (invite-only on request). Lobby data carries `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (16 hex characters of SHA-256 over the full fingerprint) so a joiner sees a mismatch before dialling. The full Hello/Welcome fingerprint check still runs afterwards.
+- **Lobby**: two-slot, friends-only by default (invite-only on request). Lobby data carries `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (16 hex characters of SHA-256 over the full fingerprint) so a joiner sees a mismatch before dialling. The full Hello/Welcome fingerprint check still runs afterwards. The host also writes `pbdmp_level`, `pbdmp_mode` and `pbdmp_players` when they change.
+- **Join a friend**: every 3 s while the screen is open, `GetFriendCount`/`GetFriendByIndex` (immediate friends) and `GetFriendGamePlayed` find friends in this app (`GetAppID`) with a lobby. `FriendGameInfo_t` is 24 bytes: game id @0, lobby @16. Steam reports a friends-only lobby there and hides an invite-only one. Each lobby's data is requested with `RequestLobbyData` at most every 10 s; `LobbyDataUpdate_t` (lobby @0, member @8, success @16) says it arrived. Lobbies without PBDMP data are left out, and a different version or build is shown but cannot be joined. Join uses the same path as an accepted invite.
+- **Join Game while closed**: Steam starts the game with `+connect_lobby <id>`; PBDMP joins that lobby once the main menu and Steam are ready.
 - **Carrier**: `ISteamNetworkingSockets` P2P on virtual port 0 through Steam's relay network. One reliable message carries one protocol frame; `MessageStream` presents the connection as the byte stream `CoopSession` already used for TCP, so the protocol is unchanged.
 - **Tuning**: Steam's default 512 KB send buffer and 256 KB/s send rate throttle scene snapshot bursts, so connections use a 2 MB buffer and 512 KB/s. The joiner allows 60 seconds to connect, because the host only accepts on Unity's main thread and may be inside a loading screen.
 - **Admission**: the host accepts only lobby members. A request that arrives before Steam has delivered the member list waits up to 10 seconds for it.

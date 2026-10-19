@@ -140,9 +140,10 @@ internal sealed class NativeUiKit
         var navigation = button.navigation; navigation.mode = Navigation.Mode.None; button.navigation = navigation;
     }
 
+    // A copied native button can carry its source's disabled look while still interactable, so both are compared.
     internal static void SetButtonState(MainHyperButton button, bool enabled)
     {
-        if (button.interactable == enabled) return;
+        if (button.interactable == enabled && button._state == (enabled ? ButtonState.INTERACTABLE : ButtonState.DISABLED)) return;
         if (enabled) button.SetInteractable(); else button.SetDisabled();
         button.interactable = enabled;
     }

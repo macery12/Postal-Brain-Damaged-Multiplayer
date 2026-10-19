@@ -19,7 +19,7 @@ try {
     $game = Start-Process -FilePath (Join-Path $GameDir 'POSTAL Brain Damaged.exe') -WorkingDirectory $GameDir -WindowStyle Hidden -PassThru -ArgumentList '-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-logFile',('"' + (Join-Path $output 'unity.log') + '"')
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $passed = $false
-    while ($watch.Elapsed.TotalSeconds -lt 150) {
+    while ($watch.Elapsed.TotalSeconds -lt 180) {
         Start-Sleep -Seconds 1
         $game.Refresh()
         if ($game.HasExited) { throw "Game exited with code $($game.ExitCode). Inspect $output" }
