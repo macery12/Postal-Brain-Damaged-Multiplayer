@@ -89,6 +89,8 @@ public sealed partial class MultiplayerBehaviour
                 _sharedCombatLoot!.gameObject.SetActive(false);
                 foreach(var attackComponent in _sharedCombatNpc.GetComponentsInChildren<NpcMeleeDamageComponent>(true)) attackComponent.SetActive(false);
                 _sharedCombatNpc.HitPoints.SetCurrentSilent(57);
+                // The ledger also holds native drops made before hosting began (rediscovered from LootController).
+                File.WriteAllLines(Marker("loot-ledger"),_world.LootLedgerForTest.Select(p=>$"{p.x:R},{p.y:R},{p.z:R}"));
                 File.WriteAllText(Marker("enemy-asset"),_sharedCombatNpc.NpcId.ID);
                 File.WriteAllLines(Marker("registered-weapons.txt"),Resources.FindObjectsOfTypeAll<WeaponId>().Select(w=>$"{w.name} category={w.Category} model={w.PlayerWeaponModel?.GetIl2CppType().Name} prefab={w.PlayerWeaponPrefab?.name}"));
                 Player.Instance.GetComponent<PlayerHitProcessorComponent>().SetCurrentHitPoints(100);
@@ -166,7 +168,11 @@ public sealed partial class MultiplayerBehaviour
                 _sharedCombatNpc=_world!.EnemyForTest(File.ReadAllText(Marker("enemy-asset")));
                 TravelCheck(_sharedCombatNpc!=null && _sharedCombatNpc.HitPoints.Current==57,"late join receives host enemy health before gameplay");
                 TravelCheck(_sharedCombatNpc!.GetComponentsInChildren<UnityEngine.AI.NavMeshAgent>(true).All(a=>!a.enabled),"client enemy navigation authority is disabled");
-                TravelCheck(_world!.PersonalLootForTest==1,"late join receives a personal copy of the host's pre-join loot ledger");
+                var ledger=File.ReadAllLines(Marker("loot-ledger")).Select(l=>l.Split(',').Select(v=>float.Parse(v,System.Globalization.CultureInfo.InvariantCulture)).ToArray()).Select(v=>new Vector3(v[0],v[1],v[2])).ToArray();
+                var pickups=Object.FindObjectsOfType<Pickup>().Where(p=>!p._pickedUp).ToArray();
+                Plugin.Logger.LogInfo($"LOOT TEST ledger=[{string.Join(";",ledger)}], personal={_world!.PersonalLootForTest}, pickups=[{string.Join(";",pickups.Select(p=>p.name+"@"+p.transform.position))}]");
+                TravelCheck(ledger.Length>=1 && _world.PersonalLootForTest==ledger.Length,"late join receives a personal copy of every entry in the host's pre-join loot ledger");
+                TravelCheck(ledger.All(p=>pickups.Count(k=>Vector3.Distance(k.transform.position,p)<1.5f)==1),"each pre-join ledger drop exists exactly once on P2, without a native duplicate");
                 var loot=Object.FindObjectsOfType<BagPickup>().First(b=>b.name.Contains("Clone") && b._healthAmount==17);
                 TravelCheck(loot._armorAmount==11,"native loot quantities are captured after native post-drop initialization");
                 Player.Instance.GetComponent<PlayerHitProcessorComponent>().SetCurrentHitPoints(100);

@@ -55,6 +55,7 @@ internal sealed partial class SharedWorld : IDisposable
     internal bool ReadyForPerformance=>Active && !Client && _peerMatched && _session.Snapshot.Connected && _life.State.Released && !_life.Frozen;
     internal int IncomingHitApplications { get; private set; }
     internal int PersonalLootForTest=>_personalLoot.Count;
+    internal Vector3[] LootLedgerForTest=>_loot.Values.Select(f=>Unity(f.Position)).ToArray();
     internal IReadOnlyDictionary<string,ProjectileModel> ModelsForTest=>_assets!.Models;
     internal string ModelOriginForTest(string key)=>_assets!.ModelOrigins[key];
     internal int ProjectileCreatesForTest { get; private set; }

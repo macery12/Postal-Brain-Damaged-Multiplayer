@@ -25,6 +25,13 @@ public sealed partial class MultiplayerBehaviour
             _doorTestStep=1;return;
         }
         if(_lifecycle is {NativeReady:false}) {_lifecycle.AutoContinue();return;}
+        if(_lifecycle is {NativeReady:true,LocalTutorialActive:true})
+        {
+            // A native tutorial on P1 is a shared pause; dismiss it like a player would.
+            TravelCheck(true,"native tutorial waiting for Use input is dismissed by the door fixture at stage "+_doorTestStep);
+            Player.Instance!.GetComponent<PlayerTutorialComponent>().OnUseDown();
+            return;
+        }
         if(_doorTestStep<8 && _world?.Active!=true) return;
         if(TravelRole=="host") DoorTestHost();else DoorTestClient();
     }

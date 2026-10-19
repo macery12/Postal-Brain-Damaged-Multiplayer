@@ -29,6 +29,8 @@ internal static class WorldSceneryPatches
     private static bool PhysicsUpdate(PhysicalObject __instance)=>SharedWorld.Current is not {Client:true,Active:true} w || !w.SharedPhysics(__instance);
     private static bool Optimize(PhysicalObject __instance,ref bool __0,ref bool __1)
     {
+        // The native optimizer can still tick an object destroyed by a scene unload; its body would only throw.
+        if(__instance==null) return false;
         if(SharedWorld.Current is {Active:true,Client:true} guest && guest.SharedPhysics(__instance)) return false;
         if(SharedWorld.Current is {Active:true,Client:false} w && w.Remote?.IsAlive==true &&
             Vector3.Distance(__instance.transform.position,w.Remote.CenterOfMass)<60)
