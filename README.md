@@ -20,14 +20,14 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 | NPCs, pedestrians and flying enemies | | | ✅ | Shared enemies and reactions. |
 | Doors and shared unlocks | | | ✅ | Either player can interact. |
 | Urine interactions | | | ✅ | Shared puzzles and effects. |
-| Mission triggers and machinery | | ✅ | | World adapters implemented; campaign playtesting continues. |
-| Joining an active session | | ✅ | | Current-world restoration implemented; broader playtesting continues. |
+| Mission triggers and machinery | | | ✅ | Shared puzzles, rides and scripted progression; confirmed in two-PC play. |
+| Joining an active session | | | ✅ | Join or rejoin mid-level with the current world restored. |
 | Shared checkpoints | | | ✅ | P1 can restore the shared recovery point. |
 | Multiplayer saves | | | ✅ | Separate co-op slots, quicksave and autosaves. |
-| Survival co-op | | ✅ | | All three base arenas: shared waves, personal offers, readiness, wave revival, shared results, co-op records and late join. Natural two-PC playtesting continues. |
+| Survival co-op | | | ✅ | All three base arenas: shared waves, personal offers, readiness, wave revival, shared results, co-op records and late join. |
 | FPS and network performance | | ✅ | | Optimization remains a priority. |
 
-**Development coverage: 93%** (includes partial work); **last accepted baseline: 90%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
+**Development coverage: 95%** (includes partial work); **last accepted baseline: 95%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
 
 ![Multiplayer in the native main menu](docs/images/main-menu.png)
 

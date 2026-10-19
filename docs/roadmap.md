@@ -28,14 +28,13 @@ Keys/items are checked and consumed on the interacting player when native rules 
 | --- | --- | --- |
 | FPS and frame pacing | Profile capture, allocations/GC, rendering and active-world spikes from the maintainer's playtest. | Major next-pass priority; compare before/after under retained budgets. |
 | Network performance | Profile snapshot size, bandwidth, queue age, combat traffic and LAN/Steam delivery under load. | Functional synchronization is separate from responsiveness; measure before transport changes. |
-| Natural campaign validation | Two-PC progression through puzzles, encounters and bosses. | Catalogue discovery alone is insufficient. |
 | Mission/world coverage | Classify remaining callbacks, specialised machinery and timeline tracks. | Preserve host authority; do not replay arbitrary client callbacks. |
 | Scenery acceptance | Gameplay fragments and natural destruction/prop routes. | World/scenery adapters and focused rollback/rejoin checks are implemented; remaining cases are in the playtest checklist. |
 | Player presentation | Weapon grip, reload/jump/death transitions and visual polish. | Keep cosmetic animation separate from gameplay authority. |
 | Checkpoint coverage | Exercise additional natural campaign checkpoint and machinery sequences. | Native world restoration plus durable multiplayer adapters are implemented. |
 | Solo-save import | Explicit conversion into a new co-op slot. | Co-op persistence is implemented; solo slots are never implicitly imported. |
 | Transport evaluation | Measure real LAN and Steam-relay latency, loss and snapshot pressure; consider unreliable pose messages on Steam. | Retain bounded queues and main-thread capture budgets. |
-| Steam joining | Two-account acceptance; joining from a closed game (`+connect_lobby`) and an in-game friends list. | Both players keep the strict exact-build check. |
+| Steam joining | Joining from a closed game (`+connect_lobby`) and an in-game friends list. Two-account joining, rejoining and the build-mismatch check passed in the October 18, 2026 playtest. | Both players keep the strict exact-build check. |
 
 Host-owned co-op saves now provide named manual slots, one quicksave and three rotating autosaves. Either player can activate a supported checkpoint; only P1 can restore it. Ordinary deaths still respawn independently. Native solo save/profile writes remain blocked during multiplayer and return after session cleanup. See [co-op saves](co-op-saves.md).
 

@@ -1,5 +1,7 @@
 # Megapass campaign playtest
 
+**Completed October 18, 2026.** The maintainer played this checklist on two PCs over Steam, including saves, rejoining and checkpoints. Busy-world performance remains for the next optimization phase.
+
 The implementation closeout uses focused native regressions and a maintainer campaign playtest, as agreed on October 16, 2026. These checks can happen during normal co-op play; exhaustive automated traversal is not a prerequisite for starting the next development phase. Unverified paths keep their partial markers in [sync progress](sync-progress.md).
 
 ## Start here

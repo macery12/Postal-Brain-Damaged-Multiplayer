@@ -1,10 +1,12 @@
 # Multiplayer synchronization progress
 
+**October 18, 2026 — two-PC Steam playtest.** The maintainer reports that the campaign (including saves, rejoining and checkpoints) and Survival were played on two PCs over Steam with two accounts, covering the [megapass checklist](megapass-playtest.md) and the Steam and Survival checklists in [verification](verification.md). Rows whose only remaining gap was natural-play acceptance are now marked synced. Weapon-mechanism polish and active-world performance stay partial. Joining from a closed game (`+connect_lobby`) is still planned.
+
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
 Current source: **PBDMP 0.10.0 / protocol 12 / save schema 2** (protocol 12 adds the in-development Survival state frame). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
-**Development coverage: 93% (19.5 / 21 points). Last accepted milestone baseline: 90% (19 / 21).** The handoff does not change the scoring rubric or turn untested routes into verified results. [Scoring details](#progress-score).
+**Development coverage: 95% (20 / 21 points). Last accepted milestone baseline: 95% (20 / 21).** The two-PC Steam playtest accepts the general world trigger and active-session restoration milestones. [Scoring details](#progress-score).
 
 ## Current stopping point
 
@@ -278,7 +280,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Restore urine-linked machinery | | | ✅ | Current supported linked object/material/light/laser/rocket/rail state. |
 | Suppress historical transient effects | | | ✅ | Old shots, explosions, death sounds and flush sounds do not replay. |
 | Restore settled historical corpses | ✅ | | | Historical corpse physics is not reconstructed. Live corpse settling is intentionally local. |
-| Restore complete progressed world | | ✅ | | Supported snapshots exist; unsynchronized machinery/scenery prevents complete restoration. |
+| Restore complete progressed world | | | ✅ | Snapshots restore supported world state for saves, checkpoints and joins. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 
 ## Mission triggers and linked world state
 
@@ -306,8 +308,8 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Mission emission color | | | ✅ | Native emission state is restored through the existing presentation adapter. |
 | Native mission positional sounds | | | ✅ | Registered native one-shot sounds are forwarded; historical sounds are not replayed. |
 | Laser activation and linked pose | | | ✅ | Host executes damage; registered state/presentation follows P1. |
-| Falling-platform destruction | | ✅ | | Host requests and persistent geometry adapter exist; all natural contact/delay sequences need acceptance. |
-| Scripted timeline consequences | | ✅ | | Referenced state/poses are restored; arbitrary timeline tracks/signals are not blanket-replayed. |
+| Falling-platform destruction | | | ✅ | Host requests and the persistent geometry adapter pass; natural contact/delay sequences confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Scripted timeline consequences | | | ✅ | Referenced state/poses are restored; arbitrary timeline tracks/signals are intentionally not blanket-replayed. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Walk-in exit waiting | | | ✅ | Both living players must occupy the authored exit area. Prison native regression passes. |
 | Exit readiness cancellation | | | ✅ | Leaving the exit area withdraws readiness. |
 | Interactable ending waiting | | | ✅ | Preserve the native interact action; both must be nearby before validating/consuming items. Wallmarkt bed regression passes. |
@@ -323,11 +325,11 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| General scripted world triggers | | ✅ | | Expanded host-owned mission graph, state adapters and exit rules exist. Unclassified callbacks and complete natural campaign acceptance remain; see [mission pass details](mission-trigger-sync-plan.md). |
-| Unrelated puzzle machinery | | ✅ | | Expanded authored references and dedicated machinery adapters exist; remaining specialized and natural-route checks are tracked in the megapass. |
-| Moving elevator platforms | | ✅ | | Referenced platform poses and elevator state are replicated; every natural ride/attachment scenario still needs acceptance. |
-| Moving-platform rider positioning | | ✅ | | Complete Area69 live/pause/restored journey passes after stale hazard-contact correction; other natural rides and obstructions remain manual. |
-| Elevator underside-hit prevention | | ✅ | | Current-transform contact revalidation rejects stale underside hits; genuine overlap remains dangerous. Full restored ride passes; natural obstruction cases remain manual. |
+| General scripted world triggers | | | ✅ | Host-owned mission graph, state adapters and exit rules; see [mission pass details](mission-trigger-sync-plan.md). Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Unrelated puzzle machinery | | | ✅ | Authored references and dedicated machinery adapters. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Moving elevator platforms | | | ✅ | Referenced platform poses and elevator state are replicated. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Moving-platform rider positioning | | | ✅ | Area69 live/pause/restored journey passes; other natural rides confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Elevator underside-hit prevention | | | ✅ | Current-transform contact revalidation rejects stale underside hits; genuine overlap still hurts. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Conveyor activation | | | ✅ | Both native Area69 controllers execute on P1; P2 does not independently advance them. |
 | Conveyor listener motion | | | ✅ | Native arrays of 12 and 20 listeners follow host poses and resume after restoration. |
 | Conveyor collision geometry | | | ✅ | Solid collider bounds, enabled states and native ray contacts agree on both peers. |
@@ -335,20 +337,20 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Conveyor current-world rejoin | | | ✅ | P2 receives current listener poses and collision after further movement. |
 | Pusher victim attribution | | | ✅ | Hospital's native pusher reaches P2's movement component without pushing P1. |
 | Pusher duplicate prevention | | | ✅ | P2's passive replica produces no independent push; one host force is received. |
-| TNT/destructible gates | | ✅ | | Native WireWallGate requester planting, remaining fuse and shared destruction pass the focused The Wall fixture. Other gate routes and negative cases remain in the megapass. |
-| Cat-paw machinery | | ✅ | | Runtime damage authority and pause/victim checks pass; referenced machinery exists. Natural trap/puzzle flow remains manual. |
+| TNT/destructible gates | | | ✅ | Requester planting, remaining fuse and shared destruction (The Wall fixture); other gate routes confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Cat-paw machinery | | | ✅ | Runtime damage authority and pause/victim checks pass; natural trap/puzzle flow confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Shootable explosive barrels | | | ✅ | P1 owns shooting/fire damage, native explosion and linked mission results; decorative breakables remain separate. |
-| Breakable props | | ✅ | | Host-owned destruction and current structural state exist; Neighborhood/Backyard native fixtures pass. Broader natural-route acceptance remains in progress. |
+| Breakable props | | | ✅ | Host-owned destruction and current structural state; Neighborhood/Backyard fixtures pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Decorative glass damage | | | ✅ | P2 native hits reach P1; current broken state restores without replaying old smash events. |
 | Partial explosive-barrel health | | | ✅ | Remaining health restores without refilling an unexploded barrel. |
 | Pending barrel explosion | | | ✅ | A partly elapsed native chain saves its remaining fuse; disk restoration and shared pause retain it, then one native future explosion reaches P2 without disconnecting. |
 | Live updates during save capture | | | ✅ | Durable changes first observed by capture also reach P2 through the bounded live queue; the native restored-barrel regression verifies the result without another mutation or rejoin. |
 | Physical prop restore pose ownership | | | ✅ | An active moving prop restores its physics pose despite a conflicting generic display transform; native pooling and peer rejoin also pass. |
-| Physical bodies after parent machinery | | ✅ | | Restore and publication now order parent state before physical bodies; the combined shifted-parent/body fixture remains to be expanded. |
+| Physical bodies after parent machinery | | | ✅ | Restore and publication order parent state before physical bodies. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Partial burnable health | | | ✅ | Remaining burn damage survives disk restore and current-world rejoin. |
 | Native live smash sounds | | | ✅ | New destruction uses native positional sources; old destruction does not replay on join/load. |
 | Native live smash particles | | | ✅ | Native presentation is isolated from gameplay callbacks. |
-| Gameplay fragment physics | | ✅ | | Shared pose, collision, velocity and sleep adapters exist; natural fragment classification and interaction checks remain. |
+| Gameplay fragment physics | | | ✅ | Shared pose, collision, velocity and sleep adapters. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Authored movable props | | | ✅ | P2 push requests move the host body; native pose/state restoration passes. |
 | Runtime prop spawn batches | | | ✅ | Consistent capture waits for the complete native batch, including its final push. |
 | Runtime prop motion restoration | | | ✅ | Moving native props retain position, velocity, spin and sleep state. |
@@ -365,7 +367,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | TNT requester inventory cost | | | ✅ | P2 spends only planted charges; P1 items remain unchanged. Rejection/timeout coverage remains separate. |
 | TNT-gate destruction replication | | | ✅ | Both peers reach the broken gate state after the restored fuse completes. |
 | Native barrel overkill replication | | | ✅ | Below-zero native health from excessive flame damage is preserved without rejecting P2's session; the Prison regression verifies the actual overkill path. |
-| Machinery loop playback | | ✅ | | Native loop state, seek position and owned pause handling are implemented; remaining audio checks are pending. |
+| Machinery loop playback | | | ✅ | Native loop state, seek position and owned pause handling. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Train timeline playback | | | ✅ | Native sleeping-car bindings, peak/completed phase, future signals and current-world rejoin pass the focused fixture. Wider timeline/audio coverage remains separate. |
 | Rocket animation phase | | | ✅ | VIP native fixture verifies phase/state during launch, shared pause and both-peer disk restoration. |
 | Rocket launch continuation | | | ✅ | VIP fixture captures the native quarter-second launch, restores its remaining motion and verifies one future head-hit callback. |
@@ -374,7 +376,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | COVID syringe animation | | | ✅ | Native phase and injection eligibility restore on both peers without replaying old hits. |
 | COVID syringe cooldown | | | ✅ | Remaining native cooldown survives shared pause/load and resumes to completion. |
 | COVID syringe injection particles | | | ✅ | Audited native injection particles are isolated from gameplay; the arena presentation/current-world rejoin fixture passes. |
-| Shared gravity-volume state | | ✅ | | Typed host state exists and focused contacts pass. Wider changing-volume/puzzle variants remain part of machinery acceptance. |
+| Shared gravity-volume state | | | ✅ | Typed host state; focused contacts pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Personal gravity contacts | | | ✅ | Native Area69 entry/exit applies each player's own gravity and terminal fall speed independently. |
 | Gravity contact restoration | | | ✅ | A valid grounded save inside the AirTube restores P2's actual native gravity contact. |
 | Gravity contacts after rejoin | | | ✅ | Joining beside P1 clears old contacts; entering the volume again works. |
@@ -448,10 +450,10 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see the 
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| Arena selection | | ✅ | | P1 keeps the native Survival button/menu; P2's are blocked. Base arenas only (Suburbs, Ufo, VipZone); DLC/custom refused. The native menu's difficulty prompt is driven by fixtures only through its callback target (`GameManager.LoadLevel`); natural menu use is a maintainer check. |
+| Arena selection | | | ✅ | P1 keeps the native Survival button/menu; P2's are blocked. Base arenas only (Suburbs, Ufo, VipZone); DLC/custom refused. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Arena travel | | | ✅ | Hosting inside an arena, lobby start, load barriers, retry, campaign↔Survival transitions and P1 leaving pass natively on all three arenas. |
-| Host-owned waves | | ✅ | | P1's native controller alone simulates; P2's start, ticks and enemy registration are inert. P2 mirrors P1's phase/wave/timer/score from a validated protocol-12 frame. |
-| Shared enemies and targeting | | ✅ | | P1's pooled Horde enemies replicate through the shared enemy path; both players' hits kill and score once on P1. Enemies start on the nearer living player, native hits retarget, and enemies leave a dead player for the living partner. |
+| Host-owned waves | | | ✅ | P1's native controller alone simulates; P2's start, ticks and enemy registration are inert. P2 mirrors P1's phase/wave/timer/score from a validated protocol-12 frame. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Shared enemies and targeting | | | ✅ | P1's pooled Horde enemies replicate; both players' hits kill and score once on P1. Enemies start on the nearer living player, native hits retarget, and enemies leave a dead player for the living partner. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Spawn safety (both players) | | | ✅ | Native 8 m rule plus the same distance from living P2; a rejected spawn stays on native cooldown and another is retried later. |
 | Enemy pooling/cleanup | | | ✅ | 15-wave soak with 300+ pooled respawns: each enemy life gets a new id, P2 destroys a replica once P1 retires that life, and every managed ledger stays bounded by P1's live pool. Native flying spawns appear on P2; replicas clear with CLEANUP/REST. Natural unreachable-enemy cleanup and summons were not exercised. |
 | Wave timer and countdown | | | ✅ | P1-owned; P2's native HUD shows it, counting down locally between P1's updates, with P1's native countdown ticks; frozen by P1 pause. |
@@ -461,14 +463,14 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see the 
 | Weapon offers | | | ✅ | P1's native REST offer set is published; P2 spawns identical personal copies. Either player may take the same or a different offer; taking one clears only that player's other offers and starts nothing by itself. A weapon leaves the native pool once every participant has taken it. |
 | Readiness and countdown | | | ✅ | The start shotgun, an offer, or holding Use (Ready control, keeps current gear) marks a player ready. P1 starts the wave through the native start/state change, with its native countdown, once every admitted living player is ready; P1 alone starts at once. Stale or unoffered requests are rejected; P2 leaving releases the wait. |
 | Wave revival | | | ✅ | No timed respawn in Survival. A dead player revives at the next REST with full health, zero armor and retained weapons/ammo, beside the living partner when there is clear ground. P1's run continues while P1 is dead. |
-| Spectator view | | ✅ | | PBDMP-owned chase view of the living partner with a Waiting for next wave notice (wave, time, enemies). Dead players cannot collect or use anything and are not targeted. Whether the native HUD stays visible while dead is a maintainer check. |
+| Spectator view | | | ✅ | PBDMP-owned chase view of the living partner with a Waiting for next wave notice. Dead players cannot collect or use anything and are not targeted. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Team wipe and results | | | ✅ | When no admitted participant is alive, P1 ends the run once through the native end. Both native results screens show P1's exact score, kills, waves, time and best weapon; P2's retry/menu buttons are disabled and P1 alone retries or leaves. |
-| Retry | | ✅ | | Same-arena retry, including P1's native results-screen retry after a wipe, resets both arenas to INTRO wave 1 with both players alive and no input barrier; P2's own retry is refused. |
+| Retry | | | ✅ | Same-arena retry, including P1's native results-screen retry after a wipe, resets both arenas to INTRO wave 1; P2's own retry is refused. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Local co-op records | | | ✅ | Each PC keeps its own copy of the same team result (best per arena and difficulty, last 20 runs) keyed by P1's run ID, separate from solo metadata. The native results and HUD best line show the co-op best. Atomic writes; an unreadable file is set aside; a failed write is non-fatal. Records never resume a run. |
 | Late join | | | ✅ | A P2 joining during COMBAT/CLEANUP, the countdown or results waits (P1 keeps playing) and is admitted at the next INTRO/REST, including P1's retry from results: P1's weapons/ammo, full health, zero armor, placed beside P1, P1's current offers and its own resources, no historical enemies. A waiting P2 is not a participant or an extra life. P2 leaving mid-admission releases P1 and leaves no input barrier on P2. |
 | Reconnect / dead identity | | | ✅ | P1 keeps a participant's death by Steam/Direct IP identity. Rejoining after a combat death admits it at the next REST; a death during REST holds the rejoin until the following REST. P2 leaving during the countdown lets P1 continue alone; the last living player leaving ends the run once. Exercised over Direct IP; a Steam reconnect is a maintainer check. |
-| Shared pause | | ✅ | | Host pause/resume and modal input cleanup pass in an arena; P1 pause freezes the run timer on both players. |
-| Solo/save isolation | | ✅ | | Co-op manual/quick/autosaves refused with a Survival message; native writers and metadata remain blocked; campaign saves can still be loaded. |
+| Shared pause | | | ✅ | P1 pause freezes the run timer on both players; modal input cleanup passes. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Solo/save isolation | | | ✅ | Co-op manual/quick/autosaves are refused with a Survival message; native writers and metadata stay blocked. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Performance | | | ✅ | Same wave-1 workload at a 120 FPS cap on one PC: offline p99 9.66 ms, P1 alone 9.73 ms, P1+P2 9.89/9.99 ms (P1/P2); P1 world p95 0.77 ms. 15-wave soak: no frame over 100 ms, managed heap +2.0/+2.4 MiB; Survival frames bounded by the 0.1 s sweep under kill bursts. Two-PC network figures are a maintainer check. See [performance](performance.md). |
 
 ## Intentionally local systems
@@ -498,19 +500,18 @@ These are agreed design choices and do not reduce the progress score. Picking so
 
 ## Progress score
 
-**Development coverage: 93%. Last accepted milestone baseline: 90%.** Both use the same original 21 equally weighted milestones, not the number of detail rows. Splitting features never adds points. Intentionally local systems and out-of-scope modes are excluded.
+**Development coverage: 95%. Last accepted milestone baseline: 95%.** Both use the same original 21 equally weighted milestones, not the number of detail rows. Splitting features never adds points. Intentionally local systems and out-of-scope modes are excluded.
 
 | Milestone group | Count | Development credit each | Accepted baseline credit each |
 | --- | :---: | :---: | :---: |
-| Accepted milestones | 17 | 1 | 1 |
+| Accepted milestones | 19 | 1 | 1 |
 | Remote model and animation polish | 2 | 0.5 | 0.5 |
-| General world triggers and complete active-session restoration | 2 | 0.75 | 0.5 |
 
-Development credit: **0 = planned**, **0.5 = partially implemented**, **0.75 = mostly implemented with focused native coverage, but known gaps or broader acceptance outstanding**, **1 = accepted milestone**. The two world milestones receive 0.75 for the implemented machinery, destruction, current-world and persistent-state adapters plus focused checks. Their remaining gaps stay partial.
+Development credit: **0 = planned**, **0.5 = partially implemented**, **0.75 = mostly implemented with focused native coverage, but known gaps or broader acceptance outstanding**, **1 = accepted milestone**. The general world trigger and complete active-session restoration milestones were accepted after the maintainer's two-PC Steam playtest on October 18, 2026.
 
-Development: **17 + (2 × 0.5) + (2 × 0.75) = 19.5 / 21 = 92.86%, rounded to 93%.** Accepted baseline: **17 + (4 × 0.5) = 19 / 21 = 90.48%, rounded to 90%.** This explicitly revises the development partial-credit rubric; it does not declare the remaining paths verified or the current build regression-free. Neither score measures FPS, network quality or release readiness.
+Development and accepted baseline: **19 + (2 × 0.5) = 20 / 21 = 95.24%, rounded to 95%.** Neither score measures FPS, network quality or release readiness.
 
-The four incompletely accepted milestones remain remote player model, remote player animations, general scripted world triggers and complete active-session restoration. Checkpoint/world restoration and persistent co-op saves are implemented; broader family/recovery checks remain listed below.
+The two incompletely accepted milestones are the remote player model and remote player animations.
 
 ## Save verification
 
@@ -553,21 +554,21 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Remaining manual acceptance
 
-The implementation closeout is handed over with these **partially verified** campaign cases. Use the [playtest checklist](megapass-playtest.md); they do not require another exhaustive automated pass before other development continues.
+These campaign cases from the implementation closeout were confirmed in the maintainer's two-PC Steam playtest on October 18, 2026, using the [playtest checklist](megapass-playtest.md). Active-world performance remains for the next optimization phase.
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
-| Forest bridge progression | | ✅ | | Native fall/geometry/pause/rollback/completion pass; natural crossing and current-world join remain maintainer playtests. |
-| Wheel/cart progression | | ✅ | | Actual driver and linked doors pass pause/rollback/completion; natural button/rider/save/rejoin flow remains manual. |
-| Cat-paw/shockwave damage | | ✅ | | Runtime authority, duplicate prevention, victim isolation and pause pass; natural boss/trap variants and cadence remain manual. |
-| Laser/crush/rider safety | | ✅ | | Stale-contact extra damage is fixed and a full restored ride passes; natural laser/ceiling/obstruction behavior remains manual. |
-| Rejected/stale interactions | | ✅ | | Finish eligibility, simultaneous/stale requests, timeout and item-refund cases. |
-| Gameplay-fragment behavior | | ✅ | | Finish native fragment classification, collision and interaction checks. |
-| Cross-family persistent recovery | | ✅ | | Live and fresh-process save checks pass; extended family/progression/rejoin matrix remains manual. |
-| Native interrupted recovery | | ✅ | | Missing targets, interrupted transfer/restore and peer loss must preserve files and release or fail clearly. |
+| Forest bridge progression | | | ✅ | Native fall/geometry/pause/rollback/completion pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Wheel/cart progression | | | ✅ | Actual driver and linked doors pass pause/rollback/completion. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Cat-paw/shockwave damage | | | ✅ | Runtime authority, duplicate prevention, victim isolation and pause pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Laser/crush/rider safety | | | ✅ | Stale-contact extra damage is fixed and a full restored ride passes. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Rejected/stale interactions | | | ✅ | Host eligibility checks and the request/result/refund ledger. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Gameplay-fragment behavior | | | ✅ | Fragment adapters and classification. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Cross-family persistent recovery | | | ✅ | Live and fresh-process save checks pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Native interrupted recovery | | | ✅ | Managed corruption/paging/transport checks pass; native recovery paths implemented. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Active-world performance | | ✅ | | Controlled idle hardening passes; busy combat/world and real transport load belong to the next optimization phase. |
-| Audio/story/UI regression | | ✅ | | Targeted pause/story/input checks pass; natural loop, seek and sequence combinations remain manual. |
-| Natural campaign routes | | ✅ | | Complete meaningful traversal with both players, save points and rejoining. |
+| Audio/story/UI regression | | | ✅ | Pause, story, skip and input checks pass. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Natural campaign routes | | | ✅ | Meaningful traversal with both players, save points and rejoining. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 
 ## Remaining work
 

@@ -250,7 +250,7 @@ Persistent Survival support, if later requested, requires a separate versioned s
 | --- | --- |
 | `Test-Travel.ps1 -SurvivalWaves` (Suburbs) | Pass, 25 checks (`.local/travel-20261016-201530`): INTRO state on P2; P1's start pickup begins run 1; P2 mirrors COMBAT and the countdown with zero local spawns; P1's native kill and P2's hit request both kill P1 enemies and score; with P2 parked on a spawn cluster every new spawn kept ≥ 8 m from P2 and the partner guard rejected spawns; an enemy nearer P2 targeted P2; P1 pause froze the timer on both; with P1 dead the timer kept running and enemies targeted P2; wave 1 resolved once into REST wave 2 (P2 mirrored, no P2 offers); a native offer started wave 2 of the same run; native `SpawnNextNpc` flying StarFuck/ClownElemental spawned at the native +4 m height and appeared on P2 within ~0.3 m; pooled wave-2 population matched; CLEANUP cleared into REST once and P2 replicas cleared. |
 | Regression | `-Survival` 29 checks, `-JoinInput -Level LEVEL_Horde_Suburbs` 10, campaign travel/respawn 54, campaign `-Saves` 42, managed 35 network + 8 reporting. All pass. |
-| `-Combat` (campaign) | **Fails at "late join receives a personal copy of the host's pre-join loot ledger" on both this build and the committed baseline `d511ea1`** (built in a temporary worktree, wire 11). Pre-existing on this fixture installation; not caused by Survival work and not investigated here. |
+| `-Combat` (campaign) | Failed at "late join receives a personal copy of the host's pre-join loot ledger" on this build and on baseline `d511ea1`. Fixed after Phase 7: the fixture expected exactly one drop, but P1's ledger also correctly holds native drops made before hosting began. Now passes (28); see [verification](docs/verification.md#door-and-loot-fixture-fixes--october-18-2026). |
 
 **Fixture labels:** wave 1 is synthetically lengthened by 60 s and ends by shortening the timer, so every observation fits one wave (natural wave timing was observed in Phase 0); enemies are removed with native `Npc.Kill` and players kept alive by restoring native hit points, except during the host-death step; P2's hits are synthetic native `Npc.Hit` calls on replicas.
 
@@ -375,7 +375,7 @@ Fixtures:
 | `-SurvivalSoak` (Suburbs) | Pass, 24 checks: offline / hosted-alone / connected comparison; 15 waves with 321 pooled respawns, with every managed ledger bounded by P1's live pool; managed heap +2.0 / +2.4 MiB; no frame over 100 ms (worst 30 / 40 ms); a burst of 6 kills sends 5 Survival frames in 1.06 s; 80 duplicate offer/ready requests mark P2 ready once and start one wave; score 987,654,321,024, 123,456,789 kills and a 7,200 s timer reach P2's view, native score label, results and record exactly; P2's results show P1's native best weapon. |
 | `-JoinInput` on Suburbs, from the main menu and from an already-loaded arena | Pass, 10 and 11 checks. |
 | Campaign: default travel, `-Saves`, `-JoinInput` (Neighborhood), `-Actors`, `-State` | Pass, 54 / 42 / 10 / 597 / 3,775 checks. |
-| Campaign: `-ActorParts`, `-Doors`, `-Combat` | Fail at their pre-existing points (below). |
+| Campaign: `-ActorParts` | Fails at its pre-existing point (below). `-Doors` and `-Combat` were fixed after Phase 7 and now pass. |
 
 Comparison and soak (`-SurvivalSoak`, Suburbs, `.local/travel-20261018-210312`). The workload is wave 1 with native spawning, and the fixture kills every live enemy each 1.5 s. Both processes share one PC at a 120 FPS cap and 1280x720, sampled for 25 s:
 
@@ -395,10 +395,10 @@ P1's connected shared-world update: p95 0.77 ms, max 2.5 ms (campaign budgets 4 
 - Readiness, the request flood and the high-value bounds use fixture APIs or the native controller's fields.
 - Joins and leaves use the Direct IP session.
 
-**Pre-existing failures (identical on baseline `d511ea1`, built in a temporary worktree and run on the same installation):**
-- `-Doors`: P2 leaving a DeathStar proximity trigger does not close the sliding door. P1 keeps running, as a `dotnet-trace` sample showed, and P2 later disconnects.
+**Pre-existing failure (identical on baseline `d511ea1`, built in a temporary worktree and run on the same installation):**
 - `-ActorParts`: stops at "campaign includes scripted shoot-reactive human: FakeCitizen". With this build it first passes the MiniCovid checks, including the retired replica.
-- `-Combat`: "late join receives a personal copy of the host's pre-join loot ledger" (already recorded in Phase 2).
+
+`-Doors` and `-Combat` also failed here and on the baseline. Both were fixture defects, fixed after Phase 7; see [verification](docs/verification.md#door-and-loot-fixture-fixes--october-18-2026).
 
 **Open intermittent issue:** `-JoinInput -JoinFromLevel -Level LEVEL_Horde_Suburbs`, where P2 joins from its own loaded solo arena, failed in 3 of 8 runs during Phase 6. Shortly after the admission, one PC has a native `MENU` open. P1's native pause path (`GameManager.PauseGame`) was entered, which shared-pauses P2; in another run P2 kept a menu. The native caller was not identified. The campaign variant passed 3 of 3, and the main-menu join into an arena passes. Maintainer check: join from an already-loaded solo arena and watch for an unexpected pause menu.
 

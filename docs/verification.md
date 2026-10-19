@@ -12,9 +12,24 @@ Installed/exported **0.10.0 / protocol 12 / save schema 2**, build **41D74217133
 | Survival fixtures, all three base arenas | `-Survival` 29, `-SurvivalWaves` 30–33, `-SurvivalPrep` 47–48, `-SurvivalResults` 22, `-SurvivalJoin` 23, `-SurvivalFailures` 16 checks on each arena; all pass. |
 | Survival soak (Suburbs) | 24 checks. 15 waves, 321 pooled respawns, managed ledgers bounded by the live pool, no frame over 100 ms, kill and request bursts bounded, high score/kills/timer exact on both PCs and records. Comparison figures are in [performance](performance.md). |
 | Arena join input | Main-menu and already-loaded-arena joins pass, 10 and 11 checks. The loaded-arena join failed intermittently (3 of 8 runs) during hardening; see the handoff. |
-| Campaign regression | Travel 54, `-Saves` 42, `-JoinInput` 10, `-Actors` 597, `-State` 3,775 pass. `-ActorParts` (FakeCitizen), `-Doors` (DeathStar proximity close) and `-Combat` (pre-join loot ledger) fail at the same points as baseline `d511ea1` on this installation. |
+| Campaign regression | Travel 54, `-Saves` 42, `-JoinInput` 10, `-Actors` 597, `-State` 3,775 pass. `-ActorParts` (FakeCitizen) fails at the same point as baseline `d511ea1` on this installation. `-Doors` (19, three runs) and `-Combat` (28) pass after the [fixture fixes below](#door-and-loot-fixture-fixes--october-18-2026). |
 
 Fixture actions are native calls, not natural combat; the [Survival two-player checklist](#survival-two-player-checklist) lists what a natural playtest should confirm.
+
+## Door and loot fixture fixes — October 18, 2026
+
+Build **D5F77CFC3F12EBFC** (`PBDMP.dll` 287488ACAEF342A5, `PBDMP.Network.dll` 6F0B1AFF1BA59FC8), run on an isolated test copy. Not installed.
+
+- **`-Doors` (DeathStar proximity close).** DeathStar shows a native tutorial that waits for Use. On P1 that tutorial is an intended shared pause: time scale 0 and the session frozen. The sliding-door tween could not finish, and `TickDoorProximity` skips frozen sessions, so the fixture waited forever. Once the tutorial is dismissed, PBDMP's proximity close runs as designed. The fixture now dismisses native tutorials, as `-Combat` already did. No product change was needed.
+- **`-Combat` (pre-join loot ledger).** P1's ledger correctly includes native drops made before hosting began, which the hosting rescan of `LootController` picks up. The fixture expected exactly one drop. It now checks that P2 receives one personal copy of every entry in P1's ledger, and that each entry exists exactly once on P2, with no native duplicate.
+- **Robustness fix.** The native optimizer can tick a `PhysicalObject` that a scene unload has already destroyed. The native body then throws inside `get_Rigidbody`. PBDMP's Harmony prefix on `PhysicalObject.OnOptimizeUpdate` turned that into a trampoline error, which failed one `-Doors` run during P2's Prison→DeathStar unload. The prefix now skips destroyed objects. The same native error from unpatched `Pickup`/`Npc.OnOptimizeUpdate` appears in 4 of 1,242 retained Unity logs. This fix is reasoned from the stack; the rare unload timing was not reproduced on demand.
+
+| Check | Result |
+| --- | --- |
+| Compile / managed | 0 warnings; network and reporting checks pass. |
+| `-Doors` | 19 checks, 3 of 3 runs. |
+| `-Combat` | 28 checks. |
+| Default travel, `-Props -Level LEVEL_Asylum_CoronvirusDen`, `-Scenery` | 54, 66 and 19 checks. |
 
 ## Weapon-animation pass — October 16, 2026
 
@@ -168,6 +183,8 @@ Tests create ignored output under `.local`, block profile writers with diagnosti
 
 ## Two-player Steam checklist
 
+Completed by the maintainer on October 18, 2026, on two PCs with two Steam accounts.
+
 Use the same `Package.ps1` zip on both PCs and two Steam accounts that are friends and own the game.
 
 - P1 hosts from the main menu; the lobby panel shows P1's name and avatar. **Invite friend** opens the Steam overlay; P2 accepts from the main menu and joins without a question.
@@ -195,6 +212,8 @@ Use the same `Package.ps1` zip on both PCs and two Steam accounts that are frien
 Use these scenarios to regression-test future changes.
 
 ## Survival two-player checklist
+
+Completed by the maintainer on October 18, 2026, on two PCs over Steam.
 
 Natural play that the fixtures do not certify (they kill enemies, end waves and ready players through native APIs). Use the same package on both PCs; repeat on Suburbs, Ufo and VIP Zone where practical.
 
