@@ -70,7 +70,7 @@ internal sealed class NativeCoopSaves
             _listing=null;
         }
         if(_listing==null && Time.unscaledTime>=_refreshAt)
-        {_refreshAt=Time.unscaledTime+3;_listing=Task.Run(()=>new CoopSaveStore(CoopSaveService.Root).List());}
+        {_refreshAt=Time.unscaledTime+3;var store=CoopSaveService.Current?.Store;_listing=Task.Run(()=>store?.List()??Array.Empty<SaveListing>());}
         RefreshButtons();
         _status.text=SessionLifecycle.Current?.IsClient==true?"P1 controls co-op saves and loading.":SessionLifecycle.Current?.InSurvival==true?CoopSaveService.SurvivalUnsaved:CoopSaveService.Current is {} service?service.Status.Length>0?service.Status:"Co-op saves are separate from solo saves.":"Host a lobby to save or resume a co-op game.";
     }

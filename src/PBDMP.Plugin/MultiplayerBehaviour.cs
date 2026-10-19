@@ -155,6 +155,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             _view.Hud.Hold(hostPause?"Host has paused":hold,hostPause);
             _view.Hud.Banner(snapshot.Connected && _world!=null && hold.Length==0 ? _world.SurvivalBanner(PartnerLabel(snapshot)) : "");
             if(_world!=null) _world.PartnerName=PartnerLabel(snapshot);
+            if(_saves!=null) _saves.LocalName=_steamSession && _steam?.Available==true && SteamNative.LocalName is {Length:>0} steamName?steamName:snapshot.Role==SessionRole.Client?"P2":"P1";
             if (_lastStatus != snapshot.Status)
             {
                 _lastStatus = snapshot.Status;

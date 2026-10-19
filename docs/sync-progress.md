@@ -4,7 +4,7 @@
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
-Current source: **PBDMP 0.10.0 / protocol 13 / save schema 2** (protocol 13 adds the shared-item and team-inventory frames). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
+Current source: **PBDMP 0.10.0 / protocol 13 / save schema 3** (protocol 13 adds the shared-item and team-inventory frames). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
 **Development coverage: 95% (20 / 21 points). Last accepted milestone baseline: 95% (20 / 21).** The two-PC Steam playtest accepts the general world trigger and active-session restoration milestones. [Scoring details](#progress-score).
 

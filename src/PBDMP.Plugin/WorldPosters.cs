@@ -85,7 +85,7 @@ internal sealed partial class SharedWorld
         // Older schema-2 development saves recorded posters as personal authored
         // pickups. Their GUIDs permit an exact, non-destructive shared union.
         if(save.World.Any(f=>f.Kind==WorldKind.Mechanism && f.Flags==6)) return;
-        var collected=save.Host.Collected.Concat(save.Guest?.Collected??Array.Empty<string>()).ToHashSet(StringComparer.Ordinal);
+        var collected=save.Host.Collected.Concat(save.Guests.SelectMany(g=>g.Collected)).ToHashSet(StringComparer.Ordinal);
         foreach(var pair in _posters)
         {
             var picked=collected.Contains("a:"+pair.Key) || pair.Value._pickedUp;

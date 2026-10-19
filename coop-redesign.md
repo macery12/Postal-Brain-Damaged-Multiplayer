@@ -2,14 +2,14 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–2 are complete; Phase 3 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–3 are complete; Phase 4 is next.**
 
 | Phase | State |
 | --- | --- |
 | 0 Native research | Complete |
 | 1 Shared items core | Complete |
 | 2 Keys, joins and saved inventory | Complete (schema change moved to Phase 3) |
-| 3 Co-op campaigns (save model) | Pending |
+| 3 Co-op campaigns (save model) | Complete |
 | 4 Multiplayer menu and entry flows | Pending |
 | 5 In-session pause menu and P2 view | Pending |
 | 6 Join a friend | Pending |
@@ -163,6 +163,31 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
 - Scripted (non-pickup) grants on P1 follow through the team inventory. No native scripted-grant route was exercised.
 - Saves still store P2's personal record, which includes its keys. The team inventory overrides them on restore. Schema 3 (Phase 3) drops them.
 
+## Phase 3 handoff (October 19, 2026)
+
+**Source**
+- `CoopSave` schema 3 adds `Guests` (one record per player, at most 8, unique identities) and `Players` (display names, at most 8).
+- `CoopSaveStore`:
+  - per-campaign folders: `CampaignFolder`, `Campaigns`, `NewCampaignId`, `DeleteCampaign`;
+  - `.info` sidecar listings, with a fallback to a full read when the sidecar is stale;
+  - a `.png` thumbnail checked for its PNG signature and limited to 2 MB;
+  - `Delete(slot)`;
+  - schemas 1 and 2 are refused with `OlderFormat`.
+- `CoopSaveService`:
+  - holds a current campaign: a fixed `DiagnosticCampaign` for fixtures, otherwise a new ID, `StartNewCampaign`, or `RequestLoad(campaign, slot)`;
+  - adds `ContinueLatest`;
+  - keeps per-identity guest records and a Players list;
+  - captures the native 160×90 thumbnail with `Player.RenderToRenderTexture` and `ReadPixels`.
+- The old Co-op saves dialog lists the current campaign until Phase 4 replaces it.
+
+**Checks**
+- Managed: 0 warnings. New scenarios cover campaign listing, thumbnails, per-player records and deletion, and older schemas being refused.
+- Native: `-Saves` 45 (adds the thumbnail, sidecar Players and campaign folder checks), `-SaveResume` 21, `-SaveReplacePartner` 22, `-Props` 66, `-Scenery` 19, `-SharedItems` 17.
+
+**Limits**
+- The map-based campaign name ("Prison (co-op)") is formatted in Phase 4's UI from the newest save's level.
+- Deleting from the UI is Phase 4.
+
 ## Current handoff
 
-Next step: Phase 3, co-op campaigns. That covers the store layout, per-campaign quick/auto/manual saves, map-based names, the Players list, thumbnails, delete, newest-save lookup and schema 3.
+Next step: Phase 4, the native-style Multiplayer menu and entry flows.

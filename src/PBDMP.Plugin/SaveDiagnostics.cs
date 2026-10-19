@@ -84,10 +84,15 @@ public sealed partial class MultiplayerBehaviour
                 _saves!.RequestSave("manual-regression","Native regression");_saveStep=3;break;
             case 3 when !_saves!.Busy:
                 var saved=_saves.Store.Read("manual-regression").Save;
-                TravelCheck(saved.Host.Collected.Contains(_savedPickup) && saved.Guest!=null,"disk save captures distinct host and guest records plus personal pickup history");
+                TravelCheck(saved.Host.Collected.Contains(_savedPickup) && saved.Guests.Length==1,"disk save captures distinct host and guest records plus personal pickup history");
                 TravelCheck(saved.Native.Count>0 && saved.World.Any(f=>f.Kind==WorldKind.Enemy && f.Value==17),"disk save includes native simulation and damaged authored NPC");
                 TravelCheck(saved.World.Any(f=>f.Kind==WorldKind.Loot) && saved.Host.Collected.Any(k=>k.StartsWith("d:",StringComparison.Ordinal)),"generated loot has durable identities and personal collection state");
-                TravelCheck(saved.Guest!.Collected.Any(k=>k.StartsWith("a:",StringComparison.Ordinal)),"native P2 pickup completion is captured separately");
+                TravelCheck(saved.Guests[0].Collected.Any(k=>k.StartsWith("a:",StringComparison.Ordinal)),"native P2 pickup completion is captured separately");
+                var png=_saves.Store.Thumbnail("manual-regression");
+                TravelCheck(png!=null && png.Length>8,"co-op saves keep the game's own screenshot thumbnail");
+                var listing=_saves.Store.List().First(l=>l.Slot=="manual-regression");
+                TravelCheck(saved.Players.Length==2 && listing.Players!.SequenceEqual(saved.Players) && File.Exists(Path.Combine(_saves.Store.Folder,"manual-regression.info")),"the save lists both players from its small sidecar");
+                TravelCheck(CoopSaveStore.Campaigns(CoopSaveService.Root).Any(c=>c.Id==CoopSaveService.DiagnosticCampaign && c.Saves>0),"the save belongs to its co-op campaign folder");
                 File.WriteAllText(Marker("save-captured.json"),JsonSerializer.Serialize(saved));
                 SetPanel(true);_view!.ShowSaves(true);_saveStageAt=Time.unscaledTime+.5f;_saveStep=30;break;
             case 30 when Time.unscaledTime>=_saveStageAt:
@@ -120,7 +125,7 @@ public sealed partial class MultiplayerBehaviour
                 if(_saveAutoCount<4) {_saves.AdvanceAutosaveForTest(_saves.AutosaveRemainingForTest);LevelController.AutoSave();_saveAutoCount++;break;}
                 var autos=_saves.Store.List().Where(s=>s.Slot.StartsWith("auto-",StringComparison.Ordinal) && s.Error==null).ToArray();
                 TravelCheck(autos.Length==3,"native autosaves rotate through exactly three slots");
-                TravelCheck(autos.Any(s=>File.Exists(Path.Combine(CoopSaveService.Root,s.Slot+".pbdmp.bak"))),"rotating autosave preserves a recovery backup");
+                TravelCheck(autos.Any(s=>File.Exists(Path.Combine(_saves.Store.Folder,s.Slot+".pbdmp.bak"))),"rotating autosave preserves a recovery backup");
                 Environment.SetEnvironmentVariable("PBDMP_SAVE_AUTOTEST",null);
                 var damaged=_world!.ActorsForTest.Values.First(n=>n!=null && n.IsAlive && n.HitPoints.Current==17);
                 damaged.HitPoints.SetCurrentSilent(4);Player.Instance.GetComponent<PlayerHitProcessorComponent>().SetCurrentHitPoints(12);
@@ -215,8 +220,8 @@ public sealed partial class MultiplayerBehaviour
                 TravelCheck(Player.Instance.HitPoints.Current==Player.Instance.HitPoints.Max && Player.Instance.Armor==0,"restoring P2 resets health and armor");
                 TravelMark("save-client-restored");_saveStep=3;break;
             case 3 when Marked("save-host-restored"):
-                var saved=new CoopSaveStore(Path.Combine(Path.GetDirectoryName(CoopSaveService.Root)!,"save-regression-host")).Read("manual-regression").Save;
-                var own=saved.Guest!.Collected.First(k=>k.StartsWith("a:",StringComparison.Ordinal));
+                var saved=new CoopSaveStore(CoopSaveStore.CampaignFolder(Path.Combine(Path.GetDirectoryName(CoopSaveService.Root)!,"save-regression-host"),CoopSaveService.DiagnosticCampaign)).Read("manual-regression").Save;
+                var own=saved.Guests[0].Collected.First(k=>k.StartsWith("a:",StringComparison.Ordinal));
                 var ownCollected=NativeSaveBridge.Entries().First(e=>"a:"+e.Guid==own).Component.Cast<Pickup>()._pickedUp;
                 // A different player joins fresh: the saved partner's personal pickup history is not theirs.
                 if(Environment.GetEnvironmentVariable("PBDMP_SAVE_REPLACE")=="1") TravelCheck(!ownCollected,"a different player starts with fresh personal pickups, not the saved partner's history");

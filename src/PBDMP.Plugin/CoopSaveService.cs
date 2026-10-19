@@ -26,7 +26,9 @@ internal sealed partial class CoopSaveService : IDisposable
     private readonly Action<string> _notice;
     private readonly Func<ulong> _remoteSteam;
     private readonly string _identity;
-    private readonly CoopSaveStore _store;
+    private CoopSaveStore _store=null!;
+    private string _campaign="";
+    private byte[]? _thumbnail;
     private readonly AutosaveClock _autosave=new(Plugin.AutosaveMinutes.Value*60);
     internal int CompletedWritesForTest {get;private set;}
     internal int CheckpointRequestsForTest {get;private set;}
@@ -42,7 +44,9 @@ internal sealed partial class CoopSaveService : IDisposable
     private readonly Dictionary<IntPtr,string> _pickupKeys=new();
     private readonly HashSet<string> _collected=new(StringComparer.Ordinal);
     private NativeSaveBridge.Entry[] _entries=Array.Empty<NativeSaveBridge.Entry>();
-    private SavedPlayer? _guest;
+    // One personal record per player who has joined this campaign, by identity (anyone can play).
+    private readonly Dictionary<string,SavedPlayer> _guests=new(StringComparer.Ordinal);
+    private readonly List<string> _players=new();
     private string _peerIdentity="", _waitingIdentity="";
     private bool _connected, _holdAck, _restoredAck, _restoreSent;
     private uint _transaction, _captureTransaction, _sentEpoch, _generation;
@@ -73,10 +77,21 @@ internal sealed partial class CoopSaveService : IDisposable
     internal string Status {get;private set;}="";
         internal bool Restoring=>_restore!=null;
     internal bool TransactionActive=>_request!=null || _restore!=null || _work!=null;
-    internal SavedPlayer? GuestForTest=>_guest;
+    internal SavedPlayer? GuestForTest=>_guests.GetValueOrDefault(_peerIdentity)??_guests.Values.FirstOrDefault();
     // The connected partner's validated Steam or Direct IP identity; empty until received.
     internal string PeerIdentity=>_peerIdentity;
     internal CoopSaveStore Store=>_store;
+    // Diagnostics share one fixed campaign so fresh processes find the fixture's saves.
+    internal const string DiagnosticCampaign="00000000000000000000000000000001";
+    internal string Campaign=>_campaign;
+    internal string LocalName {get;set;}="P1";
+    private void UseCampaign(string id) {_campaign=id;_store=new(CoopSaveStore.CampaignFolder(Root,id));}
+    // A campaign is one continuous run of the story; only a new co-op game starts another.
+    internal void StartNewCampaign()
+    {
+        if(_life.IsClient || Busy) return;
+        UseCampaign(CoopSaveStore.NewCampaignId());_guests.Clear();_players.Clear();
+    }
     internal static string Root=>Environment.GetEnvironmentVariable("PBDMP_SAVE_ROOT") is {Length:>0} diagnostic && Environment.GetEnvironmentVariable("PBDMP_SAVE_TEST")=="1"
         ?diagnostic:Path.Combine(Paths.BepInExRootPath,"PBDMP","saves");
     internal static string DirectIdentity()
@@ -94,7 +109,7 @@ internal sealed partial class CoopSaveService : IDisposable
         Action<string> notice,Action<string,Action,Action> confirm)
     {
         _session=session;_life=life;_world=world;_identity=identity;_remoteSteam=remoteSteam;_notice=notice;
-        _store=new(Root);Current=this;
+        UseCampaign(Environment.GetEnvironmentVariable("PBDMP_SAVE_TEST")=="1"?DiagnosticCampaign:CoopSaveStore.NewCampaignId());Current=this;
     }
     internal void RequestSave(string slot,string name)
     {
@@ -114,25 +129,39 @@ internal sealed partial class CoopSaveService : IDisposable
     {
         if(_life.IsClient || !_life.NativeReady || _life.State.Action==TravelAction.Menu || _life.InSurvival || !AutosEnabled || Restoring || Busy || _life.Frozen || !_autosave.Due) return;
         if(!_autosave.TryConsume()) return;
-        _autoSlot=Enumerable.Range(0,3).OrderBy(i=>File.Exists(Path.Combine(Root,"auto-"+i+".pbdmp"))?File.GetLastWriteTimeUtc(Path.Combine(Root,"auto-"+i+".pbdmp")):DateTime.MinValue).First();RequestSave("auto-"+_autoSlot,"Timed autosave");
+        _autoSlot=Enumerable.Range(0,3).OrderBy(i=>File.Exists(Path.Combine(_store.Folder,"auto-"+i+".pbdmp"))?File.GetLastWriteTimeUtc(Path.Combine(_store.Folder,"auto-"+i+".pbdmp")):DateTime.MinValue).First();RequestSave("auto-"+_autoSlot,"Timed autosave");
     }
     private static bool AutosEnabled=>string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")) || Environment.GetEnvironmentVariable("PBDMP_SAVE_AUTOTEST")=="1";
     internal void RestoreCheckpoint()
     {
         if(_life.IsClient) {Tell("P1 controls checkpoint restoration.");return;}
         if(Busy) {Tell("Wait for the current save operation to finish.");return;}
-        _catalogueRecoveryTried=false;Status="Reading co-op checkpoint...";
+        _catalogueRecoveryTried=false;Status="Reading co-op checkpoint...";var store=_store;
         _read=Task.Run(()=>
         {
-            var latest=_store.List().Where(s=>s.Slot.StartsWith("auto-",StringComparison.Ordinal) && s.Error==null).OrderByDescending(s=>s.Created).FirstOrDefault();
-            if(latest==null) throw new InvalidDataException("No valid co-op checkpoint has been saved yet.");return _store.Read(latest.Slot);
+            var latest=store.List().Where(s=>s.Slot.StartsWith("auto-",StringComparison.Ordinal) && s.Error==null).OrderByDescending(s=>s.Created).FirstOrDefault();
+            if(latest==null) throw new InvalidDataException("No valid co-op checkpoint has been saved yet.");return store.Read(latest.Slot);
         });
     }
     internal void RequestLoad(string slot)
     {
         if(_life.IsClient) {Tell("P1 controls co-op loading.");return;}
         if(Busy) {Tell("Wait for the current save operation to finish.");return;}
-        _catalogueRecoveryTried=false;Status="Reading co-op save...";_read=Task.Run(()=>_store.Read(slot));
+        _catalogueRecoveryTried=false;Status="Reading co-op save...";var store=_store;_read=Task.Run(()=>store.Read(slot));
+    }
+    internal void RequestLoad(string campaign,string slot)
+    {
+        if(_life.IsClient) {Tell("P1 controls co-op loading.");return;}
+        if(Busy) {Tell("Wait for the current save operation to finish.");return;}
+        if(!CoopSaveStore.ValidCampaign(campaign)) {Tell("That co-op game could not be found.");return;}
+        if(campaign!=_campaign) {UseCampaign(campaign);_guests.Clear();_players.Clear();}
+        RequestLoad(slot);
+    }
+    // Continue co-op: the newest save of the most recently played campaign.
+    internal bool ContinueLatest()
+    {
+        if(CoopSaveStore.Campaigns(Root).FirstOrDefault() is not {} latest) {Tell("No co-op game has been saved yet.");return false;}
+        RequestLoad(latest.Id,latest.NewestSlot);return true;
     }
     internal void Tick()
     {
@@ -183,7 +212,7 @@ internal sealed partial class CoopSaveService : IDisposable
             CoopSaveStore.RequireRestorableFormat(loaded.Save);
             if(loaded.Save.Game!=NativeSaveBridge.GameKey) throw new InvalidDataException("This save belongs to a different game build.");
             if(!SessionLifecycle.Campaign(SessionLifecycle.FindLevel(loaded.Save.Level))) throw new InvalidDataException("This co-op save uses unsupported content.");
-            _restoreStarted=false;_restore=loaded.Save;_guest=_restore.Guest;_restoreSent=false;_restoredAck=!connected;
+            _restoreStarted=false;_restore=loaded.Save;_guests.Clear();foreach(var saved in _restore.Guests) _guests[saved.Identity]=saved;_players.Clear();_players.AddRange(_restore.Players);_restoreSent=false;_restoredAck=!connected;
             if(loaded.Recovered) Tell(_catalogueRecoveryTried?"The primary world catalogue was incompatible. Recovered the previous compatible backup; original files were preserved.":"Recovered the previous valid co-op save backup.");
         }
         if(_waitingIdentity.Length>0 && _remoteSteam()!=0) {AcceptIdentity(_waitingIdentity);_waitingIdentity="";}
@@ -206,7 +235,7 @@ internal sealed partial class CoopSaveService : IDisposable
                 _catalogueRecoveryTried=true;
                 var slot=_restore.Slot;var game=NativeSaveBridge.GameKey;var catalogue=_world.PersistentManifest;var level=_life.State.Level;
                 _restore=null;_restoreStarted=false;
-                _read=Task.Run(()=>_store.ReadCompatibleRecovery(slot,game,catalogue,level));
+                var store=_store;_read=Task.Run(()=>store.ReadCompatibleRecovery(slot,game,catalogue,level));
                 Status="Checking the previous compatible recovery backup...";
                 return;
             }
@@ -239,7 +268,7 @@ internal sealed partial class CoopSaveService : IDisposable
         if(!_life.IsClient && connected && Assigned && _life.NativeReady && _world.Active && !_life.RestoringWorld && !_awaitNative && _sentEpoch!=_life.Epoch)
         {
             _restoreSent=_restore!=null;_restoredAck=false;
-            var record=_guest?.Level==_life.State.Level && _guest.Identity==_peerIdentity?_guest:null;
+            var record=_guests.GetValueOrDefault(_peerIdentity) is {} own && own.Level==_life.State.Level?own:null;
             var catchUp=_life.State.Joining || _restore!=null;
             if(!catchUp) record=null;
             Send(SaveCommand.Restore,JsonSerializer.SerializeToUtf8Bytes(new RestorePlayer(record,catchUp?_life.PlayerState.CaptureJoin():null,_restore!=null,catchUp)),_life.Epoch);
@@ -257,7 +286,7 @@ internal sealed partial class CoopSaveService : IDisposable
                 Status="Capturing co-op save...";
             }
             if(_request!=null && _holdAck && Time.frameCount>_holdFrame && _work==null && _document==null)
-            {_document=Document(_request);_work=CaptureWorld(_document).GetEnumerator();}
+            {_document=Document(_request);_thumbnail=CaptureThumbnail();_work=CaptureWorld(_document).GetEnumerator();}
             if(_request!=null && Time.unscaledTime>_deadline) throw new TimeoutException("Partner did not acknowledge the save capture.");
             if(_request==null && _restore==null && _life.NativeReady && _world.Active && _readyAt>0 && Time.unscaledTime>=_readyAt && _life.State.Released)
             {_readyAt=0;_autosave.Reset();}
@@ -343,7 +372,8 @@ internal sealed partial class CoopSaveService : IDisposable
                 var record=JsonSerializer.Deserialize<SavedPlayer>(bytes)??throw new InvalidDataException("Missing personal state.");CoopSaveStore.ValidatePlayer(record);
                 if(record.Identity!=_peerIdentity || record.Level!=_life.State.Level) throw new InvalidDataException("Partner personal state identity/map mismatch.");
                 if(page.Command==SaveCommand.HoldAck && (_request==null || page.Transaction!=_captureTransaction)) return;
-                _guest=record;if(page.Command==SaveCommand.HoldAck) _holdAck=true;break;
+                if(!_guests.ContainsKey(record.Identity) && _guests.Count>=CoopSaveStore.MaxPlayers) _guests.Remove(_guests.Keys.First());
+                _guests[record.Identity]=record;if(page.Command==SaveCommand.HoldAck) _holdAck=true;break;
             case SaveCommand.Capture:
                 if(bytes.Length>1 || bytes.Length==1 && bytes[0]>1) throw new InvalidDataException("Invalid save capture kind.");
                 _captureHold=true;_captureAuto=bytes.Length==1 && bytes[0]==1;
@@ -391,9 +421,35 @@ internal sealed partial class CoopSaveService : IDisposable
     private CoopSave Document(Request request)=>new()
     {
         Game=NativeSaveBridge.GameKey,Mod=Plugin.Version,Catalogue=_world.PersistentManifest,Slot=request.Slot,Name=request.Name,
-        Level=_life.State.Level,Difficulty=SessionLifecycle.Difficulty(),Host=PlayerRecord(),Guest=_guest,
-        Campaign=CampaignState()
+        Level=_life.State.Level,Difficulty=SessionLifecycle.Difficulty(),Host=PlayerRecord(),Guests=_guests.Values.Take(CoopSaveStore.MaxPlayers).ToArray(),
+        Players=PlayersForSave(),Campaign=CampaignState()
     };
+    // Everyone who has played this campaign, P1 first; names only, never identities.
+    private string[] PlayersForSave()
+    {
+        static string Clean(string name)=>new string(name.Trim().Where(c=>!char.IsControl(c)).Take(64).ToArray());
+        var names=new List<string>{Clean(LocalName)};names.AddRange(_players.Select(Clean));
+        if(_session.Snapshot.Connected) names.Add(Clean(_world.PartnerName));
+        var result=names.Where(n=>n.Length>0).Distinct(StringComparer.Ordinal).Take(CoopSaveStore.MaxPlayers).ToArray();
+        _players.Clear();_players.AddRange(result.Skip(1));
+        return result.Length>0?result:new[]{"P1"};
+    }
+    // The game's own 160x90 save thumbnail: the player's camera, without UI.
+    private static byte[]? CaptureThumbnail()
+    {
+        var player=Player.Instance;if(player==null) return null;
+        var previous=RenderTexture.active;Texture2D? texture=null;
+        try
+        {
+            player.RenderToRenderTexture(160,90);
+            texture=new Texture2D(160,90,TextureFormat.RGB24,false);
+            texture.ReadPixels(new Rect(0,0,160,90),0,0);texture.Apply();
+            byte[] png=ImageConversion.EncodeToPNG(texture);
+            return png.Length is > 8 and <= CoopSaveStore.MaxThumbnailBytes?png:null;
+        }
+        catch(Exception error) {Plugin.Logger.LogWarning("Co-op save thumbnail skipped: "+error.Message);return null;}
+        finally {RenderTexture.active=previous;if(texture!=null) Object.Destroy(texture);}
+    }
     private IEnumerable<int> CaptureWorld(CoopSave document)
     {
         _entries=NativeSaveBridge.Entries();
@@ -440,7 +496,8 @@ internal sealed partial class CoopSaveService : IDisposable
     {
         var document=_document!;CoopSaveStore.Validate(document);_document=null;_request=null;
         _life.PersistenceHold=false;if(_session.Snapshot.Connected) Send(SaveCommand.Resume,Array.Empty<byte>(),_life.Epoch);
-        Status="Writing co-op save...";_write=Task.Run(()=>_store.Write(document));
+        var store=_store;var thumbnail=_thumbnail;_thumbnail=null;
+        Status="Writing co-op save...";_write=Task.Run(()=>store.Write(document,thumbnail));
     }
     private void StartRestore()
     {

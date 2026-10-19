@@ -288,7 +288,7 @@ await Test("co-op save atomic replacement, corruption recovery and strict format
         save.Name="Third";store.Write(save);Check(store.Read(save.Slot).Save.Name=="Third");
         File.WriteAllText(file,"corrupt again");Check(store.Read(save.Slot).Save.Name=="First");
         Throws(()=>store.Read("../solo-profile"));
-        save.Schema=99;Throws(()=>store.Write(save));Check(store.Read(save.Slot).Save.Name=="First");save.Schema=2;
+        save.Schema=99;Throws(()=>store.Write(save));Check(store.Read(save.Slot).Save.Name=="First");save.Schema=CoopSaveStore.Schema;
         save.World=new[]{new WorldFrame(WorldKind.Fire,1,1)};Throws(()=>store.Write(save));
         File.WriteAllText(Path.Combine(folder,"manual-other.pbdmp.writing-abandoned"),"partial");
         Check(store.List().Length==1 && store.List()[0].Backup);
@@ -309,28 +309,64 @@ await Test("shared story travel metadata is bounded and round trips without chan
     Throws(()=>Protocol.Validate(story with {StoryVideo="bad\nname"}));
     return Task.CompletedTask;
 });
-await Test("legacy co-op saves remain readable and untouched but cannot silently reset new world families", () =>
+await Test("older co-op saves are refused clearly and left untouched", () =>
 {
     var folder=Path.Combine(Path.GetTempPath(),"pbdmp-legacy-test-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(folder);
     try
     {
-        var legacy=new CoopSave {Schema=1,Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="legacy",Name="Original",
-            Level="level",Host=new("direct:original","level",new() {{"_saveData","{}"}},Array.Empty<string>()),Native=new() {{"world",new() {{"state","true"}}}}};
-        var payload=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(legacy);
-        var path=Path.Combine(folder,"legacy.pbdmp");
-        using(var stream=File.Create(path)) using(var writer=new BinaryWriter(stream))
-        {writer.Write(System.Text.Encoding.ASCII.GetBytes("PBDMPS01"));writer.Write(payload.Length);writer.Write(System.Security.Cryptography.SHA256.HashData(payload));writer.Write(payload);}
-        var original=File.ReadAllBytes(path);var store=new CoopSaveStore(folder);var read=store.Read("legacy").Save;
-        Check(read.Schema==1);Throws(()=>CoopSaveStore.RequireRestorableFormat(read));Throws(()=>store.Write(read));
-        Check(File.ReadAllBytes(path).SequenceEqual(original) && !File.Exists(path+".bak"));
-        read.Schema=2;CoopSaveStore.RequireRestorableFormat(read);
-        read.World=new[]{new WorldFrame(WorldKind.Scenery,1,1,Key:"glass",Flags:1,Values:new[]{1f,0}),
-            new WorldFrame(WorldKind.Mechanism,1,1,Key:"gate",Flags:4,Value:2.5f,Values:new[]{1f}),
-            new WorldFrame(WorldKind.Sequence,1,1,Key:"train",Flags:3,Value:4,Value2:10)};
-        store.Write(read);Check(store.Read("legacy").Save.World.Length==3);
-        read.World=new[]{new WorldFrame(WorldKind.SceneryEvent,1,1,Key:"old-smash",Flags:1)};Throws(()=>store.Write(read));
+        foreach(var schema in new[]{1,2})
+        {
+            var legacy=new CoopSave {Schema=schema,Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="legacy"+schema,Name="Original",
+                Level="level",Host=new("direct:original","level",new() {{"_saveData","{}"}},Array.Empty<string>()),Native=new() {{"world",new() {{"state","true"}}}}};
+            var payload=System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(legacy);
+            var path=Path.Combine(folder,"legacy"+schema+".pbdmp");
+            using(var stream=File.Create(path)) using(var writer=new BinaryWriter(stream))
+            {writer.Write(System.Text.Encoding.ASCII.GetBytes("PBDMPS01"));writer.Write(payload.Length);writer.Write(System.Security.Cryptography.SHA256.HashData(payload));writer.Write(payload);}
+            var original=File.ReadAllBytes(path);var store=new CoopSaveStore(folder);
+            try {store.Read("legacy"+schema);throw new Exception("Expected exception.");}
+            catch(InvalidDataException e) {Check(e.Message.Contains(CoopSaveStore.OlderFormat,StringComparison.Ordinal));}
+            Throws(()=>store.Write(legacy));
+            Check(File.ReadAllBytes(path).SequenceEqual(original) && !File.Exists(path+".bak"));
+            Check(store.List().Single(l=>l.Slot=="legacy"+schema).Error!=null);
+        }
     }
     finally {foreach(var file in Directory.EnumerateFiles(folder)) File.Delete(file);Directory.Delete(folder);}
+    return Task.CompletedTask;
+});
+await Test("co-op campaigns list from sidecars, keep thumbnails and per-player records, and delete cleanly", () =>
+{
+    var root=Path.Combine(Path.GetTempPath(),"pbdmp-campaign-test-"+Guid.NewGuid().ToString("N"));
+    try
+    {
+        var png=new byte[]{0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A,1,2,3};
+        SavedPlayer Player(string id)=>new(id,"level",new() {{"_saveData","{}"}},Array.Empty<string>());
+        CoopSave Save(string slot,string level,int difficulty,DateTimeOffset at,params string[] players)=>new() {Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),
+            Slot=slot,Name=slot,Level=level,Difficulty=difficulty,Created=at,Host=Player("direct:host"),Guests=new[]{Player("steam:1"),Player("direct:2")},Players=players,
+            Native=new() {{"world",new() {{"state","true"}}}}};
+        var first=CoopSaveStore.NewCampaignId();var second=CoopSaveStore.NewCampaignId();
+        Check(CoopSaveStore.ValidCampaign(first) && !CoopSaveStore.ValidCampaign("../x") && !CoopSaveStore.ValidCampaign(first.ToUpperInvariant()));
+        var a=new CoopSaveStore(CoopSaveStore.CampaignFolder(root,first));var b=new CoopSaveStore(CoopSaveStore.CampaignFolder(root,second));
+        var t=DateTimeOffset.UtcNow;
+        a.Write(Save("auto-0","LEVEL_AD_Prison",2,t.AddMinutes(-30),"Host","Alex"),png);
+        a.Write(Save("quick","LEVEL_AD_Prison",2,t.AddMinutes(-5),"Host","Sam"));
+        b.Write(Save("manual-x","LEVEL_Asylum_Forest",1,t.AddMinutes(-10),"Host"),png);
+        var campaigns=CoopSaveStore.Campaigns(root);
+        Check(campaigns.Length==2 && campaigns[0].Id==first && campaigns[0].NewestSlot=="quick" && campaigns[0].Saves==2 && campaigns[0].Difficulty==2);
+        Check(campaigns[0].Players.SequenceEqual(new[]{"Host","Sam","Alex"}) && campaigns[1].Level=="LEVEL_Asylum_Forest");
+        Check(a.Thumbnail("auto-0")!.SequenceEqual(png) && a.Thumbnail("quick")==null);
+        Check(a.Read("quick").Save.Guests.Length==2 && a.List()[0].Players!.SequenceEqual(new[]{"Host","Sam"}));
+        // A stale sidecar falls back to the full save instead of showing old metadata.
+        File.SetLastWriteTimeUtc(Path.Combine(CoopSaveStore.CampaignFolder(root,first),"quick.info"),DateTime.UtcNow.AddDays(-1));
+        Check(a.List().First(l=>l.Slot=="quick").Name=="quick");
+        Throws(()=>a.Write(Save("auto-1","l",0,t),new byte[]{1,2,3}));
+        var dup=Save("auto-2","l",0,t);dup.Guests=new[]{Player("steam:1"),Player("steam:1")};Throws(()=>a.Write(dup));
+        var many=Save("auto-2","l",0,t,Enumerable.Range(0,9).Select(i=>"P"+i).ToArray());Throws(()=>a.Write(many));
+        a.Delete("auto-0");Check(!Directory.EnumerateFiles(CoopSaveStore.CampaignFolder(root,first),"auto-0*").Any());
+        CoopSaveStore.DeleteCampaign(root,second);Check(CoopSaveStore.Campaigns(root).Single().Id==first);
+        Throws(()=>CoopSaveStore.DeleteCampaign(root,"not-a-campaign"));
+        Directory.CreateDirectory(Path.Combine(root,"ignored-folder"));Check(CoopSaveStore.Campaigns(root).Length==1);
+    }
+    finally {if(Directory.Exists(root)) Directory.Delete(root,true);}
     return Task.CompletedTask;
 });
 await Test("large current-world baselines survive paging, cancellation and strict bounds", () =>
