@@ -240,7 +240,8 @@ public sealed partial class MultiplayerBehaviour
             case 36:
                 MenuManager.Instance.Unpause(); TogglePanel(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 37; break;
             case 37:
-                SmokeAssert(_open && _view!.DisconnectButton.LabelText.text == "Leave session" && _view.DirectButton.LabelText.text == "Direct IP: port 47777" && !_view.SavesButton.gameObject.activeSelf,
+                SmokeAssert(_open && _view!.DisconnectButton.LabelText.text == "Leave session" && _view.DirectButton.LabelText.text == "Direct IP: port 47777" &&
+                    !_view.Panel.GetComponentsInChildren<Hyperstrange.PBD.UI.Components.MainHyperButton>(true).Any(b => b.LabelText.text.Contains("save", StringComparison.OrdinalIgnoreCase)),
                     "Players & invite shows the session, Direct IP hosting and Leave session, without separate save controls");
                 Shot("coop-players.png");
                 TogglePanel();

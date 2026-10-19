@@ -634,7 +634,6 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.PrivacyButton, _view.DirectButton, _view.BackButton }
                     .Where(s => s.interactable).ToArray());
                 SmokeAssert(!_view.InviteButton.interactable && !_view.DisconnectButton.interactable && !_view.SteamHostButton.interactable, "invite, leave and Host co-op game stay disabled in the menus outside a session");
-                SmokeAssert(!_view.SavesButton.gameObject.activeSelf, "Players & invite has no separate save controls");
                 _view.DirectButton.onClick.Invoke();
                 SmokeAssert(_view.DirectOpen, "Direct IP opens as its own dialog");
                 _smokeStep = 7; _smokeNext = Time.unscaledTime + 0.5f;

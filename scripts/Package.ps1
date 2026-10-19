@@ -24,30 +24,39 @@ New-Item -ItemType Directory -Force -Path $plugin | Out-Null
 Copy-Item -LiteralPath $files -Destination $plugin
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $staging
 @"
-PBDMP $version - POSTAL: Brain Damaged two-player co-op (development build $buildId)
+PBDMP $version - POSTAL: Brain Damaged two-player co-op (build $buildId)
 
 Both players need this exact package. A different build is refused when joining.
 
+Install
 1. Install BepInEx 6.0.0-be.788+5b766a3, Unity IL2CPP win-x64, into the game folder
    (Steam: right-click the game > Manage > Browse local files):
    https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip
 2. Start the game from Steam once and let BepInEx finish its first-run setup, then quit.
 3. Copy the BepInEx folder from this zip into the game folder, merging with the existing one.
-4. Start the game from Steam. BepInEx\LogOutput.log should show: PBDMP $version development build $buildId
+4. Start the game from Steam. BepInEx\LogOutput.log should show: PBDMP $version build $buildId
 
-Playing through Steam
-- Host: Multiplayer > Host Steam game > Invite friend (or the friend uses Join Game on your name in Steam).
-- Friend: accept the invite or click Join Game while the game is running.
-- No IP addresses or port forwarding are needed; Steam relays the connection.
+Play
+Main menu > Multiplayer (or F8 in the menus):
+- Continue co-op     load the newest save of your latest co-op game
+- New co-op game     pick a map in the game's level select, confirm, choose difficulty
+- Load co-op game    co-op games on the left, their saves on the right
+- Survival co-op     the game's own arena and difficulty menu
+- Join a friend      Steam friends hosting PBDMP; Join, Refresh, or Direct IP...
 
-Playing over a LAN or a forwarded port: Multiplayer > Direct IP.
+Through Steam, P1 hosts a friends-only lobby when picking one of the first four.
+In game, pause > Players & invite holds Invite friend, lobby privacy, Direct IP hosting
+and Leave session. P2 joins from Join a friend, an invite, or Join Game on P1's name in
+Steam (this also works while P2's game is closed). Steam relays the connection: no IP
+addresses or port forwarding. Over a LAN or a forwarded TCP port, P1 switches Direct IP
+on in Players & invite and P2 uses Join a friend > Direct IP...
 
-Co-op progress: P1 hosts a lobby, then opens Multiplayer > Co-op saves... to save or resume.
-Host-owned saves live in BepInEx/PBDMP/saves and are separate from solo saves.
-
-Survival co-op: while hosting, P1 opens Survival Mode and picks a base arena and difficulty.
-Take the shotgun or an offer, or hold Use, to ready up; waves start when both are ready.
-Dead players revive at the next break. Co-op records: BepInEx/PBDMP/survival-records.json.
+Campaign: weapons, keys and mission items are shared - a pickup disappears for both and
+both players get it. Ammo, health, armor and powerups stay personal.
+Saves: P1's pause Save and Load open the co-op save screens. Each co-op game keeps its own
+quicksave, autosaves and manual saves in BepInEx/PBDMP/saves, separate from solo saves.
+Survival: take the shotgun or an offer, or hold Use, to ready up; waves start when both are
+ready. Dead players revive at the next break. Records: BepInEx/PBDMP/survival-records.json.
 
 Files:
   PBDMP.dll          $($hashes[0])

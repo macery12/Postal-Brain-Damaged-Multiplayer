@@ -1,6 +1,6 @@
-# Protocol (development)
+# Protocol
 
-PBDMP 0.10.0 development source carries protocol 13 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 1.0.0 carries protocol 13 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 

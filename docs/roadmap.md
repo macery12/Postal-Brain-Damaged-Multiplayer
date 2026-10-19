@@ -1,16 +1,17 @@
 # Roadmap and session rules
 
-Current development source: **PBDMP 0.10.0 / protocol 13**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (October 19, 2026). The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
 
-Survival co-op for the three base arenas is installed as **41D7421713392F3B** (see the [Survival handoff](../survival.md)). The focused [weapon-animation pass](weapon-animation-testing.md), previously installed as **C990AE9ED22FC33F**, remains included: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
+PBDMP 1.0.0 is installed and packaged as build **960F3A0ADE93A2BB** (`artifacts/PBDMP-1.0.0.zip`); see the [1.0.0 release record](verification.md#100-release--october-19-2026). It includes Survival co-op for the three base arenas and the weapon-animation pass.
 
 ## Current behavior
 
 - Two-player sessions through a friends-only or invite-only Steam lobby (overlay invites, Join Game while running, Steam relay), or direct IP for LAN/forwarded ports.
-- Native-themed lobby panel with player cards, Direct IP dialog, prompts, session badge and notifications; main/pause-menu entries and F8 access. Joining from inside a solo level asks first.
+- A Multiplayer menu laid out like the game's main menu (Continue co-op, New co-op game, Load co-op game, Survival co-op, Join a friend), co-op Save/Load screens built from the game's own, and **Players & invite** in the pause menu. Session badge, notifications and F8 access. Joining from inside a solo level asks first.
+- Co-op games (campaigns) named after their current map, each with its own quicksave, autosaves and manual saves with thumbnails.
 - P1 owns base-campaign level starts, restarts, difficulty, transitions and shared pause. P2 follows and cannot independently start/load/restart levels.
 - P1 owns enemy AI/health, shared combat results, supported doors, encounters, urine interactions and mission progression. Either player can interact or fight; enemies can target either player. Friendly fire is off.
-- P2 joins near P1 when safe, falling back to normal map spawn. Each join/rejoin and co-op restore copies P1's weapons, remaining ammo and equipped weapon; P2 receives full health, zero armor and no temporary powerups. Non-ammo items and pickup history remain personal.
+- P2 joins near P1 when safe, falling back to normal map spawn. Each join/rejoin and co-op restore gives P2 the team's weapons, keys and items and copies P1's remaining ammo and equipped weapon; P2 receives full health, zero armor and no temporary powerups. Resource pickup history remains personal.
 - Supported current actor/projectile/door/mission state is restored before a joining player is released. Arbitrary world scripts and complete world restoration remain unfinished.
 - Independent respawn after three seconds at the map spawn: full health, zero armor, retained weapons/remaining ammo/items, cleared temporary powerups. Shared pause stops the timer.
 - Walk-in exits gather both living players; leaving cancels readiness. Interactable endings preserve native interaction and require both nearby. Automatic endings wait until both are alive and loaded.
@@ -34,7 +35,7 @@ Health, armor/shields, ammo, consumables and powerup types/durations remain pers
 | Checkpoint coverage | Exercise additional natural campaign checkpoint and machinery sequences. | Native world restoration plus durable multiplayer adapters are implemented. |
 | Solo-save import | Explicit conversion into a new co-op slot. | Co-op persistence is implemented; solo slots are never implicitly imported. |
 | Transport evaluation | Measure real LAN and Steam-relay latency, loss and snapshot pressure; consider unreliable pose messages on Steam. | Retain bounded queues and main-thread capture budgets. |
-| Steam joining | Joining from a closed game (`+connect_lobby`) and an in-game friends list. Two-account joining, rejoining and the build-mismatch check passed in the October 18, 2026 playtest. | Both players keep the strict exact-build check. |
+| Steam joining | Two-account check of Join a friend and of `+connect_lobby` (both implemented in 1.0.0, one-account checks pass). Invite/Join Game joining, rejoining and the build-mismatch check passed in the October 18, 2026 playtest. | Both players keep the strict exact-build check. |
 
 Host-owned co-op saves now provide named manual slots, one quicksave and three rotating autosaves. Either player can activate a supported checkpoint; only P1 can restore it. Ordinary deaths still respawn independently. Native solo save/profile writes remain blocked during multiplayer and return after session cleanup. See [co-op saves](co-op-saves.md).
 
@@ -54,5 +55,7 @@ Survival co-op for the three base arenas is implemented (see the [Survival hando
 | 0.7.0 | Expanded mission state, required destruction, exit gathering and large-snapshot backpressure. |
 | 0.8.0 | Steam lobby hosting/joining over Steam relay; native lobby panel, player cards, prompts and in-game badge. |
 | 0.9.0 | Separate co-op saves, host-controlled checkpoint rollback, personal pickup persistence and partner identity/catch-up. |
+| 0.10 development | World megapass, weapon animation pass and Survival co-op for the three base arenas. |
+| 1.0.0 | Identical weapons/keys/mission items, co-op campaigns with thumbnails, the native-style Multiplayer menu, co-op Save/Load screens, Players & invite, Join a friend and `+connect_lobby`. |
 
 These are development milestones, not a list of published downloads. Older research notes describe their original scope and should not override current behavior.

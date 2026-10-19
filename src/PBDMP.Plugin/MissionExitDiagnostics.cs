@@ -28,6 +28,8 @@ public sealed partial class MultiplayerBehaviour
             _missionExitStep=1;return;
         }
         if(_lifecycle is {NativeReady:false}) {_lifecycle.AutoContinue();return;}
+        // A native tutorial (Wallmarkt shows one) holds the shared pause until its player dismisses it.
+        if(_lifecycle?.LocalTutorialActive==true && Player.Instance!=null) {Player.Instance.GetComponent<Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent>().OnUseDown();return;}
         if(TravelRole=="host") MissionExitHostTest();else MissionExitClientTest();
     }
     private void MissionExitHostTest()

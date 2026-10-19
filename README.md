@@ -1,8 +1,8 @@
 # POSTAL: Brain Damaged Multiplayer (PBDMP)
 
-Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign, letting you team up with a Steam friend over the internet or with someone on your LAN.
+Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign and the base Survival arenas, letting you team up with a Steam friend over the internet or with someone on your LAN.
 
-Built for BepInEx 6 IL2CPP. **Current development version: 0.10.0.**
+Built for BepInEx 6 IL2CPP. **Current version: 1.0.0** (protocol 13, save schema 3).
 
 ## Sync progress
 
@@ -33,7 +33,7 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 
 ## Installation
 
-No public release is available yet while the mod is in development. To play with a friend, one of you builds it (instructions below), runs `.\scripts\Package.ps1`, and sends the resulting `artifacts\PBDMP-<version>.zip`; its `INSTALL.txt` lists the BepInEx build to install. Both players must use the same zip.
+A release is the zip that `.\scripts\Package.ps1` produces, `artifacts\PBDMP-<version>.zip`. Its `INSTALL.txt` lists the BepInEx build to install and the exact DLL hashes. Both players must use the same zip; a different build is refused when joining. To make one yourself, build from source (below) and run `Package.ps1`.
 
 <details>
 <summary>Build and install from source</summary>

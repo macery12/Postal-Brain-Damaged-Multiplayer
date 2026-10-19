@@ -1,6 +1,26 @@
 # Verification and troubleshooting
 
-Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 12 / save schema 2** (Survival in development); see the implementation closeout below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3**; see the 1.0.0 release record below. Earlier sections are historical. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+
+## 1.0.0 release — October 19, 2026
+
+Installed and packaged **1.0.0 / protocol 13 / save schema 3**, build **960F3A0ADE93A2BB** (`PBDMP.dll` 8F48E0C20209C8E7, `PBDMP.Network.dll` 154AA4D3299BFE3F). `artifacts/PBDMP-1.0.0.zip` holds exactly that pair, and the game folder's installed DLLs match it. Every check below ran on that DLL pair in isolated installations.
+
+| Check | Result |
+| --- | --- |
+| Compile / managed | 0 warnings; 41 network scenarios, 8 reporting checks. |
+| Single game | Runtime smoke 46; `-CoopMenu` 36; `Test-Steam` 25 (one account, including Join a friend). |
+| Campaign (two processes) | Travel 54; `-Saves` 49, `-SaveResume` 23, `-SaveReplacePartner` 24; `-JoinInput` 10; `-SharedItems` 19; `-Doors` 20; `-DoorReload` 6; `-Combat` 28; `-State` (Prison) 3,775; `-Actors` 597; `-ActorParts` 33; `-Urine` 3,175; `-Mission` 1,829; `-WorldRegression` Neighborhood 919, Prison 1,595; `-MissionExits` Prison 13, Wallmarkt 13. |
+| Survival, each base arena (Suburbs / UFO / VIP Zone) | `-Survival` 29 / 29 / 29; `-SurvivalWaves` 30 / 30 / 32; `-SurvivalPrep` 47 / 47 / 48; `-SurvivalResults` 22 each; `-SurvivalJoin` 23 each; `-SurvivalFailures` 16 each. `-SurvivalSoak` (Suburbs) 24; arena `-JoinInput` 10 and `-JoinFromLevel` 11. |
+
+Fixture fixes found during the release pass:
+- `-ActorParts` and `-DoorReload` need `-Level LEVEL_AD_Neighborhood`, the map they test. Their earlier failures came from running on the default map.
+- `-MissionExits` on Wallmarkt now dismisses the native tutorial popup that map shows. An open tutorial holds the shared pause, so P2's respawn timer never ran. The pre-redesign build failed at the same point.
+
+Maintainer checks still open (two Steam accounts):
+- Join a friend: seeing and joining a host, "Full" after joining, invite-only lobbies hidden;
+- Join Game with P2's game closed (`+connect_lobby`);
+- Steam hosting from the new menus and the Direct IP switch in Players & invite.
 
 ## Survival co-op closeout — October 18, 2026
 
@@ -155,6 +175,8 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 
 # Native UI/model smoke test; does not enter gameplay.
 .\scripts\Test-Runtime.ps1 -GameDir $GameDir
+# The Multiplayer menu, co-op Load/Save screens, Join a friend and Players & invite (one game, Direct IP).
+.\scripts\Test-Runtime.ps1 -GameDir $GameDir -CoopMenu
 
 # Steam path on one account; needs the Steam client running. Creates and leaves a private lobby, and checks
 # Join a friend against it (lobby data, the friend scan, the list, Join's prompt, Direct IP...).
@@ -164,7 +186,9 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 .\scripts\Test-Travel.ps1 -GameDir $GameDir
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Combat
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Doors
-.\scripts\Test-Travel.ps1 -GameDir $GameDir -DoorReload
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -DoorReload -Level LEVEL_AD_Neighborhood
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SharedItems
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -ActorParts -Level LEVEL_AD_Neighborhood
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -State -Level LEVEL_AD_Prison
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Urine
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood
@@ -191,7 +215,7 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalSoak                     # comparison, soak (-SurvivalSoakWaves 8-200, default 15), bursts, high values
 ```
 
-Additional `Test-Travel.ps1` modes include `-Actors`, `-ActorParts`, `-UrineParts`, `-JoinInput`, `-FocusInput` and `-Audit -AuditLevels LEVEL_Name`. `Test-CombatProbe.ps1` checks a native P2 targeting/hit proxy. Inspect each script's parameter block before combining diagnostic modes.
+Additional `Test-Travel.ps1` modes include `-Actors`, `-UrineParts`, `-JoinInput`, `-FocusInput` and `-Audit -AuditLevels LEVEL_Name`. `Test-CombatProbe.ps1` checks a native P2 targeting/hit proxy. Inspect each script's parameter block before combining diagnostic modes.
 
 Tests create ignored output under `.local`, block profile writers with diagnostic flags, and stop only processes they own. A Steam install started directly would relaunch itself through Steam and exit, so the scripts set `SteamAppId` for the processes they start; the Steam client must be running. Travel tests create a second loader/executable directory using hardlinks/junctions to the reader's installed game; they require a compatible Windows filesystem. Most windows are hidden. Unattended travel diagnostics keep the desktop cursor unlocked and verify that it stays free; `-FocusInput` deliberately retains native cursor behavior to exercise real window focus and mouse input. Game/platform profile access and graphics initialization must work in the environment used for testing. Hidden automation is not the normal player launch path.
 

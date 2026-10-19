@@ -1,18 +1,20 @@
 # Co-op saves and checkpoints
 
-PBDMP stores multiplayer progress separately from solo saves. P1 owns the files and controls saving/loading. Open **Multiplayer → Co-op saves...** from the main menu or pause menu, or through F8. Host a lobby before loading a saved campaign; P1 can resume alone and invite the partner later.
+PBDMP stores multiplayer progress separately from solo saves. P1 owns the files and controls saving and loading; P2 cannot save, load or restore checkpoints. The screens are copies of the game's own Save and Load menus, with its save entries and thumbnails.
 
 ## Controls
 
-| Control | Behavior |
-| --- | --- |
-| New slot / Save new slot | Enter a name and create a manual save. |
-| Overwrite slot | Select a manual slot; replacement requires confirmation. |
-| Quicksave | Replaces the dedicated quicksave slot; the native quicksave action also routes here. |
-| Quickload | P1 loads the co-op quicksave rather than a solo slot. |
-| Autosave | Three slots rotate every five minutes of active gameplay by default. Checkpoint/interest volumes do not force captures. Pause, loading, story sequences and save transactions do not advance the timer. |
-| Restore checkpoint | P1 restores the newest valid autosave for both players and the world. |
-| Load selected | Restores the selected slot after confirmation. |
+| Where | Control | Behavior |
+| --- | --- | --- |
+| Multiplayer menu | Continue co-op | Hosts and loads the newest save of the most recently played co-op game. |
+| Multiplayer menu | New co-op game | The game's level select, *Load this map as a multiplayer game?*, difficulty, then the map loads. Starts a new co-op game (campaign). |
+| Multiplayer menu | Load co-op game | Co-op games on the left (map, difficulty, players, last played) and the selected game's saves on the right. **Load**, **Delete** (the focused save, or the whole co-op game) and **Back**, each with the game's confirmation prompt. |
+| Pause menu (P1) | Save | **New save** (with a live thumbnail) asks for a name; selecting an existing manual save overwrites it after confirmation. Saves can be deleted here. |
+| Pause menu (P1) | Load | Load co-op game on the current co-op game, plus **Load latest autosave**, which restores the newest valid autosave for both players and the world. Loading from inside a level asks first, because unsaved progress is lost. |
+| In game (P1) | Quicksave / Quickload | The game's own quicksave and quickload act on the co-op game's quicksave. |
+| Automatic | Autosave | Three slots per co-op game rotate every five minutes of active gameplay by default. Checkpoint/interest volumes do not force captures. Pause, loading, story sequences and save transactions do not advance the timer. |
+
+P1 can resume alone and be joined later. P2's pause Save and Load are greyed out, and P2's Multiplayer menu shows a read-only *Playing with [host]* view.
 
 Set `[Saves] AutosaveMinutes` in `BepInEx/config/pbdmp.multiplayer.cfg` to an integer from **5 to 10**, then restart the game/session. Loading a level or save, or completing a manual/quicksave, starts a fresh interval. There is no immediate autosave simply for entering a map or remaining inside an interest area.
 
@@ -30,7 +32,7 @@ Weapons, keys and mission items are identical for both players: P1's inventory h
 | Remaining ammo and equipped weapon | Restored from the save. | Copy of P1 on every join/rejoin and save/checkpoint restore. Independent during subsequent play. |
 | Health and armor | Saved values restored. | Full health, zero armor on join/rejoin and restore. |
 | Temporary powerups | Saved remaining effects restored. | Cleared on join/rejoin and restore. |
-| Keys, non-ammo items and pickup history | Personal saved record. | Personal saved record for the current map, independent of P1. |
+| Ammo, health, armor and powerup pickup history | Personal saved record. | Personal saved record for the current map, independent of P1. |
 | Position and view | Saved position/view, with safe-position fallback. | Saved position/view on restore; normal joins spawn beside P1 with map-spawn fallback. |
 
 If P1 advances while P2 is absent, the partner's record is retained. A return on another map uses that map's normal starting non-ammo state rather than stale positions/keys/pickup history, then catches up to P1's current weapons/ammo.
@@ -60,13 +62,13 @@ Unsupported schema, mismatching game/content or damaged data produces an error. 
 Solo save/profile writes and leaderboard uploads remain isolated during multiplayer; disconnect restores normal offline behavior. Solo-save import is a future explicit conversion feature. The [sync checklist](sync-progress.md) distinguishes supported world adapters from still-unclassified scripts and decorative scenery; persistent native restoration does not imply live synchronization for every decorative object.
 
 
-## Development world-format expansion
+## World format
 
-The 0.10 development source uses save schema 2 and wire protocol 10. Its [world megapass](../megapass.md) is still undergoing acceptance. Typed records add remaining machinery delays/motion, partial scenery damage, physical prop lifetimes and motion, current arena ordering, native cooldowns and mechanical timeline phases. Personal player records also retain an optional authored platform reference and relative feet position. Restoration uses the restored platform pose before safe-position validation and rebuilding rider contacts. Personal pickups and non-ammo resources retain the rules above.
+Save schema 3 builds on the [world megapass](../megapass.md) records. Typed records add remaining machinery delays/motion, partial scenery damage, physical prop lifetimes and motion, current arena ordering, native cooldowns and mechanical timeline phases. Personal player records also retain an optional authored platform reference and relative feet position. Restoration uses the restored platform pose before safe-position validation and rebuilding rider contacts. Personal pickups and non-ammo resources retain the rules above.
 
 Joining captures the host's current world, including changes made since loading a save. Baselines up to the disk limit stream through bounded chunks; incomplete restoration never releases gameplay. Saving also waits for a native prop-spawn batch or unresolved item reservation to finish.
 
-Older 0.9 schema-1 saves do not contain enough state for a reliable expanded-world restoration. The development loader clearly refuses those saves and preserves their originals/backups rather than silently resetting missing machinery or scenery. A future migration requires sufficient source state; there is no automatic destructive conversion.
+Older schema-1 and schema-2 saves are refused with a clear message, and their originals and backups are preserved. There is no automatic conversion.
 
 ## World and collectible consistency
 

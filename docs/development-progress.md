@@ -1,8 +1,8 @@
 # Development status
 
-Current development: **PBDMP 0.10.0 / protocol 12 / save schema 2**. The last accepted milestone baseline remains 0.9.0.
+Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (October 19, 2026). See the [1.0.0 release record](verification.md#100-release--october-19-2026). Earlier entries below are historical.
 
-Survival co-op for the three base arenas is installed as **41D7421713392F3B** (see the [Survival handoff](../survival.md)). The focused [weapon-animation pass](weapon-animation-testing.md), previously installed as **C990AE9ED22FC33F**, remains included: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
+PBDMP 1.0.0 is installed and packaged as build **960F3A0ADE93A2BB** (`artifacts/PBDMP-1.0.0.zip`); see the [1.0.0 release record](verification.md#100-release--october-19-2026). It includes Survival co-op for the three base arenas and the weapon-animation pass.
 
 The [megapass implementation closeout](../megapass.md) fixes loaded-map admission, runtime paw damage authority and stale host hazard contacts. Native bridge, actual wheel-driver/cart-door, complete restored elevator, scenery/prop, save and fresh-process recovery checks provide targeted evidence. The retained native survival and damage assertions remain strict.
 

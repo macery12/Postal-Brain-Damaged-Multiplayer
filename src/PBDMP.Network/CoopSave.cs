@@ -103,7 +103,7 @@ public sealed class CoopSaveStore
     }
     private static void Text(string value,int max,bool empty=false)
     { if(value == null || (!empty && value.Length==0) || Encoding.UTF8.GetByteCount(value)>max) throw new InvalidDataException("Invalid co-op save text."); }
-    public const string OlderFormat = "This co-op save was made by an older development build and can't be loaded. Start a new co-op game.";
+    public const string OlderFormat = "This co-op save was made by an older PBDMP development build and can't be loaded. Start a new co-op game.";
     public static void ValidatePlayers(string[] players)
     {
         if (players == null || players.Length > MaxPlayers || players.Any(p => string.IsNullOrWhiteSpace(p) || p.Length > 64 || p.Any(char.IsControl)))

@@ -4,7 +4,7 @@
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
-Current source: **PBDMP 0.10.0 / protocol 13 / save schema 3** (protocol 13 adds the shared-item and team-inventory frames). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
+Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (protocol 13 adds the shared-item and team-inventory frames). The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
 **Development coverage: 95% (20 / 21 points). Last accepted milestone baseline: 95% (20 / 21).** The two-PC Steam playtest accepts the general world trigger and active-session restoration milestones. [Scoring details](#progress-score).
 
@@ -40,11 +40,11 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Peer timeout | | | ✅ | Lost connections end waiting instead of leaving the session stuck. |
 | P2 disconnect | | | ✅ | P1 continues playing. |
 | P1 departure | | | ✅ | Ends the session and returns P2 to the main menu. |
-| Main-menu multiplayer controls | | | ✅ | Native-themed lobby, player cards, Steam/Direct IP controls and session status. |
+| Main-menu multiplayer controls | | | ✅ | A copy of the game's main menu: Continue co-op, New co-op game (the game's level select), Load co-op game, Survival co-op and Join a friend. |
 | Main-menu news panel | | | ✅ | Local information panel uses native artwork/fonts; hidden behind menus/dialogs and during gameplay. |
 | Bug-report shortcut | | | ✅ | Opens the structured issue form with software versions/build IDs and in-memory last-session context; attachments remain manual. Template must be published on GitHub. |
 | Last-session report context | | | ✅ | Local-only map, host/joining role and transport survive title/disconnect; cleared by a new game launch. |
-| Pause-menu multiplayer controls | | | ✅ | Native-themed entry and F8 shortcut. |
+| Pause-menu multiplayer controls | | | ✅ | P1's native Save and Load open the co-op screens; **Players & invite** (and F8) holds player cards, invite, lobby privacy, Direct IP hosting and Leave session. P2 gets a read-only view. |
 | Start campaign level | | | ✅ | P1 starts; P2 follows. Built-in campaign only. |
 | Restart current level | | | ✅ | P1 restarts both players' level. |
 | Next-level travel | | | ✅ | P2 follows P1's campaign transition. |

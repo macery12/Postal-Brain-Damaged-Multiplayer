@@ -2,7 +2,7 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–6 are complete; Phase 7 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. All phases are complete. Released as PBDMP 1.0.0, build 960F3A0ADE93A2BB, on October 19, 2026.**
 
 | Phase | State |
 | --- | --- |
@@ -13,7 +13,7 @@ Updated October 18, 2026.
 | 4 Multiplayer menu and entry flows | Complete (Join a friend opens Direct IP until Phase 6) |
 | 5 In-session pause menu and P2 view | Complete |
 | 6 Join a friend | Complete (two-account join is a maintainer check) |
-| 7 Hardening, docs and handoff | Pending |
+| 7 Hardening, docs and handoff | Complete (1.0.0) |
 
 ## Start here
 
@@ -306,6 +306,30 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
   - Join Game with P2's game closed (`+connect_lobby`).
 - Steam hides invite-only lobbies from `GetFriendGamePlayed`, so they only arrive as invites.
 
-## Current handoff
+## Phase 7 handoff: 1.0.0 release (October 19, 2026)
 
-Next step: Phase 7, hardening, the full campaign and Survival regressions, removing the unreachable `NativeCoopSaves` dialog, docs (`co-op-saves.md`, sync rows), package, install when the game is closed, handoff.
+**Source**
+- The unreachable `NativeCoopSaves` dialog and the hidden Co-op saves button are removed.
+- Version 1.0.0 (protocol 13 and save schema 3 unchanged). The load log reads `PBDMP 1.0.0 build <id>`.
+- `Package.ps1` writes a 1.0 `INSTALL.txt` for the new menus, Join a friend, shared items and co-op saves.
+- `MissionExitDiagnostics` dismisses native tutorials (see below).
+
+**Docs**: README (Play together, saves, version), `co-op-saves.md` (the new controls, team inventory row, world format), roadmap (current behavior, milestones 0.10 and 1.0), protocol, Steam research, sync rows, development status, and the verification release record and commands.
+
+**Checks**: everything in the [1.0.0 release record](docs/verification.md#100-release--october-19-2026), run on the final DLL pair:
+- 18 campaign and 21 Survival two-process fixtures;
+- runtime smoke, `-CoopMenu`, the Steam probe and the managed tests.
+
+**Findings during the release pass**
+- `-ActorParts` and `-DoorReload` need `-Level LEVEL_AD_Neighborhood`, the map they test; the documented commands now say so.
+- `-MissionExits -Level LEVEL_AD_Wallmarkt` timed out because Wallmarkt's native tutorial popup holds the shared pause, which also pauses P2's respawn timer. The pre-redesign build (`02740af`) failed identically. The fixture now dismisses tutorials like the other fixtures, and passes with 13 checks.
+
+**Install and package**
+- `artifacts/PBDMP-1.0.0.zip`, build 960F3A0ADE93A2BB (`PBDMP.dll` 8F48E0C20209C8E7, `PBDMP.Network.dll` 154AA4D3299BFE3F).
+- Installed with `Install-Plugin.ps1` into the Steam game folder while the game was closed; the installed hashes match the zip.
+
+**Open maintainer checks (two Steam accounts)**
+- Join a friend: list, join, "Full", invite-only hidden;
+- `+connect_lobby` from a closed game;
+- Steam hosting from the new menus;
+- the Direct IP switch in Players & invite.
