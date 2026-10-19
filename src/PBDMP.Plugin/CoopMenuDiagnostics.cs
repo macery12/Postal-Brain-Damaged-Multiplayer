@@ -14,6 +14,7 @@ public sealed partial class MultiplayerBehaviour
     private float _coopMenuAt;
     private string? _coopCampaignBefore;
     private string _coopCampaign = "", _coopLevel = "";
+    private int _coopWrites;
     private static bool CoopMenuTestEnabled => Environment.GetEnvironmentVariable("PBDMP_COOP_MENU_TEST") == "1";
     private static Transform Group => MenuManager.MainCanvas.transform.Find("MainCanvasGroup");
     private static bool Shown(string menu) => Group.Find(menu) is { } t && t.gameObject.activeInHierarchy && t.GetComponent<CanvasGroup>() is { } g && g.alpha > 0.5f;
@@ -38,6 +39,23 @@ public sealed partial class MultiplayerBehaviour
             foreach (var t in transforms) t.gameObject.layer = 31;
             canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = capture; canvas.planeDistance = 1;
             Canvas.ForceUpdateCanvases(); capture.Render();
+            // PBDMP's own overlay canvas (Players & invite, prompts, HUD) draws above the game's.
+            if (_ui != null && _ui.GetComponent<Canvas>() is { } overlay)
+            {
+                var overlayTransforms = overlay.GetComponentsInChildren<Transform>(true); var overlayLayers = overlayTransforms.Select(t => t.gameObject.layer).ToArray();
+                var overlayMode = overlay.renderMode;
+                try
+                {
+                    foreach (var t in overlayTransforms) t.gameObject.layer = 31;
+                    overlay.renderMode = RenderMode.ScreenSpaceCamera; overlay.worldCamera = capture; overlay.planeDistance = 0.5f;
+                    Canvas.ForceUpdateCanvases(); capture.Render();
+                }
+                finally
+                {
+                    overlay.renderMode = overlayMode;
+                    for (var i = 0; i < overlayTransforms.Length; i++) overlayTransforms[i].gameObject.layer = overlayLayers[i];
+                }
+            }
             RenderTexture.active = target; pixels.ReadPixels(new UnityEngine.Rect(0, 0, width, height), 0, 0); pixels.Apply();
             File.WriteAllBytes(Path.Combine(SmokeOutput(), name), ImageConversion.EncodeToPNG(pixels));
         }
@@ -86,7 +104,7 @@ public sealed partial class MultiplayerBehaviour
                 SmokeAssert(Shown("MENU_PBDMP_Multiplayer") && !Shown("MENU_Main"), "Multiplayer opens the native-style co-op menu in place of the main menu");
                 SmokeAssert(_coopMenu!.NewGame.LabelText.text == "New co-op game" && _coopMenu.Back.LabelText.text == "Back", "co-op menu shows its own labels in the main menu's lettering");
                 SmokeAssert(_coopMenu.Continue.interactable, "Continue co-op is available once a campaign exists");
-                SmokeAssert(_coopMenu.PreviewTitleForTest == "PRISON (CO-OP)" && _coopMenu.PreviewTitleRendersForTest, "the Continue preview names the newest campaign by its map in the game's header lettering");
+                SmokeAssert(_coopMenu.PreviewTitleForTest == CampaignName("LEVEL_AD_Prison") && _coopMenu.PreviewTitleRendersForTest, "the Continue preview names the newest campaign by its map in the game's header lettering");
                 Shot("coop-menu.png");
                 _coopMenu.Load.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 10; break;
             case 10:
@@ -167,6 +185,40 @@ public sealed partial class MultiplayerBehaviour
                 SmokeAssert(_session?.Snapshot.Role == PBDMP.Network.SessionRole.Host && _saves.Campaign == _coopCampaign && LevelManager.CurrentLevel!.name == _coopLevel,
                     "Continue co-op hosts and loads the newest save of that campaign");
                 Shot("coop-continued.png");
+                // The native pause menu's Save during the session opens the co-op save screen.
+                GameManager.PauseGame(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 30; break;
+            case 30:
+                Group.Find("MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+                _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 31; break;
+            case 31:
+                SmokeAssert(Shown("MENU_PBDMP_CoopSave") && !Shown("MENU_Save") && _coopSave!.EntryCount == 2, "pause Save opens the co-op save screen with New save and the campaign's manual save");
+                SmokeAssert(Group.Find("MENU_Pause/ButtonsLayout/BUTTON_PBDMP_Multiplayer").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().LabelText.text == "Players & invite", "the pause entry is Players & invite");
+                Shot("coop-pause-save.png");
+                _coopWrites = _saves!.CompletedWritesForTest;
+                _coopSave!.SaveButton.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 32; break;
+            case 32:
+                SmokeAssert(Shown("PROMPT_Input") && Group.Find("PROMPT_Input/OverlayImage/Background/Text").GetComponent<TMPro.TMP_Text>().text == "NAME THIS SAVE", "New save asks for a name in the native prompt");
+                Shot("coop-save-name.png");
+                Group.Find("PROMPT_Input/OverlayImage/Background/BUTTON_Confirm").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+                _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 33; break;
+            case 33 when !_saves!.Busy && _saves.CompletedWritesForTest > _coopWrites:
+                SmokeAssert(_saves.Store.List().Count(s => s.Slot.StartsWith("manual-", StringComparison.Ordinal)) == 2, "the named save is written to the same campaign");
+                MenuManager.Close(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 34; break;
+            case 34:
+                Group.Find("MENU_Pause/ButtonsLayout/BUTTON_Load").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+                _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 35; break;
+            case 35:
+                SmokeAssert(Shown("MENU_PBDMP_CoopLoad") && !Shown("MENU_Load") && _coopLoad!.LatestAutosaveButton.gameObject.activeInHierarchy && _coopLoad.SelectedCampaign?.Id == _coopCampaign,
+                    "pause Load opens co-op Load on the current campaign with Load latest autosave");
+                Shot("coop-pause-load.png");
+                MenuManager.Close(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 36; break;
+            case 36:
+                MenuManager.Instance.Unpause(); TogglePanel(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 37; break;
+            case 37:
+                SmokeAssert(_open && _view!.DisconnectButton.LabelText.text == "Leave session" && _view.DirectButton.LabelText.text == "Direct IP: port 47777" && !_view.SavesButton.gameObject.activeSelf,
+                    "Players & invite shows the session, Direct IP hosting and Leave session, without separate save controls");
+                Shot("coop-players.png");
+                TogglePanel();
                 Plugin.Logger.LogInfo("PBDMP SMOKE PASS: native co-op menu flow"); _coopMenuStep = 99; break;
         }
     }

@@ -84,7 +84,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 if (MenuManager.MainCanvas.transform.Find("MainCanvasGroup/PROMPT_Input") == null) return;
                 BuildUI();
             }
-            if (Input.GetKeyDown(KeyCode.F8)) { if (_session == null && InMainMenu) OpenCoopMenu(); else TogglePanel(); }
+            if (Input.GetKeyDown(KeyCode.F8)) { if (InMainMenu && !_open) OpenCoopMenu(); else TogglePanel(); }
             else if (_open && Input.GetKeyDown(KeyCode.Escape) && !_view!.Cancel()) SetPanel(false);
             _view!.Refresh();
             _steam!.Tick();
@@ -494,7 +494,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             other = new("Empty slot", "P2", "Host a game to invite a friend", null, "P2", false);
         var hostFirst = role != SessionRole.Client;
         return new(role, steam.Phase, steam.Available, _steamSession, steam.InviteOnly, snapshot.Connected,
-            hostFirst ? self : other, hostFirst ? other : self, status);
+            hostFirst ? self : other, hostFirst ? other : self, status, !InMainMenu, int.TryParse(_port?.text, out var port) ? port : Plugin.DefaultPort);
     }
 
     [HideFromIl2Cpp]
@@ -503,6 +503,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         if (!pose.Ready || pose.Level.Length == 0) return "In the menus";
         // Level keys end in the scene name, such as LEVEL_TheWall_Interior.
         var scene = pose.Level[(pose.Level.LastIndexOf(':') + 1)..];
+        // The game's own level name, as its level select lists it.
+        foreach (var level in LevelManager.AllLevels)
+            if (level.name == scene) { try { if (level.Name is { Length: > 0 } name) return "Playing " + name; } catch (Exception) { } break; }
         if (scene.StartsWith("LEVEL_", StringComparison.Ordinal)) scene = scene[6..];
         return "Playing " + scene.Replace('_', ' ');
     }
@@ -563,7 +566,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
 
     private void BuildUI()
     {
-        _view = new NativeMultiplayerUI(MenuManager.MainCanvas, HostSteam, () => _steam!.Invite(), () => _steam!.TogglePrivacy(),
+        _view = new NativeMultiplayerUI(MenuManager.MainCanvas, () => EnsureHosting(() => { }), () => _steam!.Invite(), () => _steam!.TogglePrivacy(),
             Host, Join, ResetSession, TogglePanel);
         _steam = new SteamService(OnLobbyHosted, OnLobbyEntered, OnJoinRequested, ShowInfo, message => _view!.Hud.Toast(message));
         _ui = _view.Root; _panel = _view.Panel; _menuButton = _view.MainEntry.gameObject;
@@ -625,22 +628,19 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             case 1:
                 NativeUiDiagnostics.Capture(SmokeOutput());
                 CaptureUI("runtime-panel.png");
-                // Offline: Steam host, privacy (when Steam runs), Direct IP, saves and Back are reachable.
-                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.SteamHostButton, _view.PrivacyButton, _view.DirectButton, _view.SavesButton, _view.BackButton }
+                // Offline in the menus: privacy (when Steam runs), Direct IP and Back are reachable. Hosting starts from the
+                // Multiplayer menu or, inside a level, Host co-op game; saving uses the pause menu.
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _view!.PrivacyButton, _view.DirectButton, _view.BackButton }
                     .Where(s => s.interactable).ToArray());
-                SmokeAssert(!_view.InviteButton.interactable && !_view.DisconnectButton.interactable, "invite and leave stay disabled outside a session");
-                _view.SavesButton.onClick.Invoke();
-                SmokeAssert(_view.Saves.Open,"Co-op saves opens as its own dialog");
-                NativeUiDiagnostics.AssertLayerNavigation(_view,_view.Saves.Controls);
-                CaptureUI("runtime-saves.png");
-                SmokeAssert(_view.Cancel() && !_view.Saves.Open && _open,"Escape closes Co-op Saves before the multiplayer panel");
+                SmokeAssert(!_view.InviteButton.interactable && !_view.DisconnectButton.interactable && !_view.SteamHostButton.interactable, "invite, leave and Host co-op game stay disabled in the menus outside a session");
+                SmokeAssert(!_view.SavesButton.gameObject.activeSelf, "Players & invite has no separate save controls");
                 _view.DirectButton.onClick.Invoke();
                 SmokeAssert(_view.DirectOpen, "Direct IP opens as its own dialog");
                 _smokeStep = 7; _smokeNext = Time.unscaledTime + 0.5f;
                 break;
             case 7:
                 CaptureUI("runtime-direct.png");
-                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _address!, _port!, _hostButton!, _joinButton!, _view!.DirectBackButton });
+                NativeUiDiagnostics.AssertLayerNavigation(_view!, new Selectable[] { _address!, _port!, _joinButton!, _view!.DirectBackButton });
                 SmokeAssert(_view.Cancel() && !_view.DirectOpen && _open, "Escape closes the Direct IP dialog before the panel");
                 _view.Prompt.Ask("Join a friend's game?\nProgress since your last save will be lost.", "Join", null, "Stay", null);
                 _smokeStep = 8; _smokeNext = Time.unscaledTime + 0.5f;

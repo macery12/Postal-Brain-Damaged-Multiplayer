@@ -12,7 +12,7 @@ namespace PBDMP.Plugin;
 
 /// <summary>Everything the lobby panel shows, rebuilt from session and Steam state every frame.</summary>
 internal readonly record struct LobbyModel(SessionRole Role, LobbyPhase Phase, bool SteamAvailable, bool SteamSession,
-    bool InviteOnly, bool Connected, CardModel First, CardModel Second, string Status);
+    bool InviteOnly, bool Connected, CardModel First, CardModel Second, string Status, bool InLevel = false, int DirectPort = 0);
 
 /// <summary>Own multiplayer controls; borrow only native UI assets and audited control components.</summary>
 internal sealed class NativeMultiplayerUI : IDisposable
@@ -43,6 +43,9 @@ internal sealed class NativeMultiplayerUI : IDisposable
     internal NativeNewsPanel News { get; }
     internal GameObject DirectDialog { get; }
     internal MainMenu MainMenu { get; private set; } = null!;
+    // Re-hosts the same campaign over the other transport while nobody has joined.
+    internal System.Action? DirectSwitch { get; set; }
+    private bool _hosting;
     private readonly NativeUiKit _kit;
     internal NativeUiKit Kit => _kit;
     private readonly RectTransform _spiral, _directSpiral;
@@ -85,15 +88,17 @@ internal sealed class NativeMultiplayerUI : IDisposable
 
         // 1340 units wide stays inside a 5:4 viewport at the 1080-unit reference height.
         var box = _kit.BoxAt(Panel.transform, "Multiplayer panel", new Vector2(1340, 820), out _spiral).transform;
-        _kit.HeadingAt(box, "Title", "MULTIPLAYER", new Vector2(670, 712), new Vector2(1100, 66), 42);
-        _kit.TextAt(box, "Subtitle", "STEAM CO-OP  /  TWO PLAYERS", new Vector2(670, 656), new Vector2(1100, 40), 24);
-        SteamHostButton = Action(box, "Host Steam game", 0, hostSteam);
+        // Players & invite: who is here and how others get in. Saving and loading use the pause menu.
+        _kit.HeadingAt(box, "Title", "PLAYERS", new Vector2(670, 712), new Vector2(1100, 66), 42);
+        _kit.TextAt(box, "Subtitle", "INVITE  /  LOBBY  /  DIRECT IP", new Vector2(670, 656), new Vector2(1100, 40), 24);
+        SteamHostButton = Action(box, "Host co-op game", 0, hostSteam);
         InviteButton = Action(box, "Invite friend", 1, invite);
         PrivacyButton = Action(box, "Lobby: friends only", 2, privacy);
-        DirectButton = Action(box, "Direct IP...", 3, () => ShowDirect(true));
-        DisconnectButton = Action(box, "Leave lobby", 4, disconnect);
+        DirectButton = Action(box, "Direct IP...", 3, () => { if (DirectSwitch != null && _hosting) DirectSwitch(); else ShowDirect(true); });
+        DisconnectButton = Action(box, "Leave session", 4, disconnect);
         SavesButton = Action(box,"Co-op saves...",5,()=>ShowSaves(true));
-        BackButton = Action(box, "Back", 6, toggle);
+        SavesButton.gameObject.SetActive(false);
+        BackButton = Action(box, "Back", 5, toggle);
         FirstCard = new PlayerCard(_kit, box, "Player slot 1", new Vector2(960, 506), new Vector2(660, 184));
         SecondCard = new PlayerCard(_kit, box, "Player slot 2", new Vector2(960, 302), new Vector2(660, 184));
         Status = _kit.TextAt(box, "Connection status", "Offline", new Vector2(670, 93), new Vector2(1140, 70), 23);
@@ -173,8 +178,8 @@ internal sealed class NativeMultiplayerUI : IDisposable
     {
         if (Prompt.Open) return Prompt.Controls;
         if(Saves.Open) return Saves.Controls;
-        if (DirectOpen) return new Selectable[] { Address, Port, HostButton, JoinButton, DirectBackButton }.Where(s => s.interactable).ToArray();
-        return new Selectable[] { SteamHostButton, InviteButton, PrivacyButton, DirectButton, DisconnectButton, SavesButton, BackButton }.Where(s => s.interactable).ToArray();
+        if (DirectOpen) return new Selectable[] { Address, Port, HostButton, JoinButton, DirectBackButton }.Where(s => s.interactable && s.gameObject.activeSelf).ToArray();
+        return new Selectable[] { SteamHostButton, InviteButton, PrivacyButton, DirectButton, DisconnectButton, BackButton }.Where(s => s.interactable && s.gameObject.activeSelf).ToArray();
     }
 
     private Selectable? First() => Controls().FirstOrDefault();
@@ -221,16 +226,20 @@ internal sealed class NativeMultiplayerUI : IDisposable
     {
         var offline = model.Role == SessionRole.Offline && model.Phase == LobbyPhase.None;
         var steamReady = model.SteamAvailable && offline;
-        NativeUiKit.SetLabel(SteamHostButton, model.Phase == LobbyPhase.Creating ? "Creating lobby..." : "Host Steam game");
-        NativeUiKit.SetButtonState(SteamHostButton, steamReady);
+        NativeUiKit.SetLabel(SteamHostButton, model.Phase == LobbyPhase.Creating ? "Creating lobby..." : "Host co-op game");
+        NativeUiKit.SetButtonState(SteamHostButton, offline && model.InLevel);
+        _ = steamReady;
         NativeUiKit.SetButtonState(InviteButton, model.Phase == LobbyPhase.Hosting && !model.Connected);
         NativeUiKit.SetLabel(PrivacyButton, model.InviteOnly ? "Lobby: invite only" : "Lobby: friends only");
         NativeUiKit.SetButtonState(PrivacyButton, model.SteamAvailable && model.Role != SessionRole.Client &&
             model.Phase is LobbyPhase.None or LobbyPhase.Hosting);
-        NativeUiKit.SetButtonState(DirectButton, offline);
-        NativeUiKit.SetLabel(DisconnectButton, model.SteamSession || model.Phase != LobbyPhase.None ? "Leave lobby" : "Disconnect");
+        _hosting = model.Role == SessionRole.Host;
+        NativeUiKit.SetLabel(DirectButton, !_hosting ? "Direct IP..." : model.SteamSession ? "Direct IP: off" : "Direct IP: port " + model.DirectPort);
+        NativeUiKit.SetButtonState(DirectButton, offline || _hosting && !model.Connected && (model.SteamSession || model.SteamAvailable));
+        NativeUiKit.SetLabel(DisconnectButton, "Leave session");
         NativeUiKit.SetButtonState(DisconnectButton, !offline);
-        NativeUiKit.SetButtonState(HostButton, offline);
+        // Hosting now starts from the Multiplayer menu or Host co-op game; the dialog only joins.
+        HostButton.gameObject.SetActive(false);
         NativeUiKit.SetButtonState(JoinButton, offline);
         Address.interactable = offline; Port.interactable = offline;
         FirstCard.Set(model.First); SecondCard.Set(model.Second);

@@ -94,11 +94,13 @@ public sealed partial class MultiplayerBehaviour
                 TravelCheck(saved.Players.Length==2 && listing.Players!.SequenceEqual(saved.Players) && File.Exists(Path.Combine(_saves.Store.Folder,"manual-regression.info")),"the save lists both players from its small sidecar");
                 TravelCheck(CoopSaveStore.Campaigns(CoopSaveService.Root).Any(c=>c.Id==CoopSaveService.DiagnosticCampaign && c.Saves>0),"the save belongs to its co-op campaign folder");
                 File.WriteAllText(Marker("save-captured.json"),JsonSerializer.Serialize(saved));
-                SetPanel(true);_view!.ShowSaves(true);_saveStageAt=Time.unscaledTime+.5f;_saveStep=30;break;
+                GameManager.PauseGame();_saveStageAt=Time.unscaledTime+.5f;_saveStep=30;break;
             case 30 when Time.unscaledTime>=_saveStageAt:
-                ScreenCapture.CaptureScreenshot(Marker("co-op-saves-ui.png"));_saveStageAt=Time.unscaledTime+.2f;_saveStep=31;break;
+                // The native pause menu's Save opens the co-op save screen during the session.
+                MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+                _saveStageAt=Time.unscaledTime+.8f;_saveStep=31;break;
             case 31 when Time.unscaledTime>=_saveStageAt:
-                GameManager.PauseGame();SetPanel(true);_view!.ShowSaves(true);
+                TravelCheck(MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_PBDMP_CoopSave").gameObject.activeInHierarchy,"P1's pause Save opens the co-op save screen");
                 _savedActor!.HitPoints.SetCurrentSilent(5);Player.Instance.GetComponent<PlayerHitProcessorComponent>().SetCurrentHitPoints(22);
                 TravelMark("save-mutated");_saves!.RequestLoad("manual-regression");_saveStep=4;break;
             case 4 when !_saves!.Busy && _lifecycle!.State.Released && Marked("save-client-restored"):
@@ -231,6 +233,11 @@ public sealed partial class MultiplayerBehaviour
                 TravelCheck(Object.FindObjectsOfType<BagPickup>(true).Any(b=>b.name.Contains("Clone") && b._healthAmount==17 && !b._pickedUp),"P2 receives an available personal copy of P1's collected enemy drop");
                 var wall=Object.FindObjectsOfType<BreakableObject>(true).First(b=>MissionPath(b.transform)=="OBJECTIVES/BreakableWall");
                 TravelCheck(JsonSerializer.Serialize(MissionBreakState(wall))==File.ReadAllText(Marker("saved-wall-after-restore.json")),"P2 restores the same structural wall cutout and collision as P1");
+                // P2 cannot save or load: the pause menu's Save opens neither the co-op nor the native screen.
+                GameManager.PauseGame();
+                MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Pause/ButtonsLayout/BUTTON_Save").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
+                TravelCheck(!MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_PBDMP_CoopSave").gameObject.activeInHierarchy && !MenuManager.MainCanvas.transform.Find("MainCanvasGroup/MENU_Save").gameObject.activeInHierarchy,"P2's pause Save is refused during the co-op session");
+                MenuManager.Instance.Unpause();
                 CheckJoinGameplayInput("P2 after co-op save restoration");
                 TravelCheck(_session!.Snapshot.Connected && InputManager.Instance.CurrentInputState==InputManager.InputState.GAMEPLAY,"P2 releases loading/save input gates after restoration");
                 TravelMark("save-client-done");_saveStep=4;break;

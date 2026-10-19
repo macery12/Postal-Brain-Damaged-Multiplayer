@@ -17,6 +17,7 @@ internal sealed class NativeCoopLoadMenu
     internal MainHyperButton LoadButton { get; }
     internal MainHyperButton DeleteButton { get; }
     internal MainHyperButton BackButton { get; }
+    internal MainHyperButton LatestAutosaveButton { get; }
     internal CampaignListing? SelectedCampaign { get; private set; }
     internal SaveListing? SelectedSave { get; private set; }
     internal int CampaignCount => _campaigns.Count;
@@ -64,6 +65,12 @@ internal sealed class NativeCoopLoadMenu
         NativeUiKit.PrepareButton(LoadButton, "Load", LoadSelected);
         NativeUiKit.PrepareButton(DeleteButton, "Delete", DeleteSelected);
         NativeUiKit.PrepareButton(BackButton, "Back", () => MenuManager.Close());
+        // During P1's session: the game's own wording for restoring the shared checkpoint.
+        LatestAutosaveButton = Object.Instantiate(DeleteButton.gameObject, DeleteButton.transform.parent, false).GetComponent<MainHyperButton>();
+        LatestAutosaveButton.name = "BUTTON_LoadLatestAutosave";
+        LatestAutosaveButton.GetComponent<RectTransform>().anchoredPosition += new Vector2(0, -95);
+        NativeUiKit.PrepareButton(LatestAutosaveButton, "Load latest autosave", LoadLatestAutosave);
+        LatestAutosaveButton.gameObject.SetActive(false);
         _empty = kit.TextAt(root.transform, "No co-op games", "No co-op games saved yet.\nStart one with New co-op game.", new Vector2(1920, 1080), new Vector2(1800, 300), 72);
         _empty.gameObject.SetActive(false);
 
@@ -75,7 +82,10 @@ internal sealed class NativeCoopLoadMenu
 
     internal void Open()
     {
-        Refresh(null);
+        var host = CoopSaveService.Current != null && SessionLifecycle.Current is { IsClient: false } life && life.State.Action != TravelAction.Menu;
+        LatestAutosaveButton.gameObject.SetActive(host);
+        if (host) NativeUiKit.SetButtonState(LatestAutosaveButton, CoopSaveService.Current!.Store.List().Any(s => s.Error == null && s.Slot.StartsWith("auto-", StringComparison.Ordinal)));
+        Refresh(CoopSaveService.Current?.Campaign);
         MenuManager.Open(Menu);
         Menu.gameObject.SetActive(true);
     }
@@ -186,6 +196,12 @@ internal sealed class NativeCoopLoadMenu
     {
         if (SelectedCampaign is not { } campaign) return;
         _load(campaign.Id, SelectedSave?.Slot ?? campaign.NewestSlot);
+    }
+
+    private static void LoadLatestAutosave()
+    {
+        MenuManager.OpenConfirmationPrompt((Il2CppSystem.Action)(System.Action)(() => CoopSaveService.Current?.RestoreCheckpoint()), ScriptableObject.CreateInstance<Hyperstrange.Base.LocalizedString>());
+        MultiplayerBehaviour.SetPromptText("LOAD THE LATEST AUTOSAVE FOR BOTH PLAYERS?");
     }
 
     private void DeleteSelected()

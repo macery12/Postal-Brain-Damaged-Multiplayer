@@ -92,6 +92,12 @@ public sealed partial class MultiplayerBehaviour
                 QuietNpcs();_itemStep=2;break;
             case 2 when Marked("host-ready") && Quantity("WEAPON_LightningGun")==0 && Quantity("WEAPON_MachineGun")==1:
                 TravelCheck(true,"P2 matches P1's team weapons (gun removed and gun added on P1)");
+                // P2's Multiplayer menu is read-only while connected: P1 chooses maps and saves.
+                _coopMenu!.ShowGuest(PartnerLabel(_session!.Snapshot), _lifecycle!.State.Level);
+                TravelCheck(!_coopMenu.Continue.interactable && !_coopMenu.NewGame.interactable && !_coopMenu.Load.interactable && !_coopMenu.Survival.interactable &&
+                    _coopMenu.JoinFriend.LabelText.text == "Leave session" && _coopMenu.GuestCaptionForTest.StartsWith("PLAYING WITH", StringComparison.Ordinal),"P2's Multiplayer menu is read-only with Leave session");
+                _coopMenu.ShowLatest(null, "", "", null);
+                TravelCheck(_coopMenu.JoinFriend.LabelText.text == "Join a friend" && _coopMenu.NewGame.interactable,"the menu returns to P1-style actions afterwards");
                 _itemAmmo=Quantity("AMMO_Brains");
                 TravelMark("client-prepared");_itemStep=3;break;
             case 3 when Marked("host-took-weapon") && Quantity("WEAPON_LightningGun")==1 && _world!.SharedPickupForTest(File.ReadAllText(Marker("item-lightning")))!._pickedUp:

@@ -87,6 +87,12 @@ internal sealed partial class CoopSaveService : IDisposable
     internal string LocalName {get;set;}="P1";
     private void UseCampaign(string id) {_campaign=id;_store=new(CoopSaveStore.CampaignFolder(Root,id));}
     // A campaign is one continuous run of the story; only a new co-op game starts another.
+    // Re-hosting (another transport) keeps playing the same campaign.
+    internal void ResumeCampaign(string id)
+    {
+        if(_life.IsClient || Busy || !CoopSaveStore.ValidCampaign(id)) return;
+        UseCampaign(id);
+    }
     internal void StartNewCampaign()
     {
         if(_life.IsClient || Busy) return;
@@ -435,7 +441,7 @@ internal sealed partial class CoopSaveService : IDisposable
         return result.Length>0?result:new[]{"P1"};
     }
     // The game's own 160x90 save thumbnail: the player's camera, without UI.
-    private static byte[]? CaptureThumbnail()
+    internal static byte[]? CaptureThumbnail()
     {
         var player=Player.Instance;if(player==null) return null;
         var previous=RenderTexture.active;Texture2D? texture=null;

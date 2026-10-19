@@ -40,7 +40,7 @@ internal static class NativeUiDiagnostics
             view.FirstCard.Backing.sprite.name != "UI_Text" || view.Hud.Text.font.name != "FONT_Text")
             throw new InvalidOperationException("UI must reuse the original native fonts, panel and card art.");
         entry.LabelText.SetText(); view.PauseEntry.LabelText.SetText();
-        if (entry.LabelText.text != "Multiplayer" || view.PauseEntry.LabelText.text != "Multiplayer")
+        if (entry.LabelText.text != "Multiplayer" || view.PauseEntry.LabelText.text != "Players & invite")
             throw new InvalidOperationException("Language refresh must not overwrite multiplayer labels.");
         var down = parent.Find("BUTTON_Horde").GetComponent<Selectable>().navigation.selectOnDown;
         if (down == null || down.Pointer != entry.Pointer)

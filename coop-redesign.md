@@ -2,7 +2,7 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–4 are complete; Phase 5 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–5 are complete; Phase 6 is next.**
 
 | Phase | State |
 | --- | --- |
@@ -11,7 +11,7 @@ Updated October 18, 2026.
 | 2 Keys, joins and saved inventory | Complete (schema change moved to Phase 3) |
 | 3 Co-op campaigns (save model) | Complete |
 | 4 Multiplayer menu and entry flows | Complete (Join a friend opens Direct IP until Phase 6) |
-| 5 In-session pause menu and P2 view | Pending |
+| 5 In-session pause menu and P2 view | Complete |
 | 6 Join a friend | Pending |
 | 7 Hardening, docs and handoff | Pending |
 
@@ -223,6 +223,46 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
 - Steam hosting from the menu was not exercised; the fixture uses Direct IP.
 - Controller navigation inside the Load columns is configured, but only fixture clicks were exercised.
 
+## Phase 5 handoff (October 19, 2026)
+
+**Source**
+- `NativeCoopSaveMenu`: a copy of `MENU_Save`.
+  - It lists "New save" (with a live 160×90 camera thumbnail) and the campaign's manual saves.
+  - Save opens the native `PROMPT_Input`, titled "NAME THIS SAVE", or the overwrite confirmation. Delete is also available.
+  - Prompt callbacks never close menus; the native prompt closes itself.
+- `CoopMenuPatches`:
+  - `MenuManager.Open` prefix: during a co-op level session, native `MENU_Save`/`MENU_Load` open the co-op screens on P1. P2 gets a "P1 controls co-op saves and loading." notice, and Survival shows its existing refusal.
+  - `PauseMenu.Enable` postfix: disables P2's Save/Load.
+- `NativeCoopLoadMenu`:
+  - opens on the current campaign;
+  - adds **Load latest autosave** for P1 in a session (the native confirmation, then `RestoreCheckpoint`);
+  - loading from inside P1's level asks "LOAD THIS SAVE? UNSAVED PROGRESS IS LOST."
+- **Players & invite** (the pause entry, and F8 in game) reworks the panel:
+  - *Host co-op game* (solo in a level), *Invite friend* and lobby privacy;
+  - *Direct IP*: off, or "port N". While nobody has joined it re-hosts the same campaign over the other transport (`SwitchDirectHosting`, `CoopSaveService.ResumeCampaign`).
+  - *Leave session* and *Back*.
+  - The old Host and Co-op saves buttons are gone, and the Direct IP dialog only joins.
+- **P2's Multiplayer menu while connected** is read-only (`NativeCoopMenu.ShowGuest`): "PLAYING WITH [host]", P1's map, the P1-only actions disabled, and Leave session.
+- Map, campaign and player-card names use the game's own localized level names (`LevelId.Name`), e.g. "T-Day".
+
+**Checks**
+- `-CoopMenu`: 28 checks, adding:
+  - pause Save → co-op Save screen; Players & invite label;
+  - New save → native name prompt → a named save in the same campaign;
+  - pause Load → co-op Load on the current campaign, with Load latest autosave;
+  - Players & invite labels.
+- Original runtime smoke: passes, updated for the new panel.
+- Two-player:
+  - `-Saves` 47 (P1 reaches the co-op Save screen through the native pause Save; P2's pause Save is refused);
+  - `-SaveResume` 22, `-SaveReplacePartner` 23;
+  - `-SharedItems` 19 (P2's read-only menu view, then restored);
+  - `-JoinInput` 10, default travel 54, `-SurvivalPrep` 47.
+
+**Limits**
+- The Direct IP switch was not run, because it would create a real Steam lobby on this machine. Only its label in Direct IP hosting was checked.
+- Steam hosting from the menus is a maintainer check.
+- The old `NativeCoopSaves` dialog class remains unreachable from the UI. Remove it in Phase 7.
+
 ## Current handoff
 
-Next step: Phase 5, the pause menu (native Save/Load to co-op, Players & invite) and P2's read-only view.
+Next step: Phase 6, Join a friend (an in-game list of Steam friends hosting PBDMP, plus Direct IP).

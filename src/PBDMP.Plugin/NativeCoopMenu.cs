@@ -24,10 +24,13 @@ internal sealed class NativeCoopMenu
     private readonly Image _thumbnail;
     private readonly GameObject _preview;
     private Texture2D? _thumbnailTexture;
+    private readonly System.Action _join, _leave;
+    private bool _guest;
 
     internal NativeCoopMenu(Transform group, NativeUiKit kit, System.Action continueGame, System.Action newGame, System.Action load,
-        System.Action survival, System.Action join)
+        System.Action survival, System.Action join, System.Action leave)
     {
+        _join = join; _leave = leave;
         var source = NativeUiKit.Require(group, "MENU_Main").gameObject;
         var submenu = NativeUiKit.Require(group, "MENU_Settings_General").GetComponent<Menu>();
         var root = kit.InactiveCopy(source);
@@ -102,6 +105,7 @@ internal sealed class NativeCoopMenu
     }
 
     internal string PreviewTitleForTest => _previewTitle.text;
+    internal string GuestCaptionForTest => _previewCaption.text;
     internal bool PreviewTitleRendersForTest => _previewTitle.isActiveAndEnabled && _previewTitle.textBounds.extents.x > 0;
     internal void Open()
     {
@@ -109,9 +113,30 @@ internal sealed class NativeCoopMenu
         Menu.gameObject.SetActive(true);
     }
 
+    // P2 in P1's session: read-only. P1 chooses maps and saves; the only action is leaving.
+    internal void ShowGuest(string host, string? map)
+    {
+        _guest = true;
+        foreach (var button in new[] { Continue, NewGame, Load, Survival }) NativeUiKit.SetButtonState(button, false);
+        NativeUiKit.PrepareButton(JoinFriend, "Leave session", _leave); NativeUiKit.SetButtonState(JoinFriend, true);
+        Menu._firstSelected = JoinFriend;
+        _preview.SetActive(true); _previewCaption.text = "PLAYING WITH " + host.ToUpperInvariant();
+        _previewTitle.text = map == null ? "WAITING FOR P1" : MultiplayerBehaviour.CampaignName(map);
+        _previewLine.text = "P1 chooses maps and saves."; _previewWhen.text = "Your health, ammo and consumables stay your own.";
+        _thumbnail.sprite = null; _thumbnail.color = new Color(0.1f, 0.05f, 0.13f);
+        Navigate(new[] { Continue, NewGame, Load, Survival, JoinFriend, Back });
+    }
+
     // Shows the newest campaign; hides the preview and disables Continue when none exists.
     internal void ShowLatest(string? title, string details, string when, byte[]? thumbnail)
     {
+        if (_guest)
+        {
+            _guest = false; _previewCaption.text = "CONTINUE CO-OP";
+            foreach (var button in new[] { NewGame, Load, Survival }) NativeUiKit.SetButtonState(button, true);
+            NativeUiKit.PrepareButton(JoinFriend, "Join a friend", _join);
+            Menu._firstSelected = Continue; Navigate(new[] { Continue, NewGame, Load, Survival, JoinFriend, Back });
+        }
         NativeUiKit.SetButtonState(Continue, title != null);
         _preview.SetActive(title != null);
         if (title == null) return;
