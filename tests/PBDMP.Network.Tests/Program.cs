@@ -37,6 +37,38 @@ await Test("Survival state frames are bounded, exact and reject stale or malform
     return Task.CompletedTask;
 });
 
+await Test("shared item and team inventory frames are bounded, exact and direction-checked",()=>
+{
+    var collect=new SharedItemCollect("a:0123456789abcdef",2,true,true);
+    var frame=SharedItemsProtocol.ToFrame(collect,5);
+    Check(frame.Kind==WorldKind.SharedItem && SharedItemsProtocol.CollectFromFrame(frame)==collect);
+    Check(SharedItemsProtocol.CollectFromFrame(Protocol.Decode(Protocol.Encode(new(MessageKind.World,World:frame with {Sequence=3}))).World!)==collect);
+    foreach(var bad in new[]{collect with {Pickup=""},collect with {Pickup="x:1"},collect with {Pickup="a:"+new string('f',200)},collect with {Picker=0},collect with {Picker=3}})
+        Throws(()=>SharedItemsProtocol.ToFrame(bad,5));
+    foreach(var bad in new[]{frame with {Flags=4},frame with {Actor=0},frame with {Asset="x"},frame with {Data=new[]{"x"}},frame with {Kind=WorldKind.Loot}})
+        Throws(()=>SharedItemsProtocol.CollectFromFrame(bad));
+    var request=new SharedItemRequest("d:42",7,new(1,2,3));
+    var requestFrame=SharedItemsProtocol.ToFrame(request,5);
+    Check(SharedItemsProtocol.RequestFromFrame(requestFrame)==request && WorldProtocol.FromClient(WorldKind.SharedItemRequest));
+    Check(!WorldProtocol.FromClient(WorldKind.SharedItem) && !WorldProtocol.FromClient(WorldKind.TeamInventory));
+    foreach(var bad in new[]{requestFrame with {Actor=1},requestFrame with {Flags=1},requestFrame with {Key="a:"}})
+        Throws(()=>SharedItemsProtocol.RequestFromFrame(bad));
+    // A full base-game team inventory packs into one bounded frame and decodes exactly.
+    var items=Enumerable.Range(0,SharedItemsProtocol.MaxItems).Select(i=>new TeamItem($"{i:x32}",i%3==0?1:i)).ToArray();
+    var team=new TeamInventory(9,items);
+    var teamFrame=SharedItemsProtocol.ToFrame(team,5);
+    var decoded=SharedItemsProtocol.TeamFromFrame(Protocol.Decode(Protocol.Encode(new(MessageKind.World,World:teamFrame with {Sequence=4}))).World!);
+    Check(decoded.Version==9 && decoded.Items.OrderBy(i=>i.Id,StringComparer.Ordinal).SequenceEqual(items.OrderBy(i=>i.Id,StringComparer.Ordinal)));
+    Check(SharedItemsProtocol.TeamFromFrame(SharedItemsProtocol.ToFrame(new TeamInventory(1,Array.Empty<TeamItem>()),5)).Items.Count==0);
+    foreach(var bad in new[]{new TeamInventory(1,new[]{new TeamItem("a",0)}),new TeamInventory(1,new[]{new TeamItem("a",1001)}),new TeamInventory(1,new[]{new TeamItem("a=b",1)}),
+        new TeamInventory(1,new[]{new TeamItem("a",1),new TeamItem("a",2)}),new TeamInventory(1,Enumerable.Range(0,129).Select(i=>new TeamItem("i"+i,1)).ToArray())})
+        Throws(()=>SharedItemsProtocol.ToFrame(bad,5));
+    foreach(var bad in new[]{teamFrame with {Data=new[]{"abc"}},teamFrame with {Data=new[]{"a=-1"}},teamFrame with {Data=new[]{"a=1,a=2"}},teamFrame with {Key="x"},teamFrame with {Flags=1}})
+        Throws(()=>SharedItemsProtocol.TeamFromFrame(bad));
+    Check(!WorldProtocol.Durable(frame) && !WorldProtocol.Durable(teamFrame));
+    return Task.CompletedTask;
+});
+
 await Test("Survival long-run extremes stay exact and inside the frame and record limits",()=>
 {
     // The largest legal values of a very long run: score/damage, waves, kills, enemies, timer, offers and result fields.

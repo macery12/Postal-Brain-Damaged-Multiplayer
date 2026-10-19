@@ -133,7 +133,8 @@ internal sealed partial class SharedWorld
                 {
                     if(Environment.GetEnvironmentVariable("PBDMP_DOOR_TEST")=="1") Plugin.Logger.LogInfo($"DOOR HOST preconditions: can={door.CanBeInteractedWith(Player.Instance)}, first={door.FirstInteraction}, p1alive={Player.Instance.IsAlive}");
                     if (Player.Instance.IsAlive) door.HandleInteract(Player.Instance);
-                    else if (door._requiredStatesComponent==null || door._requiredStatesComponent.RequirementsMet())
+                    else if ((door._requiredStatesComponent==null || door._requiredStatesComponent.RequirementsMet()) &&
+                        (!SharedKeys || !door.FirstInteraction || door._requiredItemsComponent==null || door._requiredItemsComponent.TryInteract(Player.Instance)))
                     {
                         // Requester is alive; a dead P1 must not disable P2's door access.
                         door._insideHandleInteract=true;

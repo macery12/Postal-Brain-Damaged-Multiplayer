@@ -51,8 +51,8 @@ public sealed partial class MultiplayerBehaviour
         if(Time.unscaledTime-_saveAt>420) throw new TimeoutException("Save diagnostic stalled: "+_saveStep+" / "+_saves?.Status);
         if(TravelRole=="host" && Environment.GetEnvironmentVariable("PBDMP_SAVE_REPLACE")=="1" && _view!.Prompt.Open && _view.Prompt.Message.Contains("different partner",StringComparison.Ordinal))
         {
-            TravelCheck(_lifecycle!.Frozen,"different partner cannot resume the reserved slot before P1 confirms");
-            _view.Prompt.ConfirmButton.onClick.Invoke();TravelMark("save-replacement-confirmed");
+            // Anyone can join a co-op game: no partner-assignment prompt may appear.
+            _view.Prompt.ConfirmButton.onClick.Invoke();TravelMark("save-replacement-prompted");
         }
         if(TravelRole=="host") SaveTestHost();else SaveTestGuest();
     }
@@ -148,7 +148,7 @@ public sealed partial class MultiplayerBehaviour
                 CheckRestoredSave();TravelCheck(!_session!.Snapshot.Connected,"P1 resumes a persistent co-op save alone before the partner joins");
                 TravelMark("host-ready");TravelMark("save-resume-host-ready");_saveStep=21;break;
             case 21 when _lifecycle!.State.Released && Marked("save-client-initial"):
-                if(Environment.GetEnvironmentVariable("PBDMP_SAVE_REPLACE")=="1") TravelCheck(Marked("save-replacement-confirmed") && _saves!.GuestForTest?.Identity=="direct:11112222333344445555666677778888","P1 explicitly assigns saved progress to the replacement player");
+                if(Environment.GetEnvironmentVariable("PBDMP_SAVE_REPLACE")=="1") TravelCheck(!Marked("save-replacement-prompted"),"a different player joins a co-op save without an assignment prompt");
                 CheckRestoredSave();TravelCheck(_saves!.GuestForTest!=null,"fresh process retains the saved partner identity and personal record");
                 WriteRestoredWorldFixture();TravelMark("save-host-restored");_saveStep=5;break;
         }
@@ -217,7 +217,10 @@ public sealed partial class MultiplayerBehaviour
             case 3 when Marked("save-host-restored"):
                 var saved=new CoopSaveStore(Path.Combine(Path.GetDirectoryName(CoopSaveService.Root)!,"save-regression-host")).Read("manual-regression").Save;
                 var own=saved.Guest!.Collected.First(k=>k.StartsWith("a:",StringComparison.Ordinal));
-                TravelCheck(NativeSaveBridge.Entries().First(e=>"a:"+e.Guid==own).Component.Cast<Pickup>()._pickedUp,"P2 retains their own collected pickup after restore/rejoin");
+                var ownCollected=NativeSaveBridge.Entries().First(e=>"a:"+e.Guid==own).Component.Cast<Pickup>()._pickedUp;
+                // A different player joins fresh: the saved partner's personal pickup history is not theirs.
+                if(Environment.GetEnvironmentVariable("PBDMP_SAVE_REPLACE")=="1") TravelCheck(!ownCollected,"a different player starts with fresh personal pickups, not the saved partner's history");
+                else TravelCheck(ownCollected,"P2 retains their own collected pickup after restore/rejoin");
                 var hostPickup=saved.Host.Collected.First(k=>k.StartsWith("a:",StringComparison.Ordinal));
                 TravelCheck(!NativeSaveBridge.Entries().First(e=>"a:"+e.Guid==hostPickup).Component.Cast<Pickup>()._pickedUp,"P1 pickup collection does not remove P2's copy after restore");
                 TravelCheck(Object.FindObjectsOfType<BagPickup>(true).Any(b=>b.name.Contains("Clone") && b._healthAmount==17 && !b._pickedUp),"P2 receives an available personal copy of P1's collected enemy drop");

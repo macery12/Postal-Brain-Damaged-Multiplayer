@@ -64,6 +64,7 @@ public sealed class Plugin : BasePlugin
         SharedProjectilePatches.Install(new Harmony("pbdmp.multiplayer.projectiles"));
         Log.LogInfo("Installing shared loot/encounter/effect hooks.");
         SharedLootPatches.Install(new Harmony("pbdmp.multiplayer.loot"));
+        SharedItemPatches.Install(new Harmony("pbdmp.multiplayer.shared-items"));
         Log.LogInfo("Installing shared encounter hooks.");
         SharedEncounterPatches.Install(new Harmony("pbdmp.multiplayer.encounters"));
         Log.LogInfo("Installing native weapon effects.");

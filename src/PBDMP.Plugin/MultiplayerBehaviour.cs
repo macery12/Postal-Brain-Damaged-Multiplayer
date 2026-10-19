@@ -154,6 +154,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             var hostPause=hold.Length==0 && _lifecycle?.HostPauseNotice==true;
             _view.Hud.Hold(hostPause?"Host has paused":hold,hostPause);
             _view.Hud.Banner(snapshot.Connected && _world!=null && hold.Length==0 ? _world.SurvivalBanner(PartnerLabel(snapshot)) : "");
+            if(_world!=null) _world.PartnerName=PartnerLabel(snapshot);
             if (_lastStatus != snapshot.Status)
             {
                 _lastStatus = snapshot.Status;
@@ -193,6 +194,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
                 else if(Environment.GetEnvironmentVariable("PBDMP_DOOR_RELOAD_TEST")=="1") RunDoorReloadTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_STATE_TEST")=="1") RunSharedStateTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_DOOR_TEST")=="1") RunDoorTest();
+                else if(SharedItemsTestEnabled) RunSharedItemsTest();
                 else if(Environment.GetEnvironmentVariable("PBDMP_SHARED_COMBAT_TEST")=="1") RunSharedCombatTest();
                 else RunTravelTest();
             }

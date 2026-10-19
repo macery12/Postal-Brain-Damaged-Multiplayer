@@ -46,8 +46,9 @@ public sealed partial class MultiplayerBehaviour
                 _keyDoor=Object.FindObjectsOfType<Interactable>(true).FirstOrDefault(d=>_world!.IsDoor(d) && d._requiredItemsComponent?._requiredItemsQuantity.Count>0);
                 TravelCheck(_keyDoor!=null,"campaign fixture contains a native required-item door");
                 var inventory=Player.Instance.GetComponent<PlayerInventoryComponent>();
+                // Identical players: the keys are given to P1 and reach P2 through the team inventory.
                 foreach(var item in _keyDoor!._requiredItemsComponent._requiredItemsQuantity)
-                {var count=inventory.GetItemQuantity(item.Key);if(count>0) inventory.RemoveItem(item.Key,count);_keyCounts[item.Key.ID]=0;}
+                {var count=inventory.GetItemQuantity(item.Key);if(count<item.Value) inventory.AddItem(item.Key,item.Value-count);_keyCounts[item.Key.ID]=inventory.GetItemQuantity(item.Key);}
                 _keyDoor.FirstInteraction=true;
                 if(_keyDoor.TryCast<Door>() is {} hinged) hinged._disableInteraction=false;
                 Plugin.Logger.LogInfo($"KEY TEST selected {_keyDoor.name} {_keyDoor.GetIl2CppType().Name}; first={_keyDoor.FirstInteraction}");
@@ -57,7 +58,8 @@ public sealed partial class MultiplayerBehaviour
                 TravelMark("host-ready");_doorTestStep=2;break;
             case 2 when Marked("client-key-request") && !_keyDoor!.FirstInteraction:
                 foreach(var item in _keyDoor._requiredItemsComponent._requiredItemsQuantity)
-                    TravelCheck(Player.Instance.GetComponent<PlayerInventoryComponent>().GetItemQuantity(item.Key)==0,"P2 required-item interaction never spends or copies P1's keys");
+                    TravelCheck(Player.Instance.GetComponent<PlayerInventoryComponent>().GetItemQuantity(item.Key)<=_keyCounts[item.Key.ID],"P2's key door uses the team key through P1's native requirement");
+                File.WriteAllLines(Marker("key-after"),KeyItems(_keyDoor).Select(i=>i.Key.ID+"	"+Player.Instance.GetComponent<PlayerInventoryComponent>().GetItemQuantity(i.Key)));
                 TravelMark("host-key-committed");_doorTestStep=3;break;
             case 3 when Marked("client-key-shared"):
                 GameManager.LoadLevel(DoorTestLevel("LEVEL_NLM_DeathStar"),true);_doorTestStep=4;break;
@@ -97,17 +99,16 @@ public sealed partial class MultiplayerBehaviour
                 _keyDoor=_world!.ComponentForTest(File.ReadAllText(Marker("key-door")))!.Cast<Interactable>();
                 var inventory=Player.Instance.GetComponent<PlayerInventoryComponent>();
                 foreach(var item in _keyDoor._requiredItemsComponent._requiredItemsQuantity)
-                {inventory.AddItem(item.Key,item.Value);_keyCounts[item.Key.ID]=inventory.GetItemQuantity(item.Key);}
+                    TravelCheck(inventory.GetItemQuantity(item.Key)>=item.Value,"P2 holds the team's keys from P1");
                 TravelCheck(PlayerSessionState.FindNearby(Player.Instance,_keyDoor.transform.position,out var point),"key fixture has grounded, clear space near its door");
                 Player.Instance.Teleport(point,Vector3.zero,Vector3.zero);_doorTestAt=Time.unscaledTime+1f;_doorTestStep=2;break;
             case 2 when Time.unscaledTime>=_doorTestAt && !_lifecycle!.Frozen:
                 TravelCheck(_keyDoor!.FirstInteraction,"guest receives the current locked first-interaction state");
                 Plugin.Logger.LogInfo($"KEY TEST requester distance={Vector3.Distance(Player.Instance.FeetPosition,_keyDoor.transform.position)}; can={_keyDoor.CanBeInteractedWith(Player.Instance)}; states={_keyDoor._requiredStatesComponent?.RequirementsMet()}; missing={_keyDoor._requiredItemsComponent.GetLackingItems(Player.Instance).Count}");
                 _keyDoor.HandleInteract(Player.Instance);TravelMark("client-key-request");_doorTestStep=3;break;
-            case 3 when Marked("host-key-committed") && !_keyDoor!.FirstInteraction:
+            case 3 when Marked("host-key-committed") && !_keyDoor!.FirstInteraction && File.ReadAllLines(Marker("key-after")).All(l=>l.Split('	') is var p && KeyItems(_keyDoor).First(i=>i.Key.ID==p[0]).Key is var key && Player.Instance.GetComponent<PlayerInventoryComponent>().GetItemQuantity(key)==int.Parse(p[1])):
                 TravelCheck(true,"requester's native required items unlock the shared door on both peers");
-                foreach(var item in _keyDoor._requiredItemsComponent._requiredItemsQuantity)
-                    TravelCheck(Player.Instance.GetComponent<PlayerInventoryComponent>().GetItemQuantity(item.Key)<=_keyCounts[item.Key.ID],"P2 retains native requester-only required-item consumption policy");
+                TravelCheck(true,"the team key is consumed once and both players hold the same count");
                 TravelMark("client-key-shared");_doorTestStep=4;break;
             case 4 when File.Exists(Marker("proximity-door")) && _lifecycle!.WorldReady && _lifecycle.State.Released:
                 _proximityTestDoor=_world!.ComponentForTest(File.ReadAllText(Marker("proximity-door")))!.Cast<SlidingDoors>();
@@ -136,6 +137,8 @@ public sealed partial class MultiplayerBehaviour
                 TravelMark("client-pass");_doorTestStep=99;break;
         }
     }
+    private static List<(ItemId Key,int Value)> KeyItems(Interactable door)
+    {var items=new List<(ItemId,int)>();foreach(var item in door._requiredItemsComponent._requiredItemsQuantity) items.Add((item.Key,item.Value));return items;}
     private static bool AcceptsNativeKick(Door door)
     {foreach(var entity in door._openerEntities) if(entity.name=="WEAPON_NoWeapon") return true;return false;}
     private static LevelId DoorTestLevel(string name)

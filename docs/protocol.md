@@ -1,6 +1,6 @@
 # Protocol (development)
 
-PBDMP 0.10.0 development source carries protocol 12 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 0.10.0 development source carries protocol 13 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 
@@ -139,6 +139,16 @@ Urine surface flag 4 includes authored `OcclusionPortal.open` alongside renderer
 After the optional carrier, every pose appends 15 bytes: byte motion (grounded/airborne/sliding), uint16 actions, uint32 action sequence, float32 normalized phase and float32 charge. Action bits are firing 1, secondary 2, melee 4, loop 8, block 16, shield 32, charge 64, kick 128, left-hand 256 and saw-running 512. Undefined motion/action bits, non-finite numbers, phase outside 0–1 and charge outside 0–100 are rejected. Exact game/mod fingerprint checks remain unchanged.
 
 This data controls visuals only. Existing world messages still authorize attacks and damage. Death/scene generations retain their existing guards; initial snapshots do not replay old shot counters. Local native callbacks and current weapon state supply the snapshot, while remote visual rigs contain no gameplay scripts or colliders. The 20 Hz loop and save schema 2 are unchanged.
+
+## Shared items (protocol 13)
+
+Campaign only; Survival ignores these frames. Protocol 13 appends:
+
+- **SharedItem = 25** (P1 → P2). `Key` is the pickup key (`a:<save guid>` authored or `d:<loot id>` dropped) and `Actor` the picker (1 or 2). `Flags` bit 0 is the partner grant and bit 1 is live; a snapshot sends live off, so restored pickups disappear without sound or notices. P2 hides its copy with native `SetEnabled(true)`. When P2 is the picker or the grant is set, P2 first runs native `PickUp` on its own player.
+- **TeamInventory = 26** (P1 → P2). `Revision` is a version that only increases. `Data` packs sorted `id=quantity` tokens of P1's weapons (with a pickup), keys and mission items. P2 applies them idempotently through native `AddItem`/`RemoveItem` and ignores older versions.
+- **SharedItemRequest = 41** (P2 → P1). `Key` is the pickup, `Life` P2's life and `Position` P2's feet. P1 checks the life, a 3 m distance to P2's pose and a 4 m distance to the pickup. P1 then runs native `PickupComplete` on its own player, which fires the host listeners once; `PickUp` is suppressed when the partner gets nothing. P1 then commits a `SharedItem`.
+
+Key doors requested by P2 now run the native required-items check on P1's inventory, which is the team's. The key is consumed there and reaches P2 through the team inventory.
 
 ## Survival state (protocol 12)
 

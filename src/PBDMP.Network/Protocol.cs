@@ -25,7 +25,7 @@ public sealed record Packet(MessageKind Kind, int Version = Protocol.Version, st
 
 public static class Protocol
 {
-    public const int Version = 12;
+    public const int Version = 13;
     public const int MaxFrameBytes = 8192;
     public const int MaxInventoryItems = 64;
     private static readonly UTF8Encoding Utf8 = new(false, true);

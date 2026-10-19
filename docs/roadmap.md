@@ -1,6 +1,6 @@
 # Roadmap and session rules
 
-Current development source: **PBDMP 0.10.0 / protocol 12**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current development source: **PBDMP 0.10.0 / protocol 13**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
 
 Survival co-op for the three base arenas is installed as **41D7421713392F3B** (see the [Survival handoff](../survival.md)). The focused [weapon-animation pass](weapon-animation-testing.md), previously installed as **C990AE9ED22FC33F**, remains included: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
 
@@ -16,11 +16,11 @@ Survival co-op for the three base arenas is installed as **41D7421713392F3B** (s
 - Walk-in exits gather both living players; leaving cancels readiness. Interactable endings preserve native interaction and require both nearby. Automatic endings wait until both are alive and loaded.
 - P2 disconnecting lets P1 continue. P1 departing ends the session and returns P2 to the main menu; no host migration.
 
-## Intentionally personal systems
+## Identical and personal systems
 
-Health, armor/shields, ammo, weapons, keys, item counts, pickups and powerup types/durations remain personal. Collecting a pickup does not remove the partner's copy. Host-selected enemy drops receive separate collectible copies.
+In the campaign, weapons, keys and mission items are one team inventory owned by P1. A pickup of any of them exists once, and both players receive it. A key door uses the key for both. See [the redesign plan](../coop-redesign.md).
 
-Keys/items are checked and consumed on the interacting player when native rules require them. An accepted unlock opens shared progression for both players. This preserves resource balance without requiring duplicate keys at a shared door. Personal systems do not count as unfinished synchronization.
+Health, armor/shields, ammo, consumables and powerup types/durations remain personal. Collecting one of those pickups does not remove the partner's copy, and host-selected enemy drops receive separate collectible copies. Survival keeps every resource personal. Personal systems do not count as unfinished synchronization.
 
 ## Remaining priorities
 

@@ -56,6 +56,8 @@ internal sealed class PlayerSessionState
         if (!Pending || player == null) return false;
         if (_player == null || player.Pointer != _player.Pointer) { Cancel(); return false; }
         var inventory = _deathInventory!;
+        // Shared weapons, keys and items may change while dead (partner pickups, door keys).
+        if (!WaveRevival) KeepSharedSinceDeath(inventory, new PlayerInventoryComponent.SaveData(player.GetComponent<PlayerInventoryComponent>()));
         player.Respawn();
         if (beside is { } feet && FindNearby(player, feet, out var position)) RestoreMovement(position, new(0, yaw, 0));
         else RestoreMovement(_spawn, _rotation);
@@ -156,5 +158,15 @@ internal sealed class PlayerSessionState
     }
 
     internal void Cancel() { _deathInventory = null; _player = null; WaveRevival = false; Life++; }
+    private static void KeepSharedSinceDeath(PlayerInventoryComponent.SaveData death, PlayerInventoryComponent.SaveData current)
+    {
+        foreach (var entity in Resources.FindObjectsOfTypeAll<EntityId>())
+        {
+            if (!SharedWorld.SharedEntity(entity) || string.IsNullOrEmpty(entity.ID)) continue;
+            if (current.HeldItems.ContainsKey(entity.ID)) death.HeldItems[entity.ID] = current.HeldItems[entity.ID];
+            else if (death.HeldItems.ContainsKey(entity.ID)) death.HeldItems.Remove(entity.ID);
+        }
+    }
+
     internal void FinishRespawn() { if (Pending) Revive(null); }
 }

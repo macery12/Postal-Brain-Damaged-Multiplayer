@@ -22,11 +22,12 @@ Dying continues to use independent respawns. It never automatically rewinds the 
 
 The game's authored save serializers capture the host world and campaign data. Multiplayer adapters supplement enemy/spawn/death records, encounters and boss state, doors, mission triggers, required destruction, urine puzzles, machinery and generated loot. Restoring reloads the map, restores native state and applies durable multiplayer records before either player is released.
 
-Each player's resource items and pickup history remain personal, including authored resource pickups and separate copies of enemy drops. Posters and their level-result count are shared; their authored records persist independently of personal resource histories. A host-collected pickup does not disappear for P2. Completed damage and destruction persist; in-flight attacks, explosion sounds and other transient effects are cleared rather than replayed.
+Weapons, keys and mission items are identical for both players: P1's inventory holds them for the team, and their pickups exist once. Ammo, health, armor and consumable pickups and their history remain personal, including authored resource pickups and separate copies of enemy drops. Posters and their level-result count are shared; their authored records persist independently of personal resource histories. A host-collected pickup does not disappear for P2. Completed damage and destruction persist; in-flight attacks, explosion sounds and other transient effects are cleared rather than replayed.
 
 | Player state | P1 | P2 |
 | --- | --- | --- |
-| Weapons, remaining ammo and equipped weapon | Restored from the save. | Exact copy of P1 on every join/rejoin and save/checkpoint restore. Independent during subsequent play. |
+| Weapons, keys and mission items | Restored from the save; this is the team inventory. | Always identical to P1, including on join/rejoin and restore. |
+| Remaining ammo and equipped weapon | Restored from the save. | Copy of P1 on every join/rejoin and save/checkpoint restore. Independent during subsequent play. |
 | Health and armor | Saved values restored. | Full health, zero armor on join/rejoin and restore. |
 | Temporary powerups | Saved remaining effects restored. | Cleared on join/rejoin and restore. |
 | Keys, non-ammo items and pickup history | Personal saved record. | Personal saved record for the current map, independent of P1. |
@@ -38,7 +39,7 @@ If P1 advances while P2 is absent, the partner's record is retained. A return on
 
 Steam sessions recognize the connected Steam account. Direct IP sessions use a locally generated persistent player ID in `BepInEx/PBDMP/player-id`; keep that file when moving your installation if you want to retain the same identity. Names and IP addresses do not determine ownership. Direct IP identity is a continuity mechanism, not authentication.
 
-A different partner cannot inherit the saved P2 record automatically. P1 receives an assignment prompt and must confirm; declining disconnects the guest. Resuming without P2 keeps the absent partner's record.
+Anyone can join a co-op game, with no assignment prompt. A saved personal record is used only by the player it belongs to. A different player joins fresh: the team's weapons, keys and items, P1's remaining ammo, full health and zero armor, and untouched personal pickups. Resuming without P2 keeps the absent partner's record.
 
 ## Capture, loading and recovery
 

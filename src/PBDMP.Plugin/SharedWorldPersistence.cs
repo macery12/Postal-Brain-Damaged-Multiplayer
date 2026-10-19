@@ -184,5 +184,6 @@ internal sealed partial class SharedWorld
         var bag=pickup.TryCast<BagPickup>();if(bag!=null) {bag.SetHealth(frame.Value);bag.SetArmor(frame.Value2);}
         _ownedLoot.Add(root);
         CoopSaveService.Current?.RestoreDropCollection(pickup,"d:"+frame.Entity);
+        if(_collectedShared.Contains("d:"+frame.Entity)) pickup.SetEnabled(true);
     }
 }

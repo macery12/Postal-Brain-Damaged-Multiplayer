@@ -2,13 +2,13 @@
 
 Updated October 18, 2026.
 
-**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phase 0 is next.**
+**Status: the owner confirmed the design on October 18, 2026 and authorized implementation and commits ("commit as needed"). Pushing is not authorized. Phases 0–2 are complete; Phase 3 is next.**
 
 | Phase | State |
 | --- | --- |
-| 0 Native research | Pending |
-| 1 Shared items core | Pending |
-| 2 Keys, joins and saved inventory | Pending |
+| 0 Native research | Complete |
+| 1 Shared items core | Complete |
+| 2 Keys, joins and saved inventory | Complete (schema change moved to Phase 3) |
 | 3 Co-op campaigns (save model) | Pending |
 | 4 Multiplayer menu and entry flows | Pending |
 | 5 In-session pause menu and P2 view | Pending |
@@ -77,6 +77,37 @@ Mockup: the owner's private design canvas "PBDMP co-op menu flow" (seven boards)
   - `LoadMenu`/`SaveLoadMenu` (`SaveHyperButton`: `ThumbnailImage`, `TypeText`, `LevelText`, `DateText`).
   - `SaveData.Thumbnail` (`byte[]`), `PauseMenu` (`_saveButton`, `_loadButton`), `HordeModeMenu`, `ConfirmationPromptMenu`, `PromptMenu` and `MenuLegendComponent`.
 
+## Phase 0 findings (October 18, 2026)
+
+Native facts come from the recovered ISIL of the reference build. Runtime facts come from the `-Audit` pickup census over all 15 campaign maps, which writes `pickups-<level>.tsv`.
+
+- **Grant path.**
+  - `ItemPickup.PickUp(player)` invokes the `Player.OnItemPickUp(EntityId,int)` delegate (`[player+0x50]`) for each `_items` entry.
+  - `PlayerInventoryComponent.OnItemPickUp` only calls `AddItem`.
+  - `AddItem` caps the quantity at `InventoryCapacity`, then calls `ItemsInventory.AddItem` or `WeaponsInventory.AddWeapon`, shows the tutorial, and fires an inventory event.
+  - `RemoveItem` mirrors this. `AddItem` is called directly only from inside the inventory; other sources go through the delegate.
+  - Keys are consumed through `Player.RemoveItem`, and `LevelController.EndLevel` calls `RemoveKeyItems`.
+- **Key-item rule.** `RemoveKeyItems` keeps a held `ItemId` as a key item when `_isAmmo` (`+0x39`) is false and the virtual `IsUsable` is false. This matches the planned shared class.
+- **Exception.** `HEALTH_*` and `ARMOR_*` ids pass the same test, but they appear only in `HealthPickup`/`ArmorPickup`. The shared rule is therefore limited to `ItemPickup` contents.
+- **Weapons.** Shared weapons are those with a `_pickupPrefab`. That excludes unarmed, the dong, drink variants and the cutscene weapon. A weapon pickup bundles the gun, its akimbo variant and its native ammo; for example, Shotgun = `WEAPON_Shotgun`, `WEAPON_Shotgun_Akimbo` and `AMMO_Shells`×20.
+- **Census.**
+  - Shared item pickups in the campaign: weapons on Neighborhood, Prison, Hospital, ComicCon, SozebTrain and VIPZone.
+  - Keys: `KEY_*`, `ILLUMINATI_*` and `KEY_Lever`/`Winch`/`TNT`/`Square`/`Eye`/`Sozeb*`.
+  - Personal: ammo, `HEALTH_Pipe`, `AMMO_BOX`, `AKIMBO`, drinks, `PORTABLE_ARMOR`, `QUICK_PILLZ` and `STEROIDS` (usable), plus `HealthPickup`/`ArmorPickup`/`BagPickup`.
+  - Native `LootController` drops only health, ammo and bags. Enemies don't drop weapons or keys through it.
+- **Pickup lifecycle.**
+  - `HandleInteract` calls the virtual `PickUp`, sets `_isBeingPickedUp`, then runs `PickupComplete` directly or after a tween.
+  - `PickupComplete` sets `_pickedUp`, hides the object and fires the pickup and interaction listeners.
+  - `SetEnabled(true)` marks the pickup taken and hides it without firing listeners.
+- **Menus.**
+  - `MenuManager.Open(Menu)` keeps the native stack and Escape handling.
+  - `OpenConfirmationPrompt(Action, LocalizedString)`, `OpenDifficultyPrompt(Action)`, `OpenInputPrompt` and `OpenPleaseWaitPrompt` are available.
+  - `LevelSelectionMenu.StartLevel` opens the difficulty prompt.
+  - The main, pause and Horde menu instances are `MenuManager` fields.
+- **Thumbnails.** The save coroutine renders `Player.RenderToRenderTexture` into a texture through `Texture2D.ReadPixels` and stores PNG bytes from `EncodeToPNG`. `SaveHyperButton` shows them through `ImageConversion.LoadImage` → `Sprite.Create`.
+- **Steam.** PBDMP calls the flat Steam API. A hosting list needs `ISteamFriends` `GetFriendCount`/`GetFriendByIndex`/`GetFriendGamePlayed`, which reports a friend's lobby ID, plus `RequestLobbyData`/`GetLobbyData` for the build and map.
+- **Left for Phase 4:** which native objects the main-menu Story and Load buttons open, and the save/load submenu instances behind the pause menu's Save and Load buttons. Resolve these at runtime when building the menus.
+
 ## Existing implementation map
 
 | Area | Files |
@@ -110,6 +141,28 @@ Mockup: the owner's private design canvas "PBDMP co-op menu flow" (seven boards)
 | 6 | Join a friend: Steam friends hosting PBDMP (lobby/rich-presence data), Join, Refresh, Direct IP… | One-account Steam checks pass; two-account join is a maintainer check. |
 | 7 | Hardening, the full campaign and Survival regressions, README/protocol/co-op-saves/sync rows, package, install when the game is closed, handoff. | Regressions pass; docs updated. |
 
+## Phase 1–2 handoff (October 19, 2026)
+
+**Source**
+- Protocol 13 (`SharedItemsProtocol`).
+- `SharedItems.cs`: classification; single shared pickups, authored and dropped; partner grants; team inventory; partner notices.
+- `SharedItemDiagnostics.cs` (`-SharedItems`).
+- P2 key doors consume the team key natively on P1 (`SharedDoorPatches.Requirements`).
+- No partner-assignment prompt; a different player joins fresh (`CoopSaveService.Assigned`).
+- Campaign respawn keeps shared-class holdings changed while dead (`PlayerSessionState.KeepSharedSinceDeath`).
+- The `-Doors` and replace-partner fixtures were updated to the new rules.
+- The campaign audit now writes the `pickups-<level>.tsv` census.
+
+**Checks**, on an isolated copy:
+- Managed: 0 warnings; network scenarios and 8 reporting checks pass, including the shared-item protocol scenario.
+- Native: `-SharedItems -Level LEVEL_AD_Prison` 17; `-Doors` 20; `-Combat` 28; default travel 54; `-Saves`, `-SaveResume` and `-SaveResume -SaveReplacePartner` on Neighborhood 42 / 21 / 22; `-JoinInput` 10; `-SurvivalPrep` (Suburbs) 47, so Survival offers stay personal.
+
+**Limits**
+- Fixture pickups are taken by native `Interact` after teleporting P2 onto the pickup. A natural walk-over is a maintainer check.
+- A late join receiving keys uses the same snapshot team frame that the fixture exercises for weapons, but has no dedicated check.
+- Scripted (non-pickup) grants on P1 follow through the team inventory. No native scripted-grant route was exercised.
+- Saves still store P2's personal record, which includes its keys. The team inventory overrides them on restore. Schema 3 (Phase 3) drops them.
+
 ## Current handoff
 
-Plan written. Next step: Phase 0 native research.
+Next step: Phase 3, co-op campaigns. That covers the store layout, per-campaign quick/auto/manual saves, map-based names, the Players list, thumbnails, delete, newest-save lookup and schema 3.

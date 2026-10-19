@@ -39,8 +39,10 @@ internal static class SharedDoorPatches
         if(world is not {Client:true} || !world.IsDoor(__instance)) return true;
         world.RequestDoor(__instance,player); return false;
     }
+    // Identical players: P1's inventory is the team's, so a P2 key door consumes the key natively on P1
+    // (and through the team inventory on P2). Survival keeps requester-only items.
     private static bool Requirements(ref bool __result)
-    {if(SharedWorld.Current is {RemoteInteraction:true}) {__result=true;return false;} return true;}
+    {if(SharedWorld.Current is {RemoteInteraction:true,SharedKeys:false}) {__result=true;return false;} return true;}
     private static bool HostOnly()=>SharedWorld.Current is not {Client:true,Applying:false};
     private static bool DoorHit(Component __instance,HitData __0)
     {if(SharedWorld.Current is not {Client:true,Applying:false} world || !world.IsDoor(__instance)) return true;world.ClientDoorHit(__instance,__0);return false;}

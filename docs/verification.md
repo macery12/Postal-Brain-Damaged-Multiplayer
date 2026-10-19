@@ -16,6 +16,19 @@ Installed/exported **0.10.0 / protocol 12 / save schema 2**, build **41D74217133
 
 Fixture actions are native calls, not natural combat; the [Survival two-player checklist](#survival-two-player-checklist) lists what a natural playtest should confirm.
 
+## Identical players (shared items) — October 19, 2026
+
+Protocol 13, on an isolated test copy, not installed. See the [redesign plan](../coop-redesign.md#phase-12-handoff-october-19-2026).
+
+| Check | Result |
+| --- | --- |
+| `-SharedItems -Level LEVEL_AD_Prison` | 17 checks: shared and personal classification; the team weapons match; P1's new gun reaches P2 with its ammo and a native notice; a P2 key pickup gives both the key and removes the pickup on both; an owned gun gives the partner nothing; a dead partner receives at once and keeps it through the respawn. |
+| `-Doors` | 20 checks; the key door uses the team key once and both players hold the same count. |
+| `-Saves` / `-SaveResume` / `-SaveReplacePartner` (Neighborhood) | 42 / 21 / 22; a different player joins without a prompt, with fresh personal pickups. |
+| Default travel, `-Combat`, `-JoinInput`, `-SurvivalPrep` (Suburbs) | 54, 28, 10, 47. |
+
+Fixture pickups use native `Interact`; natural walk-over pickups are a maintainer check.
+
 ## Door and loot fixture fixes — October 18, 2026
 
 Build **D5F77CFC3F12EBFC** (`PBDMP.dll` 287488ACAEF342A5, `PBDMP.Network.dll` 6F0B1AFF1BA59FC8), run on an isolated test copy. Not installed.

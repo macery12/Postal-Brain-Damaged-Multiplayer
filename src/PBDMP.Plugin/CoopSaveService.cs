@@ -24,7 +24,6 @@ internal sealed partial class CoopSaveService : IDisposable
     private readonly SessionLifecycle _life;
     private readonly SharedWorld _world;
     private readonly Action<string> _notice;
-    private readonly Action<string,Action,Action> _confirm;
     private readonly Func<ulong> _remoteSteam;
     private readonly string _identity;
     private readonly CoopSaveStore _store;
@@ -44,8 +43,8 @@ internal sealed partial class CoopSaveService : IDisposable
     private readonly HashSet<string> _collected=new(StringComparer.Ordinal);
     private NativeSaveBridge.Entry[] _entries=Array.Empty<NativeSaveBridge.Entry>();
     private SavedPlayer? _guest;
-    private string _peerIdentity="", _approved="", _waitingIdentity="";
-    private bool _connected, _asking, _holdAck, _restoredAck, _restoreSent;
+    private string _peerIdentity="", _waitingIdentity="";
+    private bool _connected, _holdAck, _restoredAck, _restoreSent;
     private uint _transaction, _captureTransaction, _sentEpoch, _generation;
     private float _deadline, _profileAt, _readyAt, _checkpointAt;
     private int _autoSlot,_holdFrame,_clientHoldFrame;
@@ -94,7 +93,7 @@ internal sealed partial class CoopSaveService : IDisposable
     internal CoopSaveService(CoopSession session,SessionLifecycle life,SharedWorld world,string identity,Func<ulong> remoteSteam,
         Action<string> notice,Action<string,Action,Action> confirm)
     {
-        _session=session;_life=life;_world=world;_identity=identity;_remoteSteam=remoteSteam;_notice=notice;_confirm=confirm;
+        _session=session;_life=life;_world=world;_identity=identity;_remoteSteam=remoteSteam;_notice=notice;
         _store=new(Root);Current=this;
     }
     internal void RequestSave(string slot,string name)
@@ -146,7 +145,7 @@ internal sealed partial class CoopSaveService : IDisposable
         var connected=_session.Snapshot.Connected;
         if(connected!=_connected)
         {
-            _connected=connected;_earlyPages.Clear();ClearNativeTransfer();_assembler.Reset();_out.Clear();_sentEpoch=0;_worldSentEpoch=0;_awaitNative=connected && _nativeBaseline!=null && _baselineLevel==_life.State.Level;_peerIdentity="";_waitingIdentity="";_approved="";_asking=false;
+            _connected=connected;_earlyPages.Clear();ClearNativeTransfer();_assembler.Reset();_out.Clear();_sentEpoch=0;_worldSentEpoch=0;_awaitNative=connected && _nativeBaseline!=null && _baselineLevel==_life.State.Level;_peerIdentity="";_waitingIdentity="";
             if(connected)
             {
                 _deadline=Time.unscaledTime+60;
@@ -184,11 +183,10 @@ internal sealed partial class CoopSaveService : IDisposable
             CoopSaveStore.RequireRestorableFormat(loaded.Save);
             if(loaded.Save.Game!=NativeSaveBridge.GameKey) throw new InvalidDataException("This save belongs to a different game build.");
             if(!SessionLifecycle.Campaign(SessionLifecycle.FindLevel(loaded.Save.Level))) throw new InvalidDataException("This co-op save uses unsupported content.");
-            _restoreStarted=false;_restore=loaded.Save;_guest=_restore.Guest;_approved="";_restoreSent=false;_restoredAck=!connected;
+            _restoreStarted=false;_restore=loaded.Save;_guest=_restore.Guest;_restoreSent=false;_restoredAck=!connected;
             if(loaded.Recovered) Tell(_catalogueRecoveryTried?"The primary world catalogue was incompatible. Recovered the previous compatible backup; original files were preserved.":"Recovered the previous valid co-op save backup.");
         }
         if(_waitingIdentity.Length>0 && _remoteSteam()!=0) {AcceptIdentity(_waitingIdentity);_waitingIdentity="";}
-        if(!_life.IsClient && connected && _peerIdentity.Length>0) CheckAssignment();
         if(_restore!=null && !_restoreStarted)
         {
             if((_life.NativeReady || _life.State.Action==TravelAction.Menu) && (!connected || Assigned)) StartRestore();
@@ -241,7 +239,7 @@ internal sealed partial class CoopSaveService : IDisposable
         if(!_life.IsClient && connected && Assigned && _life.NativeReady && _world.Active && !_life.RestoringWorld && !_awaitNative && _sentEpoch!=_life.Epoch)
         {
             _restoreSent=_restore!=null;_restoredAck=false;
-            var record=_guest?.Level==_life.State.Level?_guest:null;
+            var record=_guest?.Level==_life.State.Level && _guest.Identity==_peerIdentity?_guest:null;
             var catchUp=_life.State.Joining || _restore!=null;
             if(!catchUp) record=null;
             Send(SaveCommand.Restore,JsonSerializer.SerializeToUtf8Bytes(new RestorePlayer(record,catchUp?_life.PlayerState.CaptureJoin():null,_restore!=null,catchUp)),_life.Epoch);
@@ -275,16 +273,9 @@ internal sealed partial class CoopSaveService : IDisposable
             _session.DropPeer("P2 did not provide a multiplayer player identity.");
         DrainTransfers();
     }
-    private bool Assigned=>_peerIdentity.Length>0 && (_guest==null || _guest.Identity==_peerIdentity || _approved==_peerIdentity);
-    private void CheckAssignment()
-    {
-        if(Assigned) return;
-        _life.PersistenceHold=true;
-        if(_asking) return;_asking=true;
-        _confirm("This save belongs to a different partner. Assign the saved P2 slot and its personal progress to the joining player?",
-            ()=>{_approved=_peerIdentity;if(_guest!=null) _guest=_guest with {Identity=_peerIdentity};_asking=false;if(_restore==null) _life.PersistenceHold=false;},
-            ()=>{_asking=false;_session.DropPeer("P1 declined assigning the saved partner slot.");_life.PersistenceHold=false;});
-    }
+    // Anyone can join a co-op game. A saved personal record is used only by the player it belongs to;
+    // anyone else joins fresh (P1's weapons and ammo plus the shared team inventory).
+    private bool Assigned=>_peerIdentity.Length>0;
     private bool Safe=>!_world.HasPendingInteractions && _life.NativeReady && _world.Active && Player.Instance?.IsAlive==true && !_life.PlayerState.Pending && !_life.RestoringWorld &&
         (!_session.Snapshot.Connected || _session.Snapshot.RemotePose is {Alive:true,Ready:true} pose && pose.Epoch==_life.Epoch) &&
         !_life.StoryActive && !_life.LocalTutorialActive;

@@ -4,7 +4,7 @@
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
-Current source: **PBDMP 0.10.0 / protocol 12 / save schema 2** (protocol 12 adds the in-development Survival state frame). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
+Current source: **PBDMP 0.10.0 / protocol 13 / save schema 2** (protocol 13 adds the shared-item and team-inventory frames). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
 **Development coverage: 95% (20 / 21 points). Last accepted milestone baseline: 95% (20 / 21).** The two-PC Steam playtest accepts the general world trigger and active-session restoration milestones. [Scoring details](#progress-score).
 
@@ -432,7 +432,7 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Generated loot persistence | | | ✅ | Stable saved drop records and separate collection histories. |
 | Returning Steam partner | | | ✅ | Validates the saved slot against the connected Steam account. |
 | Returning Direct IP partner | | | ✅ | Persistent local player ID; not based on name or address. |
-| Replacement partner confirmation | | | ✅ | P1 must assign the saved partner slot before release. |
+| Replacement partner | | | ✅ | Anyone can join without a prompt; a different player joins fresh instead of taking the saved partner's personal record. |
 | Resume without P2 | | | ✅ | P1 can continue while retaining the absent partner record. |
 | P2 health reset on join/restore | | | ✅ | Full health; no resource refill during ordinary play. |
 | P2 armor reset on join/restore | | | ✅ | Zero armor. |
@@ -473,9 +473,22 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see the 
 | Solo/save isolation | | | ✅ | Co-op manual/quick/autosaves are refused with a Survival message; native writers and metadata stay blocked. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Performance | | | ✅ | Same wave-1 workload at a 120 FPS cap on one PC: offline p99 9.66 ms, P1 alone 9.73 ms, P1+P2 9.89/9.99 ms (P1/P2); P1 world p95 0.77 ms. 15-wave soak: no frame over 100 ms, managed heap +2.0/+2.4 MiB; Survival frames bounded by the 0.1 s sweep under kill bursts. Two-PC network figures are a maintainer check. See [performance](performance.md). |
 
+## Shared items
+
+Campaign only (Survival keeps every resource personal). Protocol 13. Plan: [redesign plan](../coop-redesign.md).
+
+| Feature | Planned | Partially synced | Synced | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Weapon, key and mission-item pickups | | | ✅ | One shared pickup; P1 commits every collection, both PCs collect their native copy. `-SharedItems`. |
+| Partner grants | | | ✅ | A gun new to the team comes with its native ammo for the partner; an owned gun gives the partner nothing; keys and items always go to both. |
+| Team inventory | | | ✅ | P1's absolute weapons/keys/items, applied idempotently on P2; scripted grants and consumption follow it. |
+| Key doors | | | ✅ | Either player's key door uses the team key once, natively on P1. `-Doors`. |
+| Dead partner | | | ✅ | Receives shared items at once; respawn keeps them. |
+| Partner pickup notice | | | ✅ | The game's own notification on the receiving PC, e.g. "+ SHOTGUN ([name])", once per item; none for an owned gun. |
+
 ## Intentionally local systems
 
-These are agreed design choices and do not reduce the progress score. Picking something up never removes the other player's copy.
+These are agreed design choices and do not reduce the progress score. Picking up a personal resource never removes the other player's copy. Weapons, keys and mission items are identical instead; see [Shared items](#shared-items).
 
 | System | Intentionally local | Comments |
 | --- | :---: | --- |
@@ -484,14 +497,9 @@ These are agreed design choices and do not reduce the progress score. Picking so
 | Health pickup collection | ✅ | Each player collects their own copy. |
 | Armor pickup collection | ✅ | Each player collects their own copy. |
 | Ammo pickup collection | ✅ | Each player collects their own copy. |
-| Weapon pickup collection | ✅ | Each player collects their own copy. |
-| Key pickup collection | ✅ | Each player collects their own copy; an accepted door unlock is shared. |
 | Powerup pickup collection | ✅ | Each player collects their own copy. |
-| Other item pickup collection | ✅ | Each player collects their own copy. |
-| Owned weapon inventory | ✅ | Independent after catch-up on every join/rejoin and co-op restore. |
+| Other item pickup collection | ✅ | Consumables and powerups: each player collects their own copy. Mission items are shared. |
 | Remaining ammo inventory | ✅ | Independent after catch-up on every join/rejoin and co-op restore. |
-| Key inventory | ✅ | Only the interacting player's own keys are checked/consumed. |
-| Required-item inventory | ✅ | Only the interacting player's own required items are checked/consumed. |
 | Other item counts | ✅ | Personal quantities remain independent. |
 | Active personal powerups | ✅ | Personal effects/durations remain independent. |
 | Urine powerup type | ✅ | Personal fire/ice/confusion selection; shared targets receive the acting player's results. |

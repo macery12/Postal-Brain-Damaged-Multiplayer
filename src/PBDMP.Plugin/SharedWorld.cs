@@ -94,7 +94,7 @@ internal sealed partial class SharedWorld : IDisposable
             if(!keepHostWorld)
             {
                 ClearSequences();ClearScenery();ClearMechanisms();ClearMissions();
-                ClearPosters(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine(); _catalogue=null; _assets=null; _enemies.Clear(); _enemyIds.Clear(); _lastEnemy.Clear();
+                ClearPosters(); ClearSharedItems(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine(); _catalogue=null; _assets=null; _enemies.Clear(); _enemyIds.Clear(); _lastEnemy.Clear();
                 _componentIds.Clear(); _lastDoor.Clear(); _lastMotion.Clear(); _revisions.Clear(); _snapshotEnemies.Clear(); _enemyRespawns.Clear(); _nextId=0;
             }
             _epoch=_life.Epoch; _mapGeneration=_life.MapGeneration;
@@ -106,8 +106,8 @@ internal sealed partial class SharedWorld : IDisposable
         }
         if (!_life.NativeReady || _life.State.Action==TravelAction.Menu) return;
         if (_catalogue==null)
-        { MultiplayerBehaviour.EnsurePropSpawnerFixture();_catalogue=new(); _catalogue.Build(); _assets=new(); _assets.Build(); BuildProjectilePrefabs(); BuildLootPrefabs(); BuildExplosionAssets(); BuildStreams(); BuildUrineSounds(); BuildUrineRails(); BuildPosters(); }
-        if(!Client) {TickLoot();TickSurvivalTargets();TickSurvivalRules();}
+        { MultiplayerBehaviour.EnsurePropSpawnerFixture();_catalogue=new(); _catalogue.Build(); _assets=new(); _assets.Build(); BuildProjectilePrefabs(); BuildLootPrefabs(); BuildExplosionAssets(); BuildStreams(); BuildUrineSounds(); BuildUrineRails(); BuildPosters(); BuildSharedItems(); }
+        if(!Client) {TickLoot();TickSharedItems();TickSurvivalTargets();TickSurvivalRules();}
         else TickSurvivalClient();
         TickSurvivalReadyInput();TickSurvivalHud();
         var snapshot=_session.Snapshot;
@@ -247,6 +247,8 @@ internal sealed partial class SharedWorld : IDisposable
                 else if (frame.Kind==WorldKind.SceneryEvent) PlaySceneryEvent(frame);
                 else if (frame.Kind==WorldKind.PlayerEffect) ApplyPlayerEffect(frame);
                 else if (frame.Kind==WorldKind.Survival) ApplySurvival(frame);
+                else if (frame.Kind==WorldKind.SharedItem) ApplySharedItem(frame);
+                else if (frame.Kind==WorldKind.TeamInventory) ApplyTeamInventory(frame);
             }
             finally { _applying=false; }
         }
@@ -259,6 +261,7 @@ internal sealed partial class SharedWorld : IDisposable
         else if (frame.Kind==WorldKind.Reflect) ApplyReflection(frame);
         else if (frame.Kind==WorldKind.Defense) ApplyDefense(frame);
         else if (frame.Kind==WorldKind.SurvivalRequest) ApplySurvivalRequest(frame);
+        else if (frame.Kind==WorldKind.SharedItemRequest) ApplySharedItemRequest(frame);
     }
     private void SendState(bool complete)
     {
@@ -313,6 +316,7 @@ internal sealed partial class SharedWorld : IDisposable
         foreach(var step in CaptureSequences(complete)) yield return step;
         foreach(var step in CaptureMechanisms(complete)) yield return step;
         if(complete) foreach(var loot in _loot.Values) Send(loot);
+        CaptureSharedItems(complete);
         IEnumerable<Npc> actors=complete?Object.FindObjectsOfType<Npc>():_enemies.Values.ToArray();
         foreach (var npc in actors)
         {
@@ -526,7 +530,7 @@ internal sealed partial class SharedWorld : IDisposable
         CancelStateCapture();
         RefundPendingDoorRequests();
         ClearSequences();ClearScenery(preserveHost:!Client);ClearMechanisms();ClearMissions();
-        ReleaseActor(); ClearPosters(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearWeaponAudio(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine();
+        ReleaseActor(); ClearPosters(); ClearSharedItems(); ClearProjectiles(); ClearLoot(); ClearEncounters(); ClearWeaponAudio(); ClearStreams(); ClearActors(); ClearEnemyPresentation(); ClearUrine();
         foreach (var pair in _agents) if (pair.Key!=null) pair.Key.enabled=pair.Value;
         foreach (var pair in _rootMotion) if (pair.Key!=null) pair.Key.applyRootMotion=pair.Value;
         foreach (var pair in _behaviours) if (pair.Key!=null) pair.Key.enabled=pair.Value;

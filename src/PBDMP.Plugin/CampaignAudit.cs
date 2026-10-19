@@ -47,6 +47,7 @@ public sealed partial class MultiplayerBehaviour
             .Select(a=>$"{a.name}\t{a._npcPrefab.GetComponent<Npc>()?.GetIl2CppType().Name}\t{WorldCatalogue.NpcAssetKey(a)}"));
         File.WriteAllLines(Marker("bosses-"+_auditLevels[_auditIndex].name+".tsv"),Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c=>c.GetIl2CppType().Name.Contains("BossArena")).Select(c=>$"{c.GetIl2CppType().Name}\t{c.name}\tscene={c.gameObject.scene.name}\tvalid={c.gameObject.scene.IsValid()}\tactive={c.gameObject.activeInHierarchy}"));
         File.WriteAllLines(Marker("sequences-"+_auditLevels[_auditIndex].name+".tsv"),_world.CatalogueForTest.SequenceAudit);
+        File.WriteAllLines(Marker("pickups-"+_auditLevels[_auditIndex].name+".tsv"),PickupCensus());
         Plugin.Logger.LogInfo("CAMPAIGN AUDIT: "+_auditLevels[_auditIndex].name);
         _auditIndex++;
         if(_auditIndex==_auditLevels.Length)
@@ -54,6 +55,25 @@ public sealed partial class MultiplayerBehaviour
         // Use the supported title-to-campaign flow between separate map audits.
         // Direct cross-episode loads reuse native NPC pools before full teardown.
         SharedWorldPatches.DiagnosticFreeze=false;GameManager.OpenTitle();_auditMenu=true;_auditReadyAt=0;
+    }
+    // Item class of every authored item pickup and of each weapon's pickup prefab:
+    // weapons, keys/mission items (neither ammo nor usable), ammo and usables.
+    private static string ItemClass(EntityId id)=>id.TryCast<WeaponId>()!=null?"weapon":id.TryCast<ItemId>() is {} item?item.IsAmmo?"ammo":item.IsUsable?"usable":"key":"other:"+id.GetIl2CppType().Name;
+    private static IEnumerable<string> PickupItems(Hyperstrange.PBD.Contraptions.ItemPickup pickup)
+    {foreach(var item in pickup._items) if(item.EntityId!=null) yield return $"{item.EntityId.name}:{ItemClass(item.EntityId)}x{item.Quantity}";}
+    private static IEnumerable<string> PickupCensus()
+    {
+        foreach(var pickup in UnityEngine.Object.FindObjectsOfType<Hyperstrange.PBD.Contraptions.Pickup>(true))
+        {
+            var items=pickup.TryCast<Hyperstrange.PBD.Contraptions.ItemPickup>() is {} itemPickup?string.Join(",",PickupItems(itemPickup)):pickup.MainItem!=null?pickup.MainItem.name+":"+ItemClass(pickup.MainItem):"";
+            yield return $"scene	{pickup.GetIl2CppType().Name}	{pickup.name}	{pickup.gameObject.activeInHierarchy}	{items}";
+        }
+        foreach(var weapon in Resources.FindObjectsOfTypeAll<WeaponId>())
+        {
+            var prefab=weapon._pickupPrefab?.GetComponent<Hyperstrange.PBD.Contraptions.ItemPickup>();
+            yield return $"weapon-prefab	{weapon.name}	{weapon._pickupPrefab?.name}	{weapon.Category}	{(prefab!=null?string.Join(",",PickupItems(prefab)):"")}";
+        }
+        foreach(var item in Resources.FindObjectsOfTypeAll<ItemId>()) yield return $"item	{item.name}	{ItemClass(item)}	capacity={item.InventoryCapacity}";
     }
     private void LoadAuditLevel()
     {SharedWorldPatches.DiagnosticFreeze=false;_auditReadyAt=0;_auditDeadline=Time.unscaledTime+120;GameManager.LoadLevel(_auditLevels![_auditIndex],true);}
