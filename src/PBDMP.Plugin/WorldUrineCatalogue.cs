@@ -63,9 +63,9 @@ internal sealed partial class WorldCatalogue
                 }
                 // Explicit native movement references can point outside the
                 // controller's hierarchy (e.g. fill-driven platforms/rails).
-                else if(p.Name.StartsWith('_') && p.PropertyType==typeof(Transform) && p.GetValue(actual) is Transform t) RegisterUrineSurface(t);
-                else if(p.Name.StartsWith('_') && p.PropertyType==typeof(GameObject) && p.GetValue(actual) is GameObject obj) RegisterUrineSurface(obj.transform);
-                else if(p.Name.StartsWith('_') && typeof(Component).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is Component reference && reference.gameObject.scene.IsValid() && SafeMotion(reference.transform)) Enqueue(reference);
+                else if(AuthoredMember(p) && p.PropertyType==typeof(Transform) && p.GetValue(actual) is Transform t) RegisterUrineSurface(t);
+                else if(AuthoredMember(p) && p.PropertyType==typeof(GameObject) && p.GetValue(actual) is GameObject obj) RegisterUrineSurface(obj.transform);
+                else if(AuthoredMember(p) && typeof(Component).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is Component reference && reference.gameObject.scene.IsValid() && SafeMotion(reference.transform)) Enqueue(reference);
                 else if(typeof(FMODEvent).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is FMODEvent sound) UrineAudioAssets[sound.Pointer]=sound;
             }
             foreach(var explosions in explosionListeners)

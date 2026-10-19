@@ -47,6 +47,19 @@ The budget check retains fixed targets: each connected player must retain at lea
 
 The older `-Performance` test separately checks host world p95 and complete sweep latency. Its 200 ms sweep target remains unchanged.
 
+## Survival active-combat comparison (October 18, 2026)
+
+`Test-Travel.ps1 -SurvivalSoak` on Suburbs runs the same active workload three ways: native wave 1 with enemies spawning naturally and the fixture killing every live enemy each 1.5 s. Both processes share one PC at a 120 FPS cap, 1280x720; 8 s warm-up, 25 s sample. This is not a two-PC network measurement.
+
+| Configuration | Mean FPS | p50 / p95 / p99 ms | Worst ms | Frames >50 ms | Main-thread alloc MiB/s | Traffic out / in KiB/s |
+| --- | ---: | --- | ---: | ---: | ---: | --- |
+| Offline native (P2 idle at menu) | 119.8 | 8.34 / 9.42 / 9.66 | 18.7 | 0 | 2.55 | — |
+| P1 hosting alone | 119.7 | 8.33 / 9.44 / 9.73 | 19.5 | 0 | 2.72 | — |
+| P1 with P2 connected | 119.4 | 8.34 / 9.51 / 9.89 | 21.7 | 0 | 3.77 | 55.2 / 11.9 |
+| P2 connected | 119.6 | 8.34 / 9.59 / 9.99 | 25.5 | 0 | 3.32 | 11.8 / 54.9 |
+
+Build 41D7421713392F3B. P1's connected world update: p95 0.77 ms, max 2.5 ms (campaign budgets 4 / 16 ms). The fixture then plays 15 short native waves with 321 pooled respawns. Neither PC had a frame over 100 ms (worst 30 ms on P1, 40 ms on P2), and the managed heap grew 2.0 / 2.4 MiB. Every managed ledger stays bounded by P1's live enemy pool. A one-per-frame kill burst sends at most one Survival state frame per 0.1 s sweep. Raw rows are in the run's ignored `host-soak.tsv` / `client-soak.tsv`.
+
 ## Profiling and remaining work
 
 Use untraced runs for before/after FPS comparisons. Short, private CPU/allocation traces can identify work responsible for outliers; tracing adds overhead, so traced FPS is not interchangeable with the baseline. Microsoft's [dotnet-trace documentation](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace) describes the CPU-sampling and GC-allocation profiles.

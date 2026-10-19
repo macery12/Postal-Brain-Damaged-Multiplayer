@@ -28,29 +28,41 @@ internal sealed class PlayerSessionState
         _deathInventory = null; Life++;
     }
 
-    internal void Died()
+    // Survival deaths wait for the host's wave revival instead of the campaign timer.
+    internal bool WaveRevival { get; private set; }
+
+    internal void Died(bool waveRevival = false)
     {
         var player = Player.Instance;
         if (player == null || Pending) return;
         _deathInventory = new PlayerInventoryComponent.SaveData(player.GetComponent<PlayerInventoryComponent>());
-        _remaining = 3; Life++;
+        _remaining = 3; WaveRevival = waveRevival; Life++;
     }
 
     internal void Tick(float seconds, bool paused)
     {
-        if (!Pending || paused || Player.Instance == null) return;
+        if (!Pending || WaveRevival || paused || Player.Instance == null) return;
         _remaining -= seconds;
         if (_remaining > 0) return;
+        Revive(null);
+    }
+
+    // Native revival restores health, zero armor, head, collider and UI; restore a clean local
+    // movement baseline rather than loading the host's movement, checkpoint, health or powerups.
+    // A wave revival is placed beside the living partner when there is clear ground.
+    internal bool Revive(Vector3? beside, float yaw = 0)
+    {
         var player = Player.Instance;
-        if (_player == null || player.Pointer != _player.Pointer) { Cancel(); return; }
+        if (!Pending || player == null) return false;
+        if (_player == null || player.Pointer != _player.Pointer) { Cancel(); return false; }
         var inventory = _deathInventory!;
-        // Native revival restores health/head/collider/UI; restore a clean local movement baseline
-        // rather than loading the host's movement, checkpoint, health or powerup save data.
         player.Respawn();
-        RestoreMovement(_spawn, _rotation);
+        if (beside is { } feet && FindNearby(player, feet, out var position)) RestoreMovement(position, new(0, yaw, 0));
+        else RestoreMovement(_spawn, _rotation);
         player.GetComponent<PlayerInventoryComponent>().LoadState(inventory);
-        _deathInventory = null; Life++;
+        _deathInventory = null; WaveRevival = false; Life++;
         Plugin.Logger.LogInfo("Independent player respawn completed; inventory retained and world not reset.");
+        return true;
     }
 
     private void RestoreMovement(Vector3 position, Vector3 rotation)
@@ -143,6 +155,6 @@ internal sealed class PlayerSessionState
         position = default; return false;
     }
 
-    internal void Cancel() { _deathInventory = null; _player = null; Life++; }
-    internal void FinishRespawn() { if (Pending) { _remaining = 0; Tick(0, false); } }
+    internal void Cancel() { _deathInventory = null; _player = null; WaveRevival = false; Life++; }
+    internal void FinishRespawn() { if (Pending) Revive(null); }
 }

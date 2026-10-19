@@ -24,6 +24,7 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 | Joining an active session | | ✅ | | Current-world restoration implemented; broader playtesting continues. |
 | Shared checkpoints | | | ✅ | P1 can restore the shared recovery point. |
 | Multiplayer saves | | | ✅ | Separate co-op slots, quicksave and autosaves. |
+| Survival co-op | | ✅ | | All three base arenas: shared waves, personal offers, readiness, wave revival, shared results, co-op records and late join. Natural two-PC playtesting continues. |
 | FPS and network performance | | ✅ | | Optimization remains a priority. |
 
 **Development coverage: 93%** (includes partial work); **last accepted baseline: 90%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
@@ -93,6 +94,17 @@ Death respawns only that player after three seconds at the map spawn with full h
 
 P1 can open **Multiplayer → Co-op saves...** for named slots, quicksave and checkpoint restoration. To resume, host a lobby first, then load a co-op slot. Solo saves stay separate. See [co-op saves](docs/co-op-saves.md) for the recovery and partner rules.
 
+#### Survival co-op
+
+P1 picks an arena and difficulty from the native **Survival Mode** menu while hosting, or hosts from inside an arena. The three built-in arenas (Suburbs, Ufo, VIP Zone) are supported; DLC and custom arenas are not. P2's Survival menu stays closed.
+
+- **One shared run.** P1's game runs the waves, enemies, timer, score and combo; both players see them on the normal Survival HUD. Either player's kills score, and every hit either player takes costs the team combo once.
+- **Your own gear.** Health, armor, weapons, ammo and pickups stay personal. Each player gets their own copy of every weapon offer and resource, so taking one never removes your partner's.
+- **Ready up.** At the start and between waves, take the shotgun or an offer, or hold **Use** for a second to keep your current gear. The next wave starts once both living players are ready. Playing alone, P1 starts at once.
+- **Death.** A dead player watches their partner and revives at the next break with full health, zero armor and their weapons and ammo. The run ends when nobody is left alive. Both players then see the same results, and only P1 can retry or leave.
+- **Joining late.** A player who joins mid-wave waits ("Waiting for P1's next Survival wave") while P1 keeps playing. They enter at the next break with P1's weapons and ammo. A player who died can't reconnect to come back early.
+- **Records.** Each PC keeps its own co-op best per arena and difficulty, plus the last 20 runs, in `BepInEx/PBDMP/survival-records.json`. Solo records and leaderboards are untouched. A Survival run can't be saved or resumed.
+
 ### Development and testing
 
 From `<RepoDir>`, with `$GameDir` set as above:
@@ -107,6 +119,9 @@ From `<RepoDir>`, with `$GameDir` set as above:
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Combat
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -Mission -Level LEVEL_AD_Neighborhood
 .\scripts\Test-Travel.ps1 -GameDir $GameDir -MissionExits -Level LEVEL_AD_Prison
+
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalPrep -Level LEVEL_Horde_Ufo
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalSoak
 ```
 
 `Build.ps1 -SkipTests` skips network tests. `Test-Steam.ps1` needs the Steam client running and signed in; it creates and leaves a private lobby and exercises the Steam connection path on one account. Runtime scripts launch owned game processes and block profile writes through diagnostic flags; on a Steam install they put the game's app id in the process environment so a direct launch is not redirected through Steam. Most test windows are hidden; `-FocusInput` intentionally exercises window focus. Two-instance travel tests use local hardlinks/junctions and retain ignored diagnostic output. See [verification](docs/verification.md) for prerequisites, additional modes and evidence limits.

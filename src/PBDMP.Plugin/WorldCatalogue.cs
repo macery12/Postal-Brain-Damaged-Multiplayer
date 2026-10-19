@@ -32,6 +32,7 @@ internal sealed partial class WorldCatalogue
 
     internal void Build()
     {
+        _skipCachedParent=SessionLifecycle.Survival(LevelManager.CurrentLevel);
         foreach (var asset in Resources.FindObjectsOfTypeAll<EntityId>())
             if (!string.IsNullOrEmpty(asset.ID)) Assets[asset.ID]=asset;
         foreach (var asset in Resources.FindObjectsOfTypeAll<NpcId>()) NpcAssets[NpcAssetKey(asset)]=asset;
@@ -171,6 +172,12 @@ internal sealed partial class WorldCatalogue
         else EncounterKeys.Add(Add(component));
         foreach(var transform in component.GetComponentsInChildren<Transform>(true)) if(SafeMotion(transform)) EncounterMotion[TransformKey(transform)]=transform;
     }
+    // Hyperstrange components cache their LevelController in _parent the first time .Parent
+    // is read; P1's native Survival results retry does so before a late joiner loads fresh,
+    // so following it made the two Survival catalogues differ. Survival has no saves, so it
+    // follows serialized references only; campaign keeps its manifests (saves store them).
+    private bool _skipCachedParent;
+    internal bool AuthoredMember(PropertyInfo p) => p.Name.StartsWith('_') && !(_skipCachedParent && p.Name == "_parent");
     internal static bool SafeMotion(Transform transform)
     {
         // Shared scene controllers can reference menu art. UI animation/input is

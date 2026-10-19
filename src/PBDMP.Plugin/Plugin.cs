@@ -45,6 +45,7 @@ public sealed class Plugin : BasePlugin
             Log.LogInfo("Unattended native diagnostics keep the desktop cursor unlocked.");
         }
         CoopSavePatches.Install(new Harmony("pbdmp.multiplayer.saves"));
+        SurvivalPatches.Install(new Harmony("pbdmp.multiplayer.survival"));
         WorldScriptedActionPatches.Install(new Harmony("pbdmp.multiplayer.scripted-actions"));
         WorldCannonPatches.Install(new Harmony("pbdmp.multiplayer.cannon"));
         WorldArenaPatches.Install(new Harmony("pbdmp.multiplayer.arena"));

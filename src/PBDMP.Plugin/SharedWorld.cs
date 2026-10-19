@@ -23,11 +23,11 @@ internal sealed partial class SharedWorld : IDisposable
     private readonly Dictionary<string,uint> _componentIds = new();
     private readonly Dictionary<string,string[]> _lastDoor = new();
     private readonly Dictionary<string,WorldFrame> _lastMotion = new();
-    private readonly Dictionary<Rigidbody,bool> _doorBodies = new();
+    private readonly NativeOriginals<Rigidbody> _doorBodies = new();
     private readonly Dictionary<uint,ulong> _revisions = new();
-    private readonly Dictionary<UnityEngine.AI.NavMeshAgent,bool> _agents = new();
-    private readonly Dictionary<Animator,bool> _rootMotion = new();
-    private readonly Dictionary<MonoBehaviour,bool> _behaviours = new();
+    private readonly NativeOriginals<UnityEngine.AI.NavMeshAgent> _agents = new();
+    private readonly NativeOriginals<Animator> _rootMotion = new();
+    private readonly NativeOriginals<MonoBehaviour> _behaviours = new();
     private readonly List<GameObject> _ownedEnemies = new();
     private RemoteActor? _remote;
     private uint _epoch, _nextId, _mapGeneration;
@@ -89,6 +89,7 @@ internal sealed partial class SharedWorld : IDisposable
             // Joining changes the travel epoch without reloading P1's world. Keep its current
             // entity lifetimes and loot ledger so the new peer receives the ongoing encounter.
             var keepHostWorld=!Client && _catalogue!=null && _life.NativeReady && _mapGeneration==_life.MapGeneration && _life.State.Action!=TravelAction.Menu;
+            ClearSurvival(keepHostWorld);
             if(!keepHostWorld)
             {
                 ClearSequences();ClearScenery();ClearMechanisms();ClearMissions();
@@ -105,7 +106,9 @@ internal sealed partial class SharedWorld : IDisposable
         if (!_life.NativeReady || _life.State.Action==TravelAction.Menu) return;
         if (_catalogue==null)
         { MultiplayerBehaviour.EnsurePropSpawnerFixture();_catalogue=new(); _catalogue.Build(); _assets=new(); _assets.Build(); BuildProjectilePrefabs(); BuildLootPrefabs(); BuildExplosionAssets(); BuildStreams(); BuildUrineSounds(); BuildUrineRails(); BuildPosters(); }
-        if(!Client) TickLoot();
+        if(!Client) {TickLoot();TickSurvivalTargets();TickSurvivalRules();}
+        else TickSurvivalClient();
+        TickSurvivalReadyInput();TickSurvivalHud();
         var snapshot=_session.Snapshot;
         TickWorldMechanics();TickBreakDebris();TickSequences();
         TickMissionProgress();
@@ -184,7 +187,7 @@ internal sealed partial class SharedWorld : IDisposable
         {
             if(!_enemyRespawns.Remove(npc.Pointer)) return id;
             if(_lastEnemy.TryGetValue(id,out var old)) Send(old with {Flags=0});
-            _enemies.Remove(id);
+            ForgetEnemy(id);
         }
         id=++_nextId; _enemyIds[npc.Pointer]=id; _enemies[id]=npc; return id;
     }
@@ -242,6 +245,7 @@ internal sealed partial class SharedWorld : IDisposable
                 else if (frame.Kind==WorldKind.Sequence) ApplySequence(frame);
                 else if (frame.Kind==WorldKind.SceneryEvent) PlaySceneryEvent(frame);
                 else if (frame.Kind==WorldKind.PlayerEffect) ApplyPlayerEffect(frame);
+                else if (frame.Kind==WorldKind.Survival) ApplySurvival(frame);
             }
             finally { _applying=false; }
         }
@@ -253,6 +257,7 @@ internal sealed partial class SharedWorld : IDisposable
         else if (frame.Kind==WorldKind.Special) ApplySpecial(frame);
         else if (frame.Kind==WorldKind.Reflect) ApplyReflection(frame);
         else if (frame.Kind==WorldKind.Defense) ApplyDefense(frame);
+        else if (frame.Kind==WorldKind.SurvivalRequest) ApplySurvivalRequest(frame);
     }
     private void SendState(bool complete)
     {
@@ -294,6 +299,7 @@ internal sealed partial class SharedWorld : IDisposable
     }
     private IEnumerable<int> CaptureState(bool complete)
     {
+        SendSurvival(complete);yield return 0;
         if(complete && !Client) SetMissionWait("",_pendingMissionEnd!=null?"Waiting for both players to be alive and loaded.":"",true);
         foreach(var key in _catalogue!.MissionBreakKeys) {SendMissionBreak(key,complete);yield return 0;}
         foreach(var key in _catalogue.MissionConditionKeys) {SendMissionArrays(key,complete);yield return 0;}
@@ -358,9 +364,12 @@ internal sealed partial class SharedWorld : IDisposable
     {
         if((frame.Flags&4)!=0) {ApplyEnemyPresentation(frame);return;}
         if (_revisions.TryGetValue(frame.Entity,out var revision) && frame.Sequence<=revision) return;
+        var known=_enemies.TryGetValue(frame.Entity,out var npc) && npc!=null;
+        // An unknown life that is already inactive (a retired pooled life) has nothing to show.
+        if (!known && (frame.Flags&2)==0) return;
         _revisions[frame.Entity]=frame.Sequence; _snapshotEnemies.Add(frame.Entity);
         _lastEnemy[frame.Entity]=frame;
-        if (!_enemies.TryGetValue(frame.Entity,out var npc) || npc==null)
+        if (!known)
         {
             npc=Object.FindObjectsOfType<Npc>(true).FirstOrDefault(n=>n.NpcId!=null && WorldCatalogue.NpcAssetKey(n.NpcId)==frame.Asset &&
                 _catalogue!.Key(n.SpawnPoint)==frame.Key && !_enemyIds.ContainsKey(n.Pointer));
@@ -380,10 +389,12 @@ internal sealed partial class SharedWorld : IDisposable
             }
             _enemies[frame.Entity]=npc; _enemyIds[npc.Pointer]=frame.Entity;
         }
-        npc.HitPoints.SetMax(frame.Value2);npc.HitPoints.SetCurrentSilent(frame.Value);
+        npc!.HitPoints.SetMax(frame.Value2);npc.HitPoints.SetCurrentSilent(frame.Value);
         var bossView=BossView();
         if(bossView?._currentBoss?.Pointer==npc.Pointer) bossView.OnHealthChanged(npc.HitPoints);
-        var active=(frame.Flags&2)!=0; npc.gameObject.SetActive(active);
+        var active=(frame.Flags&2)!=0;
+        if (!active && RetireReplica(frame.Entity,npc!)) return;
+        npc!.gameObject.SetActive(active);
         if (!active) return;
         SuppressEnemyAnimationEvents(npc);
         foreach (var behaviour in npc.GetComponentsInChildren<MonoBehaviour>(true))

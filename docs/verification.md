@@ -1,6 +1,20 @@
 # Verification and troubleshooting
 
-Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 11 / save schema 2**; see the implementation closeout below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+Historical baseline: **PBDMP 0.9.0 / protocol 8**. Current development is **0.10.0 / protocol 12 / save schema 2** (Survival in development); see the implementation closeout below. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+
+## Survival co-op closeout — October 18, 2026
+
+Installed/exported **0.10.0 / protocol 12 / save schema 2**, build **41D7421713392F3B** (`PBDMP.dll` 360F140AFC3F198F, `PBDMP.Network.dll` 71E8B7CD12EB7F5D). The installed DLLs and the zip entries match the tested pair. The previous install and package are kept privately for rollback. No commit or push. Full evidence and limits are in the [Survival handoff](../survival.md#phase-6-handoff-october-18-2026).
+
+| Check | Result |
+| --- | --- |
+| Compile / managed | 0 warnings; 38 network scenarios + 8 reporting checks. |
+| Survival fixtures, all three base arenas | `-Survival` 29, `-SurvivalWaves` 30–33, `-SurvivalPrep` 47–48, `-SurvivalResults` 22, `-SurvivalJoin` 23, `-SurvivalFailures` 16 checks on each arena; all pass. |
+| Survival soak (Suburbs) | 24 checks. 15 waves, 321 pooled respawns, managed ledgers bounded by the live pool, no frame over 100 ms, kill and request bursts bounded, high score/kills/timer exact on both PCs and records. Comparison figures are in [performance](performance.md). |
+| Arena join input | Main-menu and already-loaded-arena joins pass, 10 and 11 checks. The loaded-arena join failed intermittently (3 of 8 runs) during hardening; see the handoff. |
+| Campaign regression | Travel 54, `-Saves` 42, `-JoinInput` 10, `-Actors` 597, `-State` 3,775 pass. `-ActorParts` (FakeCitizen), `-Doors` (DeathStar proximity close) and `-Combat` (pre-join loot ledger) fail at the same points as baseline `d511ea1` on this installation. |
+
+Fixture actions are native calls, not natural combat; the [Survival two-player checklist](#survival-two-player-checklist) lists what a natural playtest should confirm.
 
 ## Weapon-animation pass — October 16, 2026
 
@@ -136,6 +150,16 @@ Use a compatible installation with BepInEx-generated interop and the current plu
 
 # Fresh-process actor/catalogue census across the 15 campaign maps.
 .\scripts\Test-ActorCampaign.ps1 -GameDir $GameDir
+
+# Survival co-op (base arenas: LEVEL_Horde_Suburbs, LEVEL_Horde_Ufo, LEVEL_Horde_VipZone; default Suburbs).
+.\scripts\Test-SurvivalInventory.ps1 -GameDir $GameDir                       # offline arena inventory, no session
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -Survival -Level LEVEL_Horde_Ufo  # entry, travel, guards, retry, host loss
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalWaves                    # host-owned waves, enemies, spawn safety, pause
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalPrep                     # offers, readiness, revival, spectator, wipe
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalResults                  # P2 HUD, combo damage, results, records
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalJoin                     # combat-time join hold, dead reconnect
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalFailures                 # disconnects in countdown/admission/results/combat
+.\scripts\Test-Travel.ps1 -GameDir $GameDir -SurvivalSoak                     # comparison, soak (-SurvivalSoakWaves 8-200, default 15), bursts, high values
 ```
 
 Additional `Test-Travel.ps1` modes include `-Actors`, `-ActorParts`, `-UrineParts`, `-JoinInput`, `-FocusInput` and `-Audit -AuditLevels LEVEL_Name`. `Test-CombatProbe.ps1` checks a native P2 targeting/hit proxy. Inspect each script's parameter block before combining diagnostic modes.
@@ -169,6 +193,21 @@ Use the same `Package.ps1` zip on both PCs and two Steam accounts that are frien
 - Session departure restores offline controls and save behavior without corrupting solo progress.
 
 Use these scenarios to regression-test future changes.
+
+## Survival two-player checklist
+
+Natural play that the fixtures do not certify (they kill enemies, end waves and ready players through native APIs). Use the same package on both PCs; repeat on Suburbs, Ufo and VIP Zone where practical.
+
+- P1 opens **Survival Mode** while hosting, picks an arena and each difficulty; P2's Survival button stays unavailable and P2 follows into the arena.
+- Both players take the start shotgun; the 3-2-1 countdown and wave start once on both HUDs. Hold **Use** for a second to ready without a pickup (keyboard and controller).
+- Fight a full natural wave: both players' kills score, P2 getting hit drops the shared combo, enemies chase whichever player is nearer, nothing spawns on top of P2.
+- At REST, take the same offer and different offers; each player keeps their own pickups and resource spawns; the wave waits for both.
+- One player dies: the spectator view follows the partner with the waiting notice, the dead player cannot pick anything up, and revives at the next REST with full health, zero armor and their weapons. Check whether the native HUD stays visible while spectating.
+- Both die: both PCs show the same results (score, kills, waves, time, best weapon); only P1 can retry or leave; the co-op best appears after retry.
+- P2 joins mid-wave (held with the waiting notice, admitted at REST with P1's weapons); P2 dies and reconnects (held until the following REST); P2 leaves during the countdown; P1 leaves mid-wave.
+- Ufo: breakable water capsules and the teleport behave the same for both players. VIP Zone: jump pads and glass. Suburbs: jump pad, barrels and the kill plane.
+- Play several long waves (wave 10+), watching frame time on both PCs; a natural ClownElemental summon and an unreachable enemy being cleared at CLEANUP.
+- Through Steam with a friend: the same join, death-rejoin and results checks.
 
 ## Troubleshooting
 

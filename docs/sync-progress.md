@@ -2,7 +2,7 @@
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
 
-Current source: **PBDMP 0.10.0 / protocol 11 / save schema 2**. Installed/exported animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
+Current source: **PBDMP 0.10.0 / protocol 12 / save schema 2** (protocol 12 adds the in-development Survival state frame). Installed/exported protocol-11 animation build **C990AE9ED22FC33F** supersedes megapass build **E19C56EB3B893F6A**. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
 **Development coverage: 93% (19.5 / 21 points). Last accepted milestone baseline: 90% (19 / 21).** The handoff does not change the scoring rubric or turn untested routes into verified results. [Scoring details](#progress-score).
 
@@ -441,6 +441,35 @@ Either player can trigger shared outcomes; P1 commits gameplay results. Personal
 | Clear transient attacks on load | | | ✅ | Old projectiles/effects do not replay; completed results remain. |
 
 See [co-op saves](co-op-saves.md) for controls and exact partner/resource rules.
+
+## Survival
+
+Survival (native HORDE) co-op is implemented for the three base arenas; see the [Survival plan and handoff](../survival.md) for evidence and limits. These rows are tracked separately and **do not count toward the campaign progress score**. Automated native fixtures cover every row below on Suburbs, Ufo and VIP Zone, with direct native calls standing in for natural combat; the remaining natural two-PC checks are in the [Survival checklist](verification.md#survival-two-player-checklist).
+
+| Feature | Planned | Partially synced | Synced | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Arena selection | | ✅ | | P1 keeps the native Survival button/menu; P2's are blocked. Base arenas only (Suburbs, Ufo, VipZone); DLC/custom refused. The native menu's difficulty prompt is driven by fixtures only through its callback target (`GameManager.LoadLevel`); natural menu use is a maintainer check. |
+| Arena travel | | | ✅ | Hosting inside an arena, lobby start, load barriers, retry, campaign↔Survival transitions and P1 leaving pass natively on all three arenas. |
+| Host-owned waves | | ✅ | | P1's native controller alone simulates; P2's start, ticks and enemy registration are inert. P2 mirrors P1's phase/wave/timer/score from a validated protocol-12 frame. |
+| Shared enemies and targeting | | ✅ | | P1's pooled Horde enemies replicate through the shared enemy path; both players' hits kill and score once on P1. Enemies start on the nearer living player, native hits retarget, and enemies leave a dead player for the living partner. |
+| Spawn safety (both players) | | | ✅ | Native 8 m rule plus the same distance from living P2; a rejected spawn stays on native cooldown and another is retried later. |
+| Enemy pooling/cleanup | | | ✅ | 15-wave soak with 300+ pooled respawns: each enemy life gets a new id, P2 destroys a replica once P1 retires that life, and every managed ledger stays bounded by P1's live pool. Native flying spawns appear on P2; replicas clear with CLEANUP/REST. Natural unreachable-enemy cleanup and summons were not exercised. |
+| Wave timer and countdown | | | ✅ | P1-owned; P2's native HUD shows it, counting down locally between P1's updates, with P1's native countdown ticks; frozen by P1 pause. |
+| Score | | | ✅ | Both players' kills score on P1 under native rules; long scores travel exactly; P2's native HUD and results show P1's exact score. |
+| Combo | | | ✅ | Kills by either player raise the shared combo. Each native damage event on P2 (health or armor lost) applies P1's native penalty once; P2 never penalizes its mirrored combo locally. |
+| Resource spawns | | | ✅ | Personal: each PC's native resource spawners run their own random items and cooldowns once the run starts; collecting one never removes the partner's. Spawner state stays excluded from join baselines (its Load respawns pickups). |
+| Weapon offers | | | ✅ | P1's native REST offer set is published; P2 spawns identical personal copies. Either player may take the same or a different offer; taking one clears only that player's other offers and starts nothing by itself. A weapon leaves the native pool once every participant has taken it. |
+| Readiness and countdown | | | ✅ | The start shotgun, an offer, or holding Use (Ready control, keeps current gear) marks a player ready. P1 starts the wave through the native start/state change, with its native countdown, once every admitted living player is ready; P1 alone starts at once. Stale or unoffered requests are rejected; P2 leaving releases the wait. |
+| Wave revival | | | ✅ | No timed respawn in Survival. A dead player revives at the next REST with full health, zero armor and retained weapons/ammo, beside the living partner when there is clear ground. P1's run continues while P1 is dead. |
+| Spectator view | | ✅ | | PBDMP-owned chase view of the living partner with a Waiting for next wave notice (wave, time, enemies). Dead players cannot collect or use anything and are not targeted. Whether the native HUD stays visible while dead is a maintainer check. |
+| Team wipe and results | | | ✅ | When no admitted participant is alive, P1 ends the run once through the native end. Both native results screens show P1's exact score, kills, waves, time and best weapon; P2's retry/menu buttons are disabled and P1 alone retries or leaves. |
+| Retry | | ✅ | | Same-arena retry, including P1's native results-screen retry after a wipe, resets both arenas to INTRO wave 1 with both players alive and no input barrier; P2's own retry is refused. |
+| Local co-op records | | | ✅ | Each PC keeps its own copy of the same team result (best per arena and difficulty, last 20 runs) keyed by P1's run ID, separate from solo metadata. The native results and HUD best line show the co-op best. Atomic writes; an unreadable file is set aside; a failed write is non-fatal. Records never resume a run. |
+| Late join | | | ✅ | A P2 joining during COMBAT/CLEANUP, the countdown or results waits (P1 keeps playing) and is admitted at the next INTRO/REST, including P1's retry from results: P1's weapons/ammo, full health, zero armor, placed beside P1, P1's current offers and its own resources, no historical enemies. A waiting P2 is not a participant or an extra life. P2 leaving mid-admission releases P1 and leaves no input barrier on P2. |
+| Reconnect / dead identity | | | ✅ | P1 keeps a participant's death by Steam/Direct IP identity. Rejoining after a combat death admits it at the next REST; a death during REST holds the rejoin until the following REST. P2 leaving during the countdown lets P1 continue alone; the last living player leaving ends the run once. Exercised over Direct IP; a Steam reconnect is a maintainer check. |
+| Shared pause | | ✅ | | Host pause/resume and modal input cleanup pass in an arena; P1 pause freezes the run timer on both players. |
+| Solo/save isolation | | ✅ | | Co-op manual/quick/autosaves refused with a Survival message; native writers and metadata remain blocked; campaign saves can still be loaded. |
+| Performance | | | ✅ | Same wave-1 workload at a 120 FPS cap on one PC: offline p99 9.66 ms, P1 alone 9.73 ms, P1+P2 9.89/9.99 ms (P1/P2); P1 world p95 0.77 ms. 15-wave soak: no frame over 100 ms, managed heap +2.0/+2.4 MiB; Survival frames bounded by the 0.1 s sweep under kill bursts. Two-PC network figures are a maintainer check. See [performance](performance.md). |
 
 ## Intentionally local systems
 

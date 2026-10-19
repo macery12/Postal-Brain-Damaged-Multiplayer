@@ -22,7 +22,7 @@ internal sealed partial class SharedWorld
             (p.PropertyType==typeof(bool) || p.PropertyType==typeof(int) || p.PropertyType==typeof(float) || p.PropertyType.IsEnum)).OrderBy(p=>p.Name,StringComparer.Ordinal).ToArray();
         _encounterFields[type]=fields;return fields;
     }
-    private readonly Dictionary<MonoBehaviour,bool> _encounterBehaviours=new();
+    private readonly NativeOriginals<MonoBehaviour> _encounterBehaviours=new();
     private float _encounterPollAt;
     private readonly HashSet<string> _insideEncounters=new();
     private readonly HashSet<string> _remoteTriggerInside=new();

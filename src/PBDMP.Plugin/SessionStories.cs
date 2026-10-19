@@ -23,7 +23,10 @@ internal sealed partial class SessionLifecycle
         StoryVideo=_expectedStory?.name??(NativeStoryActive?_hostStory!._currentVideo?.name??"":""),
         StoryTime=NativeStoryActive && _hostStory!._videoPlayer.isPrepared?(float)_hostStory._videoPlayer.time:0,
         StoryWaiting=StoryActive && (!_connected || _storyAdmissionPending),
-        StoryEnding=_endedCredits || StoryActive && LevelManager.CurrentLevel==null
+        StoryEnding=_endedCredits || StoryActive && LevelManager.CurrentLevel==null,
+        // Advertised before any peer connects as well: the first state a newcomer receives must
+        // already hold it, or it would follow the current (possibly earlier join) generation.
+        AdmissionWaiting=_host.State.Action!=TravelAction.Menu && (_survivalAdmissionPending || !_connected && SurvivalAdmissionHeld)
     };
     internal void StoryOpened(CutsceneMenu menu)
     {

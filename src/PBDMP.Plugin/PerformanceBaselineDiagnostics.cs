@@ -16,7 +16,7 @@ internal static class PerformanceBaseline
     private static readonly Dictionary<string,List<double>> Sections=new();
     private static long _last,_allocated;
     private static double _previousMod,_world,_life,_save;
-    private static string _phase="";
+    private static string _phase="",_workload="";
     private static float _sampleAt,_endAt;
     private static int _gen0,_gen1,_gen2;
     private static bool _samplingStarted;
@@ -49,9 +49,9 @@ internal static class PerformanceBaseline
         if(!Sections.TryGetValue(name,out var values)) Sections[name]=values=new(32768);
         values.Add(ms);
     }
-    internal static void Begin(string phase)
+    internal static void Begin(string phase,string workload="frozen (idle sync isolation)")
     {
-        _phase=phase;Frames.Clear();Sections.Clear();_last=0;_samplingStarted=false;
+        _phase=phase;_workload=workload;Frames.Clear();Sections.Clear();_last=0;_samplingStarted=false;
         _sampleAt=Time.unscaledTime+8;_endAt=_sampleAt+25;
         _gen0=GC.CollectionCount(0);_gen1=GC.CollectionCount(1);_gen2=GC.CollectionCount(2);
         QualitySettings.vSyncCount=0;Application.targetFrameRate=120;Application.runInBackground=true;
@@ -63,7 +63,7 @@ internal static class PerformanceBaseline
         if(Frames.Count<50) throw new InvalidOperationException("Too few benchmark frames.");
         var phase=_phase;_phase="";
         var frames=Frames.Select(f=>f.Frame).OrderBy(v=>v).ToArray();
-        var rows=new List<string>{"metric\tvalue",$"phase\t{phase}",$"role\t{role}",$"build\t{Plugin.BuildId[..16]}",$"level\t{LevelManager.CurrentLevel.name}","resolution\t1280x720","fps-cap\t120","npc-ai\tfrozen (idle sync isolation)",
+        var rows=new List<string>{"metric\tvalue",$"phase\t{phase}",$"role\t{role}",$"build\t{Plugin.BuildId[..16]}",$"level\t{LevelManager.CurrentLevel.name}","resolution\t1280x720","fps-cap\t120",$"npc-ai\t{_workload}",
             $"frames\t{frames.Length}",$"mean-fps\t{1000/frames.Average():F3}",$"frame-median-ms\t{Percentile(frames,.5):F3}",$"frame-p95-ms\t{Percentile(frames,.95):F3}",$"frame-p99-ms\t{Percentile(frames,.99):F3}",$"frame-max-ms\t{frames[^1]:F3}",
             $"over-50-ms\t{frames.Count(v=>v>50)}",$"over-100-ms\t{frames.Count(v=>v>100)}",$"over-250-ms\t{frames.Count(v=>v>250)}",$"gen0\t{GC.CollectionCount(0)-_gen0}",$"gen1\t{GC.CollectionCount(1)-_gen1}",$"gen2\t{GC.CollectionCount(2)-_gen2}"};
         var traffic=ProtocolTraffic.Read();var seconds=(Stopwatch.GetTimestamp()-_trafficAt)/(double)Stopwatch.Frequency;

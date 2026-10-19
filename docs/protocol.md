@@ -1,6 +1,6 @@
-# Protocol 10 (development)
+# Protocol (development)
 
-PBDMP 0.10.0 development source carries protocol 11 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 0.10.0 development source carries protocol 12 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 
@@ -50,7 +50,7 @@ Join loadouts contain current/last weapon GUIDs, up to 64 unique item records (G
 
 Client request kinds start at 32; client acknowledgements are the explicit exceptions below that value. `WorldProtocol.FromClient` enforces transport direction, while native adapters validate current epoch/life, targets, proximity and supported actions. P2 cannot publish authoritative mission/enemy state. This is host authority, not a complete anti-cheat system.
 
-Entity identity is scoped to a travel epoch; revisions and life generations distinguish pooled objects and respawns. Authored scene/component identities are catalogue-based rather than native pointers. Typed bounded data is transmitted, never arbitrary serialized objects or executable callbacks.
+Entity identity is scoped to a travel epoch; revisions and life generations distinguish pooled objects and respawns. An enemy id names one life: P1 gives a pooled enemy a new id each time it is enabled again and drops the previous id's per-life state. P2 destroys a replica it instantiated once P1 reports that life inactive (authored scene enemies are only hidden), and ignores an unknown id that is already inactive, so endless pooling (Survival) stays bounded by P1's live pool. A presentation or actor part of a pooled enemy that has no counterpart on P2's replica (a runtime-only child on P1) is logged once and ignored instead of ending the session; authored scripted actors must still match exactly. Authored scene/component identities are catalogue-based rather than native pointers. Typed bounded data is transmitted, never arbitrary serialized objects or executable callbacks.
 
 ## Loading, queues and authority
 
@@ -89,7 +89,7 @@ Player resource values/collection remain personal. P1 owns enemies, shared hit r
 | WorldRestoreBegin | 20 | P1 → P2 | Bounded byte count and SHA-256 digest for a fresh baseline transaction. |
 | WorldRestoreEnd | 21 | P1 → P2 | Finalize and verify the assembled native baseline. |
 
-Save queues hold 1,024 pages in each transport direction; the adapter retains at most 2,048 pending pages. Each send cycle includes at most 32 save pages alongside regular traffic. Epoch changes discard stale restoration work. Loading waits for native baseline acknowledgement, the shared-world snapshot and personal readiness; P2 cannot promote its own state to shared authority.
+Save queues hold 1,024 pages in each transport direction; the adapter retains at most 2,048 pending pages. Each send cycle includes at most 32 save pages alongside regular traffic. Epoch changes discard stale restoration work; pages for a *later* epoch that reach P2 before it adopts that travel epoch (P1 can begin a join baseline within a frame of a Survival REST admission) are kept, at most 4,096, and replayed once P2 adopts it, instead of being dropped and stalling the join. Loading waits for native baseline acknowledgement, the shared-world snapshot and personal readiness; P2 cannot promote its own state to shared authority.
 
 Disk schema 2 is independent of wire epochs. The envelope is eight ASCII bytes `PBDMPS01`, int32 JSON byte length, 32 SHA-256 bytes and bounded UTF-8 JSON, up to 32 MiB. `CoopSaveStore` validates data-only records, schema, scalar bounds and permitted durable world kinds. The plugin checks game hashes, supported content and the authored catalogue before native loading. Atomic replacement retains a known-good `.bak`; corrupt primary files cannot replace a valid backup.
 
@@ -139,3 +139,26 @@ Urine surface flag 4 includes authored `OcclusionPortal.open` alongside renderer
 After the optional carrier, every pose appends 15 bytes: byte motion (grounded/airborne/sliding), uint16 actions, uint32 action sequence, float32 normalized phase and float32 charge. Action bits are firing 1, secondary 2, melee 4, loop 8, block 16, shield 32, charge 64, kick 128, left-hand 256 and saw-running 512. Undefined motion/action bits, non-finite numbers, phase outside 0–1 and charge outside 0–100 are rejected. Exact game/mod fingerprint checks remain unchanged.
 
 This data controls visuals only. Existing world messages still authorize attacks and damage. Death/scene generations retain their existing guards; initial snapshots do not replay old shot counters. Local native callbacks and current weapon state supply the snapshot, while remote visual rigs contain no gameplay scripts or colliders. The 20 Hz loop and save schema 2 are unchanged.
+
+## Survival state (protocol 12)
+
+Protocol 12 appends world kind **Survival = 24** (P1 → P2). It carries P1's native Survival run presentation state; P2's native controller does not simulate. `SurvivalProtocol` in `src/PBDMP.Network/SurvivalProtocol.cs` owns the layout and validation:
+
+| Field | Encoding | Bounds |
+| --- | --- | --- |
+| Run | `Entity` (uint32) | Increments on each native `Begin` in a session. P2 ignores a lower run within the same epoch; retry is also a new epoch. |
+| Phase, countdown finished | `Flags` bits 0–3, bit 4 | Native INTRO/COMBAT/CLEANUP/REST (0–3); other bits rejected. |
+| Timer, combo | `Value`, `Value2` | Timer −60…86,400 s; combo 1–5. |
+| Score, damage | `Data[0]`, `Data[1]` decimal strings | Finite, 0…1e15. Strings avoid the generic ±1,000,000 world-float bound for long runs. |
+| Wave, waves survived, countdown, kills, live enemies | `Data[2..6]` canonical integers | Wave 1…1,000,000 (survived ≤ wave), countdown 0–10, kills ≤ 1e9, live ≤ 4,096. |
+| Ready, required, revive | `Data[7..9]` masks | Bit 1 = P1, bit 2 = P2 (0–3). Required lists admitted participants alive or awaiting revival; revive authorizes the listed dead players at this REST. |
+| Run ended | `Flags` bit 5 | Set once the team is wiped; P2 then runs its native end once. |
+| Offers | `Data[10]` | Empty, or up to 8 `slot:token` pairs, REST only. Slot 0–15 is the native offer spawn; token `W<n>`/`I<n>` (n ≤ 63) indexes the spawner's authored weapon/item prefab arrays. Duplicate slots rejected. |
+| Run ID | `Data[11]` | Empty or 32 lowercase hex characters; P1 generates it at native `Begin`. Both PCs key their local co-op record by it. |
+| Result time, best weapon | `Data[12]`, `Data[13]` | Only once the run has ended (otherwise 0 and empty): the native level `TimeStat` value (0…100,000,000) and the best weapon's asset ID (≤ 64 printable characters, no comma). |
+
+Key, asset, values, revision, actor and life must be empty/zero. The frame is transient (not saved) and is included in join snapshots. P1 sends it immediately when any field except the timer and combo changes (both decay continuously), otherwise at most every 0.5 s. P2 calls its native HUD view's own label handlers from this state and counts the timer down locally between frames. Enemies, hits and deaths use the existing Enemy/Melee/IncomingHit families unchanged.
+
+Protocol 12 also appends client kind **SurvivalRequest = 40** (P2 → P1): `Entity` = run, `Revision` = wave, `Actor` = 2, `Flags` bits 0–3 = phase and bits 4–5 = kind (1 Ready, 2 Offer, 3 Damage). Ready and Offer are INTRO/REST only; an Offer request carries exactly one REST token in `Data`; Ready and Damage carry none. Damage reports one native damage event on P2 (health or armor lost); P1 applies the native combo penalty once for the current run, in any phase but INTRO, also for a killing blow. P1 accepts a request only from an admitted, living P2 for its current run, wave and preparation phase, and an Offer only for a token in the current offer set; anything else is counted and ignored. A request only marks readiness and records the weapon choice; P2 collects its own copy locally.
+
+Travel (protocol 12) appends strict `AdmissionWaiting` after `HostMenuPaused`. It is valid only for an arena (not Menu) and tells a connecting P2 to stay where it is: P1 is holding Survival admission until its next preparation phase. P1 advertises it whenever no peer is connected and a newcomer would be held, so the first state a newcomer receives already holds it.

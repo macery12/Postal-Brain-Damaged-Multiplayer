@@ -46,8 +46,8 @@ public sealed partial class MultiplayerBehaviour
         var requested=Environment.GetEnvironmentVariable("PBDMP_TEST_LEVEL");
         if(!string.IsNullOrEmpty(requested)) foreach(var level in LevelManager.AllLevels) if(level.name==requested && SessionLifecycle.Supported(level)) return level;
         if(!string.IsNullOrEmpty(requested)) throw new InvalidOperationException("Unknown/unsupported requested campaign test map: "+requested);
-        foreach (var level in LevelManager.AllLevels) if (SessionLifecycle.Supported(level) && level.Id == 1) return level;
-        foreach (var level in LevelManager.AllLevels) if (SessionLifecycle.Supported(level)) return level;
+        foreach (var level in LevelManager.AllLevels) if (SessionLifecycle.Campaign(level) && level.Id == 1) return level;
+        foreach (var level in LevelManager.AllLevels) if (SessionLifecycle.Campaign(level)) return level;
         throw new InvalidOperationException("No base campaign test map.");
     }
 
@@ -158,7 +158,7 @@ public sealed partial class MultiplayerBehaviour
                 if (!Marked("client-restarted")) return;
                 TravelCheck(_lifecycle.Epoch > _travelEpoch, "same-map restart advances travel generation and waits for P2");
                 var next = LevelManager.NextLevel;
-                TravelCheck(SessionLifecycle.Supported(next), "next map is a supported built-in campaign map");
+                TravelCheck(SessionLifecycle.Campaign(next), "next map is a supported built-in campaign map");
                 _nextMap = next.ID; GameManager.LoadNextLevel(); GameManager.OpenLoading(); _travelStep = 9; break;
             case 9:
                 if (!_lifecycle!.NativeReady || !_lifecycle.State.Released || !Marked("client-next-map")) return;

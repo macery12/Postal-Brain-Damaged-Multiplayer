@@ -31,6 +31,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     private TMP_Text? _avatarLabel;
     private RemotePlayerVisual? _remoteVisual;
     private readonly LocalWeaponObserver _weaponObserver = new();
+    private readonly SurvivalSpectator _spectator = new();
     private TMP_Text? _status;
     private TMP_InputField? _address;
     private TMP_InputField? _port;
@@ -148,9 +149,11 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             var hold=_saves?.HoldCaption??"";
             if(hold.Length==0 && _lifecycle is {} holdLife && holdLife.State.Action!=TravelAction.Menu &&
                 (!holdLife.NativeReady || snapshot.Connected && !holdLife.State.Released || holdLife.IsClient && (!holdLife.WorldReady || !holdLife.PersonalReady))) hold="Loading...";
+            if(hold.Length==0 && _lifecycle is {IsClient:true,AdmissionWaiting:true}) hold="Waiting for P1's next Survival wave...";
             if(_view.Prompt.Open) hold="";
             var hostPause=hold.Length==0 && _lifecycle?.HostPauseNotice==true;
             _view.Hud.Hold(hostPause?"Host has paused":hold,hostPause);
+            _view.Hud.Banner(snapshot.Connected && _world!=null && hold.Length==0 ? _world.SurvivalBanner(PartnerLabel(snapshot)) : "");
             if (_lastStatus != snapshot.Status)
             {
                 _lastStatus = snapshot.Status;
@@ -159,10 +162,18 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             if (Environment.GetEnvironmentVariable("PBDMP_POSE_CAPTURE") == "1") RunPoseCapture();
             else if (_smokeEnabled) RunSmoke();
             if (Environment.GetEnvironmentVariable("PBDMP_NEWS_TEST") == "1") RunNewsTest();
+            if (SurvivalInventory.Enabled) RunSurvivalInventory();
             if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(Environment.GetEnvironmentVariable("PBDMP_WEAPON_PRESENTATION_TEST")=="1") RunWeaponPresentationTest();
+                if(Environment.GetEnvironmentVariable("PBDMP_SURVIVAL_TRAVEL_TEST")=="1") RunSurvivalTravelTest();
+                else if(SurvivalWavesEnabled) RunSurvivalWavesTest();
+                else if(SurvivalPrepEnabled) RunSurvivalPrepTest();
+                else if(SurvivalResultsEnabled) RunSurvivalResultsTest();
+                else if(SurvivalJoinEnabled) RunSurvivalJoinTest();
+                else if(SurvivalSoakEnabled) RunSurvivalSoakTest();
+                else if(SurvivalFailuresEnabled) RunSurvivalFailuresTest();
+                else if(Environment.GetEnvironmentVariable("PBDMP_WEAPON_PRESENTATION_TEST")=="1") RunWeaponPresentationTest();
                 else if(PerformanceBaseline.Enabled) RunPerformanceBaseline();
                 else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PATH_TEST"))) RunWorldPathTest();
                 else if(!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_PRESENTATION_TEST"))) RunReportedPresentationTest();
@@ -194,6 +205,19 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
     public void LateUpdate()
     {
         if (_open) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+        try { TickSpectator(); }
+        catch (Exception ex) { _spectator.Stop(); Plugin.Logger.LogError("Survival spectator: " + ex); }
+    }
+
+    // Survival: a dead player follows the living partner until the host's wave revival.
+    [HideFromIl2Cpp]
+    private void TickSpectator()
+    {
+        var remote = _session?.Snapshot is { Connected: true } snapshot ? snapshot.RemotePose : null;
+        var spectate = _lifecycle is { InSurvival: true, SurvivalEnded: false, NativeReady: true } life && SurvivalPatches.Spectating &&
+            remote is { Ready: true, Alive: true } && remote.Epoch == life.Epoch;
+        var feet = spectate ? _world?.ResolvePoseFeet(remote!) ?? new Vector3(remote!.X, remote.Y, remote.Z) : Vector3.zero;
+        _spectator.Tick(spectate, feet, remote?.Yaw ?? 0, remote?.Pitch ?? 0, remote?.Height ?? 1.8f);
     }
 
     [HideFromIl2Cpp]
@@ -237,7 +261,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             _avatarLabel.color = color; _avatarLabel.enableWordWrapping = false;
         }
         // Steam sessions name the partner; Direct IP sessions only know the role.
-        var label = _steamSession && PartnerName(snapshot) is { Length: > 0 } partner ? partner : snapshot.Role == SessionRole.Host ? "P2" : "P1";
+        var label = PartnerLabel(snapshot);
         if (_avatarLabel != null && _avatarLabel.text != label) _avatarLabel.text = label;
         _avatar.SetActive(true);
         if (_remoteLife != remote!.Life || _remoteEpoch != remote.Epoch)
@@ -423,6 +447,11 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         SetPanel(false);
     }
 
+    // Steam sessions name the partner; Direct IP sessions only know the role.
+    [HideFromIl2Cpp]
+    private string PartnerLabel(SessionSnapshot snapshot) =>
+        _steamSession && PartnerName(snapshot) is { Length: > 0 } partner ? partner : snapshot.Role == SessionRole.Host ? "P2" : "P1";
+
     [HideFromIl2Cpp]
     private string PartnerName(SessionSnapshot snapshot)
     {
@@ -510,6 +539,7 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
 
     private void ResetSession()
     {
+        _spectator.Stop();
         _saves?.Dispose();_saves=null;
         try { _world?.Dispose(); }
         catch (Exception ex) { Plugin.Logger.LogError("World cleanup: " + ex); }

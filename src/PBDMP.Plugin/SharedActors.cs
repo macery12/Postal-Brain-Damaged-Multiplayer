@@ -16,7 +16,7 @@ internal sealed partial class SharedWorld
     private readonly Dictionary<uint,Dictionary<string,Component>> _actorParts=new();
     private readonly Dictionary<(uint,string,uint,string),WorldFrame> _actorStates=new();
     private readonly Dictionary<uint,(Component Actor,Vector3 Position,Quaternion Rotation)> _actorMotion=new();
-    private readonly Dictionary<Rigidbody,bool> _actorBodies=new();
+    private readonly NativeOriginals<Rigidbody> _actorBodies=new();
     private readonly HashSet<IntPtr> _observedActors=new();
     private readonly Dictionary<IntPtr,List<Component>> _actorSoundSources=new();
     private readonly Dictionary<string,FMODEvent> _actorSounds=new();
@@ -194,7 +194,12 @@ internal sealed partial class SharedWorld
             return;
         }
         if(!ActorParts(frame.Entity!=0?frame.Entity:ScriptId(frame.Asset),actor).TryGetValue(frame.Key,out var part))
+        {
+            // A pooled/instantiated enemy can carry runtime-only children on P1 (e.g. Survival
+            // Mage effects); authored scripted actors must still match exactly.
+            if(frame.Entity!=0) {ReportPresentationMismatch(frame.Entity,frame.Key);return;}
             throw new InvalidDataException("Unknown shared actor part: "+actor.name+"/"+frame.Key);
+        }
         if(part==null) return;
         switch(frame.Flags&255)
         {

@@ -17,6 +17,9 @@ internal sealed class NativeHud
     private readonly GameObject _hold;
     private readonly TMP_Text _holdText;
     internal string HoldText=>_hold.activeSelf?_holdText.text:"";
+    private readonly GameObject _banner;
+    private readonly TMP_Text _bannerText;
+    internal string BannerText=>_banner.activeSelf?_bannerText.text:"";
     internal TMP_Text Text { get; }
 
     internal NativeHud(NativeUiKit kit, Transform root)
@@ -33,6 +36,12 @@ internal sealed class NativeHud
         _holdText=kit.TextAt(_hold.transform,"Hold reason","",new Vector2(310,50),new Vector2(580,90),34);
         _holdText.alignment=TextAlignmentOptions.Center;_holdText.raycastTarget=false;
         _hold.SetActive(false);
+        _banner=NativeUiKit.Rect("Survival notice",root,new Vector2(960,930),new Vector2(620,46));
+        var bannerArt=_banner.AddComponent<Image>();NativeUiKit.CopyImage(kit.BadgeArt,bannerArt);bannerArt.raycastTarget=false;
+        _bannerText=kit.TextAt(_banner.transform,"Text","",Vector2.zero,Vector2.zero,22);
+        NativeUiKit.Stretch(_bannerText.rectTransform);_bannerText.alignment=TextAlignmentOptions.Center;_bannerText.enableWordWrapping=false;_bannerText.raycastTarget=false;
+        _bannerText.margin=new Vector4(26,0,26,0);
+        _banner.SetActive(false);
         for (var i = 0; i < MaxToasts; i++)
         {
             var toast = NativeUiKit.Rect("Notification " + i, root, new Vector2(24, 990 - i * 46), new Vector2(400, 38));
@@ -61,6 +70,13 @@ internal sealed class NativeHud
         _hold.GetComponent<RectTransform>().anchoredPosition=hostPause?new Vector2(1350,680):new Vector2(960,540);
         if(_hold.activeSelf!=(text.Length>0)) _hold.SetActive(text.Length>0);
         if(text.Length>0) _hold.transform.SetAsLastSibling();
+    }
+
+    /// <summary>Survival preparation/spectator notice near the top of the screen; empty hides it.</summary>
+    internal void Banner(string text)
+    {
+        if(_bannerText.text!=text) {_bannerText.text=text;if(text.Length>0) Fit(_banner,_bannerText,text);}
+        if(_banner.activeSelf!=(text.Length>0)) _banner.SetActive(text.Length>0);
     }
 
     internal void Toast(string text)

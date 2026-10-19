@@ -10,7 +10,7 @@ namespace PBDMP.Plugin;
 internal static class SessionPatches
 {
     internal static bool Protect => SessionLifecycle.Current != null || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")) ||
-        Environment.GetEnvironmentVariable("PBDMP_COMBAT_PROBE") == "1";
+        Environment.GetEnvironmentVariable("PBDMP_COMBAT_PROBE") == "1" || SurvivalInventory.Enabled;
     internal static int BlockedSaves;
     internal static void Install(Harmony harmony)
     {
@@ -37,7 +37,7 @@ internal static class SessionPatches
             var life = SessionLifecycle.Current;
             if (life == null) return true;
             if (!life.PermitTravel()) return false;
-            if (!SessionLifecycle.Supported(levelId)) { life.Explain("Multiplayer supports built-in base campaign maps only."); return false; }
+            if (!SessionLifecycle.Supported(levelId)) { life.Explain(SessionLifecycle.UnsupportedContent); return false; }
             if(!loaded && levelId.VideoData!=null && !SettingsManager.GeneralSettings.SkipCutscenes && !DebugManager.NoVideo) life.ExpectStory(levelId.VideoData);
             life.BeginHost(PBDMP.Network.TravelAction.Load, levelId); return true;
         }
@@ -106,7 +106,7 @@ internal static class SessionPatches
             __state=false;
             var life = SessionLifecycle.Current;
             if (life == null) return true;
-            if (__0 == LevelController.EndLevelType.DEATH) { life.Death(); return false; }
+            if (__0 == LevelController.EndLevelType.DEATH) { if (SurvivalPatches.Ending) return true; life.Death(); return false; }
             if(__0==LevelController.EndLevelType.FINISH && SharedWorld.Current is {} world)
             {var accepted=world.FinishMission(__instance);__state=accepted && !world.Client;return accepted;}
             return !life.IsClient || __0 != LevelController.EndLevelType.FINISH;
@@ -139,7 +139,7 @@ internal static class SessionPatches
     private static class Gate
     {
         static void Postfix(InputManager.InputState __0)
-        { if (__0 == InputManager.InputState.NONE) {SessionLifecycle.Current?.ArmGate();if(SessionLifecycle.Current==null && (Environment.GetEnvironmentVariable("PBDMP_DOOR_RELOAD_TEST")=="1" || Environment.GetEnvironmentVariable("PBDMP_JOIN_INPUT_TEST")=="1")) MultiplayerBehaviour.DoorSoloGate=true;} }
+        { if (__0 == InputManager.InputState.NONE) {SessionLifecycle.Current?.ArmGate();if(SessionLifecycle.Current==null && (Environment.GetEnvironmentVariable("PBDMP_DOOR_RELOAD_TEST")=="1" || Environment.GetEnvironmentVariable("PBDMP_JOIN_INPUT_TEST")=="1" || SurvivalInventory.Enabled || Environment.GetEnvironmentVariable("PBDMP_SURVIVAL_TRAVEL_TEST")=="1")) MultiplayerBehaviour.DoorSoloGate=true;} }
     }
     [HarmonyPatch(typeof(InputManager), nameof(InputManager.RemoveLastInputMode))]
     private static class PopInput
@@ -215,7 +215,7 @@ internal static class SessionPatches
         static bool Prefix(Menu window)
         {
             if (SessionLifecycle.Current == null || window == null) return true;
-            return window.TryCast<SaveLoadMenu>() == null && window.TryCast<HordeModeMenu>() == null && window.TryCast<ModMenu>() == null;
+            return window.TryCast<SaveLoadMenu>() == null && window.TryCast<ModMenu>() == null && (window.TryCast<HordeModeMenu>() == null || !SessionLifecycle.Current.IsClient);
         }
     }
     [HarmonyPatch(typeof(GameplaySettings), nameof(GameplaySettings.SetDifficulty))]

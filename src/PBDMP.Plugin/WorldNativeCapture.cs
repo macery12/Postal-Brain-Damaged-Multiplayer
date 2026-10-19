@@ -10,6 +10,8 @@ internal sealed partial class CoopSaveService
 {
     private IEnumerator<int>? _joinCapture;
     private uint _joinCaptureEpoch,_baselineAckEpoch;
+    private string _captureWait="";
+    internal string JoinCaptureForTest=>$"capture={_joinCapture!=null} wait={_captureWait} captureEpoch={_joinCaptureEpoch} sent={_worldSentEpoch} ack={_baselineAckEpoch} await={_awaitNative} incoming={_incomingNative!=null} restoring={_guestNativeWork!=null}";
     private readonly Queue<(SaveCommand Command,byte[] Bytes,uint Epoch,uint Transaction)> _transfers=new();
     private long _transferBytes;
     private readonly WorldBaseline _baselineTransfer=new();
@@ -43,18 +45,19 @@ internal sealed partial class CoopSaveService
     }
     private IEnumerable<int> CaptureCurrentBaseline()
     {
+        _captureWait="props";
         while(_world.PendingPropSpawns) yield return 0;
         var result=new Dictionary<string,Dictionary<string,string>>(StringComparer.Ordinal);
         foreach(var entry in _entries)
         {
             if(entry.Component==null || NativeSaveBridge.Personal(entry.Component) ||
                 entry.Component.TryCast<NpcController>()!=null || entry.Component.TryCast<LootController>()!=null ||
-                NativeSaveBridge.NpcOwned(entry.Component)) continue;
-            Dictionary<string,string>? state=null;
+                NativeSaveBridge.NpcOwned(entry.Component) || NativeSaveBridge.SurvivalOwned(entry.Component)) continue;
+            Dictionary<string,string>? state=null;_captureWait=entry.Component.GetIl2CppType().Name+":"+entry.Guid;
             foreach(var step in CaptureNativeEntry(entry,v=>state=v)) yield return step;
             if(state!=null) result.Add(entry.Guid,state);
         }
-        _nativeBaseline=result;_baselineLevel=_life.State.Level;
+        _nativeBaseline=result;_baselineLevel=_life.State.Level;_captureWait="";
         _worldSentEpoch=0;_deadline=UnityEngine.Time.unscaledTime+120;
     }
     private static IEnumerable<int> CaptureNativeEntry(NativeSaveBridge.Entry entry,Action<Dictionary<string,string>?> accept)

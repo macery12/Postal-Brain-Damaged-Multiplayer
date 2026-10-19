@@ -72,7 +72,7 @@ internal sealed class NativeCoopSaves
         if(_listing==null && Time.unscaledTime>=_refreshAt)
         {_refreshAt=Time.unscaledTime+3;_listing=Task.Run(()=>new CoopSaveStore(CoopSaveService.Root).List());}
         RefreshButtons();
-        _status.text=SessionLifecycle.Current?.IsClient==true?"P1 controls co-op saves and loading.":CoopSaveService.Current is {} service?service.Status.Length>0?service.Status:"Co-op saves are separate from solo saves.":"Host a lobby to save or resume a co-op game.";
+        _status.text=SessionLifecycle.Current?.IsClient==true?"P1 controls co-op saves and loading.":SessionLifecycle.Current?.InSurvival==true?CoopSaveService.SurvivalUnsaved:CoopSaveService.Current is {} service?service.Status.Length>0?service.Status:"Co-op saves are separate from solo saves.":"Host a lobby to save or resume a co-op game.";
     }
     private void Render()
     {
@@ -90,7 +90,7 @@ internal sealed class NativeCoopSaves
     private void RefreshButtons()
     {
         var service=CoopSaveService.Current;var host=SessionLifecycle.Current is {IsClient:false};var busy=service?.Busy==true;
-        NativeUiKit.SetButtonState(_save,host && !busy && SessionLifecycle.Current!.NativeReady && SharedWorld.Current?.Active==true);
+        NativeUiKit.SetButtonState(_save,host && !busy && SessionLifecycle.Current!.NativeReady && !SessionLifecycle.Current.InSurvival && SharedWorld.Current?.Active==true);
         NativeUiKit.SetButtonState(_quick,_save.interactable);
         NativeUiKit.SetButtonState(_load,host && !busy && Selected is {Error:null});
         NativeUiKit.SetButtonState(_checkpoint,host && !busy && _slots.Any(s=>s.Slot.StartsWith("auto-",StringComparison.Ordinal) && s.Error==null));

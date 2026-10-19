@@ -10,7 +10,7 @@ internal sealed partial class SharedWorld
 {
     private readonly Dictionary<uint,Dictionary<string,Component>> _enemyParts=new();
     private readonly Dictionary<(uint Id,string Key),WorldFrame> _lastParts=new();
-    private readonly Dictionary<Animator,bool> _animatorEvents=new();
+    private readonly NativeOriginals<Animator> _animatorEvents=new();
     private Dictionary<string,Component> EnemyParts(uint id,Npc npc)
     {
         if(_enemyParts.TryGetValue(id,out var parts)) return parts;
@@ -50,7 +50,8 @@ internal sealed partial class SharedWorld
     }
     private void ApplyEnemyPresentation(WorldFrame frame)
     {
-        if(!_enemies.TryGetValue(frame.Entity,out var npc) || npc==null || !EnemyParts(frame.Entity,npc).TryGetValue(frame.Key,out var component)) throw new InvalidDataException("Unknown enemy presentation part.");
+        if(!_enemies.TryGetValue(frame.Entity,out var npc) || npc==null || !EnemyParts(frame.Entity,npc).TryGetValue(frame.Key,out var component))
+        {ReportPresentationMismatch(frame.Entity,frame.Key);return;}
         if(component==null) return;
         if(component.gameObject.Pointer!=npc.gameObject.Pointer) component.gameObject.SetActive((frame.Flags&16)!=0);
         var renderer=component.TryCast<Renderer>();var collider=component.TryCast<Collider>();

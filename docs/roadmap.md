@@ -1,8 +1,8 @@
 # Roadmap and session rules
 
-Current development source: **PBDMP 0.10.0 / protocol 11**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current development source: **PBDMP 0.10.0 / protocol 12**; the last accepted baseline is 0.9.0. The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
 
-The focused [weapon-animation pass](weapon-animation-testing.md) is installed as **C990AE9ED22FC33F**: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
+Survival co-op for the three base arenas is installed as **41D7421713392F3B** (see the [Survival handoff](../survival.md)). The focused [weapon-animation pass](weapon-animation-testing.md), previously installed as **C990AE9ED22FC33F**, remains included: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
 
 ## Current behavior
 
@@ -41,7 +41,7 @@ Host-owned co-op saves now provide named manual slots, one quicksave and three r
 
 ## Outside the current scope
 
-Survival, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
+Survival co-op for the three base arenas is implemented (see the [Survival handoff](../survival.md)); its natural two-PC playtest list is in [verification](verification.md#survival-two-player-checklist). DLC/custom Survival arenas, persistent Survival saves, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
 
 ## Historical milestones
 

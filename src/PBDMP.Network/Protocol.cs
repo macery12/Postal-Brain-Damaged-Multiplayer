@@ -17,14 +17,15 @@ public sealed record InventoryEntry(string Id, int Quantity);
 public sealed record JoinLoadout(string CurrentWeapon, string LastWeapon, IReadOnlyList<InventoryEntry> Items,
     float X, float Y, float Z, float Yaw);
 public sealed record TravelState(uint Epoch, TravelAction Action, string Level, int Difficulty,
-    bool HostReady, bool Paused, bool Released, bool Joining, JoinLoadout? Loadout = null, string StoryVideo = "", float StoryTime = 0, bool StoryWaiting = false, bool StoryEnding = false, bool HostMenuPaused = false);
+    bool HostReady, bool Paused, bool Released, bool Joining, JoinLoadout? Loadout = null, string StoryVideo = "", float StoryTime = 0, bool StoryWaiting = false, bool StoryEnding = false, bool HostMenuPaused = false,
+    bool AdmissionWaiting = false);
 public sealed record ClientReady(uint Epoch, bool Ready);
 public sealed record Packet(MessageKind Kind, int Version = Protocol.Version, string Text = "", PlayerPose? Pose = null,
     TravelState? Travel = null, ClientReady? Ready = null, WorldFrame? World = null, SavePage? Save = null);
 
 public static class Protocol
 {
-    public const int Version = 11;
+    public const int Version = 12;
     public const int MaxFrameBytes = 8192;
     public const int MaxInventoryItems = 64;
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -80,7 +81,7 @@ public static class Protocol
                     foreach (var item in loadout.Items) { WriteText(writer, item.Id); writer.Write(item.Quantity); }
                     writer.Write(loadout.X); writer.Write(loadout.Y); writer.Write(loadout.Z); writer.Write(loadout.Yaw);
                 }
-                WriteText(writer,travel.StoryVideo);writer.Write(travel.StoryTime);writer.Write(travel.StoryWaiting);writer.Write(travel.StoryEnding);writer.Write(travel.HostMenuPaused);
+                WriteText(writer,travel.StoryVideo);writer.Write(travel.StoryTime);writer.Write(travel.StoryWaiting);writer.Write(travel.StoryEnding);writer.Write(travel.HostMenuPaused);writer.Write(travel.AdmissionWaiting);
                 break;
             case MessageKind.Ready:
                 var ready = packet.Ready ?? throw new InvalidDataException("Missing ready state.");
@@ -136,12 +137,14 @@ public static class Protocol
             for (var i = 0; i < count; i++) items[i] = new(ReadText(reader), reader.ReadInt32());
             loadout = new(current, last, items, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         }
-        return new(epoch, action, level, difficulty, hostReady, paused, released, joining, loadout,ReadText(reader),reader.ReadSingle(),ReadReady(reader),ReadReady(reader),ReadReady(reader));
+        return new(epoch, action, level, difficulty, hostReady, paused, released, joining, loadout,ReadText(reader),reader.ReadSingle(),ReadReady(reader),ReadReady(reader),ReadReady(reader),ReadReady(reader));
     }
 
     public static void Validate(TravelState state)
     {
         if(state.HostMenuPaused && !state.Paused) throw new InvalidDataException("Host menu pause must hold shared gameplay.");
+        // A Survival join hold applies to an arena; it may follow an earlier join generation.
+        if(state.AdmissionWaiting && state.Action==TravelAction.Menu) throw new InvalidDataException("Invalid Survival admission hold.");
         if(state.StoryVideo==null || state.StoryVideo.Length>128 || state.StoryVideo.Any(char.IsControl) || !float.IsFinite(state.StoryTime) || state.StoryTime<0 || state.StoryTime>86400 || state.StoryWaiting && state.StoryVideo.Length==0) throw new InvalidDataException("Invalid story state.");
         if (state.Epoch == 0 || !Enum.IsDefined(typeof(TravelAction), state.Action) || state.Difficulty is < 0 or > 15 ||
             state.Level.Length > 64 || (state.Action != TravelAction.Menu && string.IsNullOrEmpty(state.Level)) ||

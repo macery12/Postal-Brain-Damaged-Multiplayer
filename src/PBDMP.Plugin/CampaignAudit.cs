@@ -18,7 +18,7 @@ public sealed partial class MultiplayerBehaviour
         if(_auditLevels==null)
         {
             _port!.text=Environment.GetEnvironmentVariable("PBDMP_TRAVEL_PORT")!;Host();
-            var levels=new List<LevelId>();foreach(var level in LevelManager.AllLevels) if(SessionLifecycle.Supported(level)) levels.Add(level);
+            var levels=new List<LevelId>();foreach(var level in LevelManager.AllLevels) if(SessionLifecycle.Campaign(level)) levels.Add(level);
             _auditLevels=levels.OrderBy(l=>l.EpisodeId?.Id??0).ThenBy(l=>l.Id).ToArray();
             var selected=Environment.GetEnvironmentVariable("PBDMP_AUDIT_LEVELS");
             if(!string.IsNullOrEmpty(selected)) _auditLevels=_auditLevels.Where(l=>selected.Split(',').Contains(l.name)).ToArray();

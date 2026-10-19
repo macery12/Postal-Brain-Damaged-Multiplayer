@@ -14,7 +14,8 @@ finally { $sha.Dispose() }
 
 $stagingParent = [IO.Path]::GetFullPath((Join-Path $repo '.local'))
 $staging = Join-Path $stagingParent 'package'
-if ([IO.Path]::GetRelativePath($repo,$staging) -ne '.local\package') { throw 'Package staging path is outside the repository.' }
+# Full-path comparison (Windows PowerShell 5.1 has no Path.GetRelativePath).
+if (!$staging.Equals((Join-Path $repo '.local\package'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Package staging path is outside the repository.' }
 if ((Test-Path -LiteralPath $stagingParent) -and (Get-Item -LiteralPath $stagingParent).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw 'Package parent cannot be a junction or symbolic link.' }
 if ((Test-Path -LiteralPath $staging) -and (Get-Item -LiteralPath $staging).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) { throw 'Package staging cannot be a junction or symbolic link.' }
 if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
@@ -43,6 +44,10 @@ Playing over a LAN or a forwarded port: Multiplayer > Direct IP.
 
 Co-op progress: P1 hosts a lobby, then opens Multiplayer > Co-op saves... to save or resume.
 Host-owned saves live in BepInEx/PBDMP/saves and are separate from solo saves.
+
+Survival co-op: while hosting, P1 opens Survival Mode and picks a base arena and difficulty.
+Take the shotgun or an offer, or hold Use, to ready up; waves start when both are ready.
+Dead players revive at the next break. Co-op records: BepInEx/PBDMP/survival-records.json.
 
 Files:
   PBDMP.dll          $($hashes[0])

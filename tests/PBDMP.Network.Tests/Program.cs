@@ -15,6 +15,125 @@ await Test("player presentation snapshots roundtrip bounded actions without chan
     return Task.CompletedTask;
 });
 
+await Test("Survival state frames are bounded, exact and reject stale or malformed runs",()=>
+{
+    var state=new SurvivalState(3,SurvivalPhase.Combat,12,11,41.5f,2,false,123456789012.25,4.5f,987,37,5_000_000.5);
+    var frame=SurvivalProtocol.ToFrame(state,7);
+    Check(frame.Kind==WorldKind.Survival && frame.Epoch==7 && SurvivalProtocol.FromFrame(frame)==state);
+    // Scores beyond the generic world float bound survive exactly.
+    Check(SurvivalProtocol.FromFrame(frame).Score==123456789012.25);
+    var decoded=Protocol.Decode(Protocol.Encode(new(MessageKind.World,World:frame with {Sequence=9}))).World!;
+    Check(SurvivalProtocol.FromFrame(decoded)==state);
+    foreach(var invalid in new[]{state with {Phase=(SurvivalPhase)4},state with {Wave=0},state with {WavesSurvived=13},state with {TimeLeft=float.NaN},state with {TimeLeft=-61},
+        state with {Countdown=11},state with {Score=-1},state with {Score=double.PositiveInfinity},state with {Score=2e15},state with {Combo=0.5f},state with {Combo=6},
+        state with {Kills=-1},state with {Alive=5000},state with {Damage=double.NaN}})
+        Throws(()=>SurvivalProtocol.ToFrame(invalid,7));
+    foreach(var bad in new[]{frame with {Flags=4},frame with {Flags=64},frame with {Data=frame.Data![..6]},frame with {Key="x"},frame with {Actor=1},frame with {Values=new[]{1f}},
+        frame with {Data=frame.Data.Select((t,i)=>i==2?"012":t).ToArray()},frame with {Data=frame.Data.Select((t,i)=>i==0?"NaN":t).ToArray()},frame with {Data=frame.Data.Select((t,i)=>i==5?"1e3":t).ToArray()},
+        frame with {Kind=WorldKind.MissionState}})
+        Throws(()=>SurvivalProtocol.FromFrame(bad));
+    Check(SurvivalProtocol.Supersedes(null,state) && SurvivalProtocol.Supersedes(state,state with {Run=4}) && !SurvivalProtocol.Supersedes(state,state with {Run=2}));
+    Check(!WorldProtocol.FromClient(WorldKind.Survival) && !WorldProtocol.Durable(frame));
+    return Task.CompletedTask;
+});
+
+await Test("Survival long-run extremes stay exact and inside the frame and record limits",()=>
+{
+    // The largest legal values of a very long run: score/damage, waves, kills, enemies, timer, offers and result fields.
+    var offers=string.Join(",",Enumerable.Range(0,SurvivalProtocol.MaxOffers).Select(i=>$"{i}:W{SurvivalProtocol.MaxPrefab}"));
+    var max=new SurvivalState(uint.MaxValue,SurvivalPhase.Rest,SurvivalProtocol.MaxWave,SurvivalProtocol.MaxWave,SurvivalProtocol.MaxTime,0,true,SurvivalProtocol.MaxScore,
+        SurvivalProtocol.MaxCombo,SurvivalProtocol.MaxKills,SurvivalProtocol.MaxAlive,SurvivalProtocol.MaxScore,Ready:3,Required:3,Revive:3,Offers:offers,RunId:new string('f',32));
+    var ended=max with {Phase=SurvivalPhase.Combat,Offers="",Ended=true,ResultTime=SurvivalProtocol.MaxResultTime,ResultWeapon=new string('w',SurvivalProtocol.MaxAssetId)};
+    foreach(var state in new[]{max,ended,max with {Score=987654321024,Damage=0.1,TimeLeft=7200.25f}})
+    {
+        var bytes=Protocol.Encode(new(MessageKind.World,World:SurvivalProtocol.ToFrame(state,uint.MaxValue) with {Sequence=ulong.MaxValue}));
+        Check(bytes.Length<Protocol.MaxFrameBytes/4 && SurvivalProtocol.FromFrame(Protocol.Decode(bytes).World!)==state);
+    }
+    var dir=Path.Combine(Path.GetTempPath(),"pbdmp-survival-extremes-"+Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store=new SurvivalRecordStore(Path.Combine(dir,"survival-records.json"));
+        for(var i=0;i<SurvivalRecordStore.MaxBest;i++)
+            store.Record(new(i.ToString("x32"),new string('a',SurvivalProtocol.MaxAssetId-2)+i.ToString("x2"),15,SurvivalProtocol.MaxScore,SurvivalProtocol.MaxKills,SurvivalProtocol.MaxWave,
+                SurvivalProtocol.MaxScore,new string('w',SurvivalProtocol.MaxAssetId),SurvivalProtocol.MaxResultTime,DateTime.UnixEpoch.AddYears(500)));
+        var file=store.Load();
+        Check(file.Best.Length==SurvivalRecordStore.MaxBest && file.Recent.Length==SurvivalRecordStore.MaxRecent && file.Best.All(r=>r.Score==SurvivalProtocol.MaxScore));
+        Check(new FileInfo(Path.Combine(dir,"survival-records.json")).Length<SurvivalRecordStore.MaxBytes);
+        Throws(()=>store.Record(new(new string('e',32),"overflow",1,1,1,1,1,"",1,DateTime.UnixEpoch)));
+    }
+    finally { if(Directory.Exists(dir)) Directory.Delete(dir,true); }
+    return Task.CompletedTask;
+});
+
+await Test("Survival preparation state and P2 requests carry bounded offers, readiness and revival",()=>
+{
+    var rest=new SurvivalState(5,SurvivalPhase.Rest,3,2,33,0,false,900,2,40,0,1200,Ready:1,Required:3,Revive:2,Offers:"0:W3,1:I8,2:W0");
+    var frame=SurvivalProtocol.ToFrame(rest,4);
+    Check(SurvivalProtocol.FromFrame(frame)==rest && SurvivalProtocol.ParseOffers(rest.Offers).SequenceEqual(new SurvivalOffer[]{new(0,"W3"),new(1,"I8"),new(2,"W0")}));
+    Check(SurvivalProtocol.FromFrame(SurvivalProtocol.ToFrame(rest with {Phase=SurvivalPhase.Combat,Offers="",Ended=true},4)).Ended);
+    Check(SurvivalProtocol.FormatOffers(new SurvivalOffer[]{new(2,"I10"),new(0,"W4")})=="2:I10,0:W4");
+    foreach(var invalid in new[]{rest with {Ready=4},rest with {Required=7},rest with {Revive=255},rest with {Offers="0:W3,0:I1"},rest with {Offers="0:X3"},rest with {Offers="16:W1"},
+        rest with {Offers="0:W64"},rest with {Offers="0:W01"},rest with {Offers=string.Join(",",Enumerable.Range(0,9).Select(i=>i+":I1"))},rest with {Phase=SurvivalPhase.Combat}})
+        Throws(()=>SurvivalProtocol.ToFrame(invalid,4));
+    Throws(()=>SurvivalProtocol.FromFrame(frame with {Data=frame.Data!.Select((t,i)=>i==7?"9":t).ToArray()}));
+    var ready=new SurvivalRequest(5,3,SurvivalPhase.Rest,SurvivalRequestKind.Ready);
+    var offer=ready with {Kind=SurvivalRequestKind.Offer,Offer="W3"};
+    var intro=new SurvivalRequest(0,1,SurvivalPhase.Intro,SurvivalRequestKind.Ready);
+    foreach(var request in new[]{ready,offer,intro})
+    {
+        var wire=SurvivalProtocol.ToFrame(request,4);
+        Check(WorldProtocol.FromClient(wire.Kind) && SurvivalProtocol.RequestFromFrame(Protocol.Decode(Protocol.Encode(new(MessageKind.World,World:wire with {Sequence=2}))).World!)==request);
+    }
+    foreach(var invalid in new[]{ready with {Phase=SurvivalPhase.Combat},ready with {Wave=0},ready with {Offer="W1"},offer with {Offer=""},offer with {Offer="Z1"},
+        offer with {Phase=SurvivalPhase.Intro},ready with {Kind=(SurvivalRequestKind)4}})
+        Throws(()=>SurvivalProtocol.ToFrame(invalid,4));
+    var damage=new SurvivalRequest(5,3,SurvivalPhase.Combat,SurvivalRequestKind.Damage);
+    Check(SurvivalProtocol.RequestFromFrame(SurvivalProtocol.ToFrame(damage,4))==damage);
+    Throws(()=>SurvivalProtocol.ToFrame(damage with {Offer="W1"},4));
+    var ended=rest with {Phase=SurvivalPhase.Combat,Offers="",Ended=true,RunId="0123456789abcdef0123456789abcdef",ResultTime=754,ResultWeapon="5f2c3e0a9b7d4e1f8a6c2b9d0e3f4a51"};
+    Check(SurvivalProtocol.FromFrame(SurvivalProtocol.ToFrame(ended,4))==ended);
+    foreach(var invalid in new[]{ended with {RunId="ABC"},ended with {RunId=new string('g',32)},ended with {ResultTime=-1},ended with {ResultWeapon="a,b"},
+        ended with {ResultWeapon=new string('a',65)},ended with {Ended=false},rest with {ResultTime=1}})
+        Throws(()=>SurvivalProtocol.ToFrame(invalid,4));
+    var good=SurvivalProtocol.ToFrame(offer,4);
+    foreach(var bad in new[]{good with {Actor=1},good with {Data=Array.Empty<string>()},good with {Flags=good.Flags|64},good with {Key="k"},
+        SurvivalProtocol.ToFrame(ready,4) with {Data=new[]{"W1"}}})
+        Throws(()=>SurvivalProtocol.RequestFromFrame(bad));
+    return Task.CompletedTask;
+});
+
+await Test("local co-op Survival records keep per-arena bests, bounded recent results and recover from corruption",()=>
+{
+    var dir=Path.Combine(Path.GetTempPath(),"pbdmp-survival-records-"+Guid.NewGuid().ToString("N"));
+    try
+    {
+        var path=Path.Combine(dir,"survival-records.json");
+        var store=new SurvivalRecordStore(path);
+        Check(store.Load().Best.Length==0 && store.Best("arena",1)==null);
+        SurvivalResult Run(int i,double score,string arena="arena",int difficulty=1)=>new(i.ToString("x32"),arena,difficulty,score,i,i,score*2,"weapon",60+i,DateTime.UnixEpoch.AddDays(i));
+        var first=store.Record(Run(1,500));
+        Check(first.Added && first.NewBest && first.PreviousBest==null);
+        var lower=store.Record(Run(2,300));
+        Check(lower.Added && !lower.NewBest && lower.PreviousBest!.Score==500);
+        Check(!store.Record(Run(2,300)).Added && store.Load().Recent.Length==2); // once per run
+        var higher=store.Record(Run(3,800));
+        Check(higher.NewBest && higher.PreviousBest!.Score==500 && store.Best("arena",1)!.Score==800);
+        store.Record(Run(4,100,"other",1));store.Record(Run(5,50,"arena",2));
+        var reloaded=new SurvivalRecordStore(path).Load();
+        Check(reloaded.Best.Length==3 && reloaded.Best.Single(r=>r.Arena=="arena" && r.Difficulty==1).RunId==3.ToString("x32"));
+        for(var i=10;i<40;i++) store.Record(Run(i,10));
+        Check(store.Load().Recent.Length==SurvivalRecordStore.MaxRecent && store.Load().Recent[0].RunId==39.ToString("x32"));
+        Throws(()=>store.Record(Run(41,-1)));Throws(()=>store.Record(Run(42,1) with {RunId=""}));Throws(()=>store.Record(Run(43,1) with {Arena=""}));
+        File.WriteAllText(path,"{ not json");
+        var recovered=new SurvivalRecordStore(path);
+        Check(recovered.Load().Best.Length==0 && recovered.RecoveredCorruption && File.Exists(path+".corrupt") && !File.Exists(path));
+        Check(recovered.Record(Run(50,5)).NewBest && new SurvivalRecordStore(path).Load().Recent.Length==1);
+        Check(Directory.GetFiles(dir).All(f=>!f.Contains(".writing-")));
+    }
+    finally { if(Directory.Exists(dir)) Directory.Delete(dir,true); }
+    return Task.CompletedTask;
+});
+
 await Test("admission reuses only an unfinished identical map load across epochs",()=>
 {
     var load=new TravelState(2,TravelAction.Load,"prison",0,false,false,false,false);
@@ -82,6 +201,10 @@ await Test("host menu pause is atomic travel metadata and distinct from capture 
     Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:state))).Travel==state);
     Check(!Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:state with {HostMenuPaused=false}))).Travel!.HostMenuPaused);
     Throws(()=>Protocol.Validate(state with {Paused=false}));
+    var waiting=new TravelState(5,TravelAction.Load,"arena",1,true,false,true,false,AdmissionWaiting:true);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:waiting))).Travel==waiting);
+    Check(Protocol.Decode(Protocol.Encode(new(MessageKind.Travel,Travel:waiting with {Joining=true}))).Travel!.AdmissionWaiting);
+    Throws(()=>Protocol.Validate(new TravelState(5,TravelAction.Menu,"",1,true,false,true,false,AdmissionWaiting:true)));
     return Task.CompletedTask;
 });
 await Test("native tank progress accepts drain/fill endpoint overshoot but rejects corrupt values", () =>

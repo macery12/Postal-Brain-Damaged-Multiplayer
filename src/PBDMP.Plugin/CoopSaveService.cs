@@ -66,6 +66,8 @@ internal sealed partial class CoopSaveService : IDisposable
     private string _baselineLevel="";
     private uint _worldSentEpoch,_controlEpoch;
     private bool _awaitNative;
+    private const int MaxEarlyPages=4096;
+    private readonly List<SavePage> _earlyPages=new();
     private IEnumerator<int>? _guestNativeWork;
     internal bool MaySendSnapshot=>!_awaitNative && (!_life.State.Joining || _baselineAckEpoch==_life.Epoch);
     internal bool Busy=>_request!=null || _work!=null || _write!=null || _read!=null || _restore!=null || _pending.Count>0;
@@ -73,6 +75,8 @@ internal sealed partial class CoopSaveService : IDisposable
         internal bool Restoring=>_restore!=null;
     internal bool TransactionActive=>_request!=null || _restore!=null || _work!=null;
     internal SavedPlayer? GuestForTest=>_guest;
+    // The connected partner's validated Steam or Direct IP identity; empty until received.
+    internal string PeerIdentity=>_peerIdentity;
     internal CoopSaveStore Store=>_store;
     internal static string Root=>Environment.GetEnvironmentVariable("PBDMP_SAVE_ROOT") is {Length:>0} diagnostic && Environment.GetEnvironmentVariable("PBDMP_SAVE_TEST")=="1"
         ?diagnostic:Path.Combine(Paths.BepInExRootPath,"PBDMP","saves");
@@ -96,6 +100,7 @@ internal sealed partial class CoopSaveService : IDisposable
     internal void RequestSave(string slot,string name)
     {
         if(_life.IsClient) {Tell("P1 controls co-op saves.");return;}
+        if(_life.InSurvival) {Tell(SurvivalUnsaved);return;}
         name=new string(name.Trim().Where(c=>!char.IsControl(c)).Take(80).ToArray());
         if(!CoopSaveStore.ValidSlot(slot) || name.Length==0) {Tell("Enter a save name.");return;}
         if(_life.State.Action==TravelAction.Menu) {Tell("Start or load a campaign before saving.");return;}
@@ -104,9 +109,11 @@ internal sealed partial class CoopSaveService : IDisposable
         _pending.Enqueue(new(slot,name));Status="Save pending.";
     }
     internal void QuickSave()=>RequestSave("quick","Quicksave");
+    // Survival runs have no resumable native/co-op snapshot; campaign files stay untouched.
+    internal const string SurvivalUnsaved="Survival runs cannot be saved or resumed. Co-op saves can still load a campaign.";
     internal void AutoSave()
     {
-        if(_life.IsClient || !_life.NativeReady || _life.State.Action==TravelAction.Menu || !AutosEnabled || Restoring || Busy || _life.Frozen || !_autosave.Due) return;
+        if(_life.IsClient || !_life.NativeReady || _life.State.Action==TravelAction.Menu || _life.InSurvival || !AutosEnabled || Restoring || Busy || _life.Frozen || !_autosave.Due) return;
         if(!_autosave.TryConsume()) return;
         _autoSlot=Enumerable.Range(0,3).OrderBy(i=>File.Exists(Path.Combine(Root,"auto-"+i+".pbdmp"))?File.GetLastWriteTimeUtc(Path.Combine(Root,"auto-"+i+".pbdmp")):DateTime.MinValue).First();RequestSave("auto-"+_autoSlot,"Timed autosave");
     }
@@ -139,7 +146,7 @@ internal sealed partial class CoopSaveService : IDisposable
         var connected=_session.Snapshot.Connected;
         if(connected!=_connected)
         {
-            _connected=connected;ClearNativeTransfer();_assembler.Reset();_out.Clear();_sentEpoch=0;_worldSentEpoch=0;_awaitNative=connected && _nativeBaseline!=null && _baselineLevel==_life.State.Level;_peerIdentity="";_waitingIdentity="";_approved="";_asking=false;
+            _connected=connected;_earlyPages.Clear();ClearNativeTransfer();_assembler.Reset();_out.Clear();_sentEpoch=0;_worldSentEpoch=0;_awaitNative=connected && _nativeBaseline!=null && _baselineLevel==_life.State.Level;_peerIdentity="";_waitingIdentity="";_approved="";_asking=false;
             if(connected)
             {
                 _deadline=Time.unscaledTime+60;
@@ -153,9 +160,22 @@ internal sealed partial class CoopSaveService : IDisposable
             _controlEpoch=_life.Epoch;ClearNativeTransfer();_out.Clear();_assembler.Reset();_guestNativeWork?.Dispose();_guestNativeWork=null;_incomingNative=null;_incomingRestore=null;_pendingCapture=0;_captureHold=false;_captureAuto=false;
             if(connected && _life.IsClient) Send(SaveCommand.Identity,JsonSerializer.SerializeToUtf8Bytes(_identity),0);
         }
-        foreach(var page in _session.DrainSaves())
+        var pages=_session.DrainSaves();
+        if(_earlyPages.Count>0)
         {
-            if(page.Command!=SaveCommand.Identity && page.Epoch!=_life.Epoch) continue;
+            var due=_earlyPages.Where(p=>p.Epoch==_life.Epoch).ToArray();
+            _earlyPages.RemoveAll(p=>p.Epoch<=_life.Epoch);
+            if(due.Length>0) {pages=due.Concat(pages).ToArray();Plugin.Logger.LogInfo($"Replayed {due.Length} co-op transfer page(s) that arrived before travel epoch {_life.Epoch}.");}
+        }
+        foreach(var page in pages)
+        {
+            if(page.Command!=SaveCommand.Identity && page.Epoch!=_life.Epoch)
+            {
+                // P1 can begin a join transfer (e.g. a Survival REST admission's world baseline)
+                // before P2 has adopted the new travel epoch. Keep those pages until it does.
+                if(_life.IsClient && page.Epoch>_life.Epoch) {if(_earlyPages.Count<MaxEarlyPages) _earlyPages.Add(page);else _earlyPages.Clear();}
+                continue;
+            }
             var bytes=_assembler.Accept(page);if(bytes!=null) Receive(page,bytes);
         }
         if(_read?.IsCompleted==true)
@@ -163,7 +183,7 @@ internal sealed partial class CoopSaveService : IDisposable
             var loaded=_read.GetAwaiter().GetResult();_read=null;
             CoopSaveStore.RequireRestorableFormat(loaded.Save);
             if(loaded.Save.Game!=NativeSaveBridge.GameKey) throw new InvalidDataException("This save belongs to a different game build.");
-            if(!SessionLifecycle.Supported(SessionLifecycle.FindLevel(loaded.Save.Level))) throw new InvalidDataException("This co-op save uses unsupported content.");
+            if(!SessionLifecycle.Campaign(SessionLifecycle.FindLevel(loaded.Save.Level))) throw new InvalidDataException("This co-op save uses unsupported content.");
             _restoreStarted=false;_restore=loaded.Save;_guest=_restore.Guest;_approved="";_restoreSent=false;_restoredAck=!connected;
             if(loaded.Recovered) Tell(_catalogueRecoveryTried?"The primary world catalogue was incompatible. Recovered the previous compatible backup; original files were preserved.":"Recovered the previous valid co-op save backup.");
         }
@@ -245,7 +265,7 @@ internal sealed partial class CoopSaveService : IDisposable
             {_readyAt=0;_autosave.Reset();}
             if(AutosEnabled)
             {
-                _autosave.Advance(Time.unscaledDeltaTime,_life.NativeReady && _world.Active && _life.State.Released && !_life.Frozen && !Busy && !_life.StoryActive && !_life.LocalTutorialActive);
+                _autosave.Advance(Time.unscaledDeltaTime,_life.NativeReady && !_life.InSurvival && _world.Active && _life.State.Released && !_life.Frozen && !Busy && !_life.StoryActive && !_life.LocalTutorialActive);
                 AutoSave();
             }
         }
@@ -388,7 +408,7 @@ internal sealed partial class CoopSaveService : IDisposable
         _entries=NativeSaveBridge.Entries();
         foreach(var entry in _entries)
         {
-            if(entry.Component==null || NativeSaveBridge.Personal(entry.Component) || NativeSaveBridge.NpcOwned(entry.Component) || entry.Component.TryCast<LootController>()!=null) continue;
+            if(entry.Component==null || NativeSaveBridge.Personal(entry.Component) || NativeSaveBridge.NpcOwned(entry.Component) || NativeSaveBridge.SurvivalOwned(entry.Component) || entry.Component.TryCast<LootController>()!=null) continue;
             Dictionary<string,string>? state=null;
             foreach(var step in CaptureNativeEntry(entry,v=>state=v)) yield return step;
             if(state!=null) document.Native.Add(entry.Guid,state);
@@ -411,7 +431,7 @@ internal sealed partial class CoopSaveService : IDisposable
             _world.ClearTransientForRestore();_world.ResetPropSpawnersForRestore();
             foreach(var pair in entries)
             {
-                if(!available.TryGetValue(pair.Key,out var entry) || NativeSaveBridge.Personal(entry.Component) || entry.Component.TryCast<NpcController>()!=null || entry.Component.TryCast<LootController>()!=null || NativeSaveBridge.NpcOwned(entry.Component))
+                if(!available.TryGetValue(pair.Key,out var entry) || NativeSaveBridge.Personal(entry.Component) || entry.Component.TryCast<NpcController>()!=null || entry.Component.TryCast<LootController>()!=null || NativeSaveBridge.NpcOwned(entry.Component) || NativeSaveBridge.SurvivalOwned(entry.Component))
                     throw new InvalidDataException("Unknown or personal native world restore entry: "+pair.Key);
                 try
                 {

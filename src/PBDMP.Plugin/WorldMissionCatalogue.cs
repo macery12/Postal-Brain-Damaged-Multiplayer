@@ -100,11 +100,11 @@ internal sealed partial class WorldCatalogue
                         Enqueue(component);if(obj!=null && SafeMotion(obj.transform)) RegisterUrineSurface(obj.transform);
                     }
                 }
-                else if(p.Name.StartsWith('_') && typeof(Component).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is Component child)
+                else if(AuthoredMember(p) && typeof(Component).IsAssignableFrom(p.PropertyType) && p.GetValue(actual) is Component child)
                 {Enqueue(child);if(child is Transform t && SafeMotion(t)) RegisterUrineSurface(t);}
-                else if(p.Name.StartsWith('_') && p.PropertyType==typeof(GameObject) && p.GetValue(actual) is GameObject obj && SafeMotion(obj.transform))
+                else if(AuthoredMember(p) && p.PropertyType==typeof(GameObject) && p.GetValue(actual) is GameObject obj && SafeMotion(obj.transform))
                 {RegisterUrineSurface(obj.transform);foreach(var behaviour in obj.GetComponents<MonoBehaviour>()) Enqueue(behaviour);}
-                else if(p.Name.StartsWith('_') && p.PropertyType.IsGenericType &&
+                else if(AuthoredMember(p) && p.PropertyType.IsGenericType &&
                     p.PropertyType.GetGenericTypeDefinition()==typeof(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<>) &&
                     typeof(UnityEngine.Object).IsAssignableFrom(p.PropertyType.GetGenericArguments()[0]) && p.GetValue(actual) is {} collection)
                 {

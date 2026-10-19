@@ -126,6 +126,13 @@ public sealed partial class MultiplayerBehaviour
                 TravelMark("part-hit-"+_partTestIndex);_partTestStep=4;break;
             case 4 when Marked("part-result-ready-"+_partTestIndex):
                 var expected=File.ReadAllLines(Marker("part-result-"+_partTestIndex)).Select(v=>float.Parse(v,CultureInfo.InvariantCulture)).ToArray();
+                // P1 deactivates the killed enemy (its part then has no active NPC: -1), after which P2
+                // destroys the replica it instantiated instead of only hiding it.
+                if(_partTestTarget==null)
+                {
+                    TravelCheck(_partTestNpc==null && expected[0]<0,"P2 retires the replica after P1 deactivates the killed actor: "+PartFixtures[_partTestIndex]);
+                    TravelMark("part-result-received-"+_partTestIndex);_partTestIndex++;_partTestStep=_partTestIndex<PartFixtures.Length && Environment.GetEnvironmentVariable("PBDMP_URINE_PARTS_TEST")!="1"?1:5;break;
+                }
                 if(!PartFixtureState(_partTestTarget!).SequenceEqual(expected)) return;
                 if(PartFixtures[_partTestIndex]=="CovidEye")
                 {

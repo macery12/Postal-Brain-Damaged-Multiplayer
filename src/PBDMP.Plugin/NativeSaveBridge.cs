@@ -52,5 +52,8 @@ internal static class NativeSaveBridge
     internal static string GameKey=>string.Join(":",Plugin.Fingerprint.Split(':').Take(2));
     internal static string CheckpointKey(PlayerTriggerCheckpointComponent point)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(WorldCatalogue.PathOf(point.transform))));
     internal static bool NpcOwned(Component c)=>c.GetComponentInParent(Il2CppType.Of<Npc>(),true)!=null;
+    // Native Horde Load is not a restore (pickup spawners spawn again; weapon spawner Load is a no-op).
+    // Survival run state travels only through typed Survival state.
+    internal static bool SurvivalOwned(Component c)=>c.TryCast<HordeModeController>()!=null || c.TryCast<HordeModePickupSpawner>()!=null || c.TryCast<HordeModeWeaponSpawner>()!=null;
     internal static bool Personal(Component c)=>c.TryCast<Pickup>()!=null && c.TryCast<CodexPickup>()==null || c.TryCast<PlayerSpawnPoint>()!=null;
 }

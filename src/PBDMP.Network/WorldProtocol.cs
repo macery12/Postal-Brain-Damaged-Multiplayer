@@ -6,8 +6,8 @@ public enum WorldKind : byte
 {
     Manifest = 1, ManifestAck, SnapshotBegin, SnapshotEnd, SnapshotAck,
     Enemy, Door, Projectile, Loot, Encounter, Impact, IncomingHit, WeaponEffect, InteractionResult, ActorState, ActorEffect,
-    UrineState, MissionState, Scenery, SceneryEvent, Mechanism, Sequence, PlayerEffect,
-    Fire = 32, Melee, Interact, Trigger, Defense, Reflect, Special, ClientEffect
+    UrineState, MissionState, Scenery, SceneryEvent, Mechanism, Sequence, PlayerEffect, Survival,
+    Fire = 32, Melee, Interact, Trigger, Defense, Reflect, Special, ClientEffect, SurvivalRequest
 }
 
 public readonly record struct NetVector(float X, float Y, float Z)

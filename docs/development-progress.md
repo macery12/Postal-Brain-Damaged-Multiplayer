@@ -1,8 +1,8 @@
 # Development status
 
-Current development: **PBDMP 0.10.0 / protocol 11 / save schema 2**. The last accepted milestone baseline remains 0.9.0.
+Current development: **PBDMP 0.10.0 / protocol 12 / save schema 2**. The last accepted milestone baseline remains 0.9.0.
 
-The focused [weapon-animation pass](weapon-animation-testing.md) is installed as **C990AE9ED22FC33F**: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
+Survival co-op for the three base arenas is installed as **41D7421713392F3B** (see the [Survival handoff](../survival.md)). The focused [weapon-animation pass](weapon-animation-testing.md), previously installed as **C990AE9ED22FC33F**, remains included: improved grips/aim/action poses and dual-wield presentation, with repeatable multi-angle captures and connected regression checks.
 
 The [megapass implementation closeout](../megapass.md) fixes loaded-map admission, runtime paw damage authority and stale host hazard contacts. Native bridge, actual wheel-driver/cart-door, complete restored elevator, scenery/prop, save and fresh-process recovery checks provide targeted evidence. The retained native survival and damage assertions remain strict.
 

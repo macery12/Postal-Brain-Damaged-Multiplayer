@@ -5,7 +5,7 @@ internal sealed partial class CoopSaveService
 {
     internal void CampaignCompleted(LevelId level)
     {
-        if(_world.ReplayingCompletion || _life.IsClient || !_life.NativeReady || _life.RestoringWorld || level.ID!=_life.State.Level) return;
+        if(_world.ReplayingCompletion || _life.IsClient || !_life.NativeReady || _life.RestoringWorld || level.ID!=_life.State.Level || !SessionLifecycle.Campaign(level)) return;
         // Native UpdateMetaData also uploads leaderboards and writes profiles. Its guard stays in place.
         // Apply only the co-op session's in-memory level data; lifecycle cleanup restores solo metadata.
         var stats=LevelController.GetLevelStats();var data=new LevelId.Data();data.Save(level);
