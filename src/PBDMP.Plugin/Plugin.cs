@@ -27,6 +27,7 @@ public sealed class Plugin : BasePlugin
     public override void Load()
     {
         Logger = Log;
+        ReadmeCaptureIsolation.Install();
         AutosaveMinutes = Config.Bind("Saves","AutosaveMinutes",5,new ConfigDescription("Host autosave interval in active gameplay minutes. Checkpoint volumes do not bypass this timer.",new AcceptableValueRange<int>(5,10)));
         DefaultAddress = Config.Bind("Connection", "Address", "127.0.0.1", "Numeric LAN IP of the host.").Value;
         DefaultPort = Config.Bind("Connection", "Port", 7777, "TCP port, 1-65535.").Value;

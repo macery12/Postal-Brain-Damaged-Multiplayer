@@ -173,7 +173,8 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             if (_steamProbe) RunSteamProbe();
             if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PBDMP_TRAVEL_TEST")))
             {
-                if(Environment.GetEnvironmentVariable("PBDMP_SURVIVAL_TRAVEL_TEST")=="1") RunSurvivalTravelTest();
+                if(ReadmeCaptureEnabled) RunReadmeCapture();
+                else if(Environment.GetEnvironmentVariable("PBDMP_SURVIVAL_TRAVEL_TEST")=="1") RunSurvivalTravelTest();
                 else if(SurvivalWavesEnabled) RunSurvivalWavesTest();
                 else if(SurvivalPrepEnabled) RunSurvivalPrepTest();
                 else if(SurvivalResultsEnabled) RunSurvivalResultsTest();
@@ -475,8 +476,8 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
         var role = snapshot.Role;
         var inLobby = role != SessionRole.Offline || steam.Phase != LobbyPhase.None;
         // Smoke captures are shared as documentation, so they never show the tester's Steam identity.
-        var identity = steam.Available && !_smokeEnabled;
-        var self = new CardModel(identity ? steam.Name(steam.LocalId) : "You",
+        var identity = steam.Available && !_smokeEnabled && !ReadmeCaptureEnabled;
+        var self = new CardModel(identity ? steam.Name(steam.LocalId) : ReadmeCaptureEnabled ? (role == SessionRole.Client ? "P2" : "P1") : "You",
             !inLobby ? "Not in a session" : role == SessionRole.Client ? "P2  /  you" : "P1  /  host  /  you",
             Where(local), identity ? steam.Avatar(steam.LocalId) : null, role == SessionRole.Client ? "P2" : "P1", true);
         CardModel other;

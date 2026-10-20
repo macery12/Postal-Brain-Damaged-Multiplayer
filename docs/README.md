@@ -32,4 +32,4 @@ These notes preserve the findings and scope at the time of research. They may de
 | [Enemy/combat research](enemy-combat-research.md) | Targeting, hit authority and encounter findings. |
 | [Shared-combat design](shared-combat-spec.md) | Accepted combat/resource ownership design. |
 
-Native UI/model renders are in `images/`; they are diagnostic captures, not a full co-op gameplay recording. The multiplayer-panel capture is the 0.8.0 lobby panel from the runtime smoke test, which never shows the tester's Steam identity. Extracted game asset files and raw diagnostic reports are not distributed.
+The seven README JPGs in `images/` are full-frame PBDMP 1.0.1 captures from two visible local game copies over Direct IP. See [capture staging and reproduction](readme-captures.md) for the privacy controls, live saves and capture-only presentation adjustments. `player-model.png` remains the diagnostic model render used by the player-model research. Extracted game assets and raw captures/reports are not distributed.

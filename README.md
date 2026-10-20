@@ -2,7 +2,7 @@
 
 Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign and the base Survival arenas, letting you team up with a Steam friend over the internet or with someone on your LAN.
 
-Built for BepInEx 6 IL2CPP. **Current version: 1.0.0** (protocol 13, save schema 3).
+Built for BepInEx 6 IL2CPP. **Current version: 1.0.1** (protocol 13, save schema 3).
 
 ## Sync progress
 
@@ -29,7 +29,22 @@ A quick look at what's ready and what's next. See the [full sync checklist](docs
 
 **Development coverage: 95%** (includes partial work); **last accepted baseline: 95%.** [Score breakdown and intentionally local systems](docs/sync-progress.md#progress-score).
 
-![Multiplayer in the native main menu](docs/images/main-menu.png)
+<p align="center">
+  <img src="docs/images/multiplayer-menu.jpg" alt="Multiplayer menu with a real co-op save preview and the Dude on the couch" width="900">
+</p>
+
+<table width="100%">
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/campaign-coop.jpg" alt="P1 and P2 fighting together in the campaign" width="100%"><br>Campaign co-op</td>
+    <td align="center" width="33%"><img src="docs/images/survival-coop.jpg" alt="P1 and P2 fighting a Survival wave" width="100%"><br>Survival co-op</td>
+    <td align="center" width="33%"><img src="docs/images/new-coop-game.jpg" alt="Native level selection with the multiplayer confirmation prompt" width="100%"><br>New co-op game</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/load-coop-game.jpg" alt="Real co-op campaigns and their saves with native thumbnails" width="100%"><br>Load co-op game</td>
+    <td align="center"><img src="docs/images/join-a-friend.jpg" alt="Join a friend with one anonymous host entry" width="100%"><br>Join a friend</td>
+    <td align="center"><img src="docs/images/players-and-invite.jpg" alt="Pause menu Players panel with P1 and P2 cards" width="100%"><br>Players &amp; invite</td>
+  </tr>
+</table>
 
 ## Installation
 
