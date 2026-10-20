@@ -91,7 +91,7 @@ Copy-Item ./artifacts/PBDMP/BepInEx/plugins/PBDMP/PBDMP.dll,
 - Hidden-window launch is not headless execution and does not guarantee mouse/focus isolation. Preserve the diagnostic cursor guard. Focus work remains separate scope unless needed for the bug.
 - Steam initialization failure is a launch prerequisite failure. Diagnose current logs without weakening assertions to manufacture a sync pass.
 
-Use a focused failing native reproduction, apply the fix, then retain its assertion. Expand testing when changed seams/new failures warrant it. Direct native invocation and synthetic transport fixtures are useful but cannot certify every natural gameplay route. `docs/verification.md` and `docs/megapass-playtest.md` separate recorded evidence from remaining maintainer checks.
+Use a focused failing native reproduction, apply the fix, then retain its assertion. Expand testing when changed seams/new failures warrant it. Direct native invocation and synthetic transport fixtures are useful but cannot certify every natural gameplay route. `docs/verification.md` separates recorded evidence from remaining maintainer checks.
 
 For performance comparisons, keep arena/workload/caps consistent; distinguish one-PC/two-process contention from world/network work. Record frame percentiles/worst stalls, allocation and measured directional traffic using current diagnostics.
 

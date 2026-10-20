@@ -6,7 +6,7 @@ Updated October 18, 2026. Intended implementer: Claude Opus 5.5.
 
 ## Start here
 
-1. Read this document, `README.md`, `docs/protocol.md`, `docs/sync-progress.md`, `docs/co-op-saves.md`, `animation-pass.md` and `docs/megapass-playtest.md`.
+1. Read this document, `README.md`, `docs/protocol.md`, `docs/sync-progress.md`, `docs/co-op-saves.md` and `docs/weapon-animation-testing.md`.
 2. Check the current branch/diff before editing. Preserve unrelated work. Do not reset, rewrite history, change Git identity, commit or push without the owner's instruction.
 3. Work phase by phase. Update the status table and append a short handoff after each useful stopping point: current source state, checks run, remaining issue and exact next step. Do not call an untested path verified.
 4. Preserve existing campaign behavior, saves, transports, animation work and performance protections. This is Survival support, not another general campaign megapass.

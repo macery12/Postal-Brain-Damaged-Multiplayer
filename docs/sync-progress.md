@@ -1,8 +1,8 @@
 # Multiplayer synchronization progress
 
-**October 18, 2026 — two-PC Steam playtest.** The maintainer reports that the campaign (including saves, rejoining and checkpoints) and Survival were played on two PCs over Steam with two accounts, covering the [megapass checklist](megapass-playtest.md) and the Steam and Survival checklists in [verification](verification.md). Rows whose only remaining gap was natural-play acceptance are now marked synced. Weapon-mechanism polish and active-world performance stay partial. Joining from a closed game (`+connect_lobby`) is implemented as of October 19, 2026 and awaits a two-account check.
+**October 18, 2026 — two-PC Steam playtest.** The maintainer reports that the campaign (including saves, rejoining and checkpoints) and Survival were played on two PCs over Steam with two accounts, covering the megapass campaign checklist and the Steam and Survival checklists in [verification](verification.md). Rows whose only remaining gap was natural-play acceptance are now marked synced. Weapon-mechanism polish and active-world performance stay partial. Joining from a closed game (`+connect_lobby`) is implemented as of October 19, 2026 and awaits a two-account check.
 
-**October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance is recorded in the [maintainer playtest checklist](megapass-playtest.md). Those cases retain partial markers where appropriate.
+**October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance went to the maintainer's playtest. Those cases retain partial markers where appropriate.
 
 Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (protocol 13 adds the shared-item and team-inventory frames). The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
@@ -16,7 +16,7 @@ P2 joining an already-loaded Prison map now uses native same-map restart and reu
 
 Native checks cover Forest bridge state and geometry through pause/rollback/completion; Backyard's actual wheel driver and linked cart doors; complete restored Area69 elevator survival; scenery advancement after restore/current-world rejoin; prop push/pool/restore/rejoin; live saves and fresh-process host-alone resume with the partner returning. Native story/pause/input checks and 34 managed network plus eight reporting scenarios also pass.
 
-The existing poster, blood-impact, garage/portal/hint, urine, cannon, conveyor, gravity, pusher and personal-resource behavior remains in the build. The controlled FPS improvements are in the [brief performance report](../preformence_report.md). Busy-world/network optimization and longer campaign traversal remain follow-up work.
+The existing poster, blood-impact, garage/portal/hint, urine, cannon, conveyor, gravity, pusher and personal-resource behavior remains in the build. The controlled FPS improvements are in the [performance results](performance.md#before-and-after-results). Busy-world/network optimization and longer campaign traversal remain follow-up work.
 
 ## Reading the tables
 
@@ -562,7 +562,7 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Remaining manual acceptance
 
-These campaign cases from the implementation closeout were confirmed in the maintainer's two-PC Steam playtest on October 18, 2026, using the [playtest checklist](megapass-playtest.md). Active-world performance remains for the next optimization phase.
+These campaign cases from the implementation closeout were confirmed in the maintainer's two-PC Steam playtest on October 18, 2026. Active-world performance remains for the next optimization phase.
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |

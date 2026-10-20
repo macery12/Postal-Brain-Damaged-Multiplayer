@@ -4,7 +4,7 @@
 
 October 12, 2026. Read-only inspection of the installed game's recovered declarations and matching native ISIL. **No new hooks or synchronization were runtime-tested by this research.** Implementation awaits the scope interview. Existing installed behavior remains version 0.5.
 
-Sources are local game data: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD` and matching `<Decompiled>/Cpp2IL/Native-ISIL/IsilDump/Assembly-CSharp/Hyperstrange/PBD` ([path placeholders](../README.md#path-placeholders)). Recovered C# contains placeholder bodies; use native ISIL to establish call ordering and runtime tests to establish compatibility. Existing gun presentation is documented in [gun-sync-research.md](gun-sync-research.md).
+Sources are local game data: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD` and matching `<Decompiled>/Cpp2IL/Native-ISIL/IsilDump/Assembly-CSharp/Hyperstrange/PBD` ([path placeholders](../README.md#path-placeholders)). Recovered C# contains placeholder bodies; use native ISIL to establish call ordering and runtime tests to establish compatibility. Gun presentation is documented in [animation and effects research](animation-effects-research.md).
 
 ## Gun capture and presentation
 

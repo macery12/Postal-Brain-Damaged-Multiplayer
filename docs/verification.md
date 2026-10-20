@@ -119,7 +119,7 @@ Repeat targeted checks from the repository root, with `$GameDir` pointing to you
 ./scripts/Test-Travel.ps1 -GameDir $GameDir -Performance -PerformanceFrameRate 120 -Level LEVEL_Asylum_Area69
 ~~~
 
-The final candidate reran Prison admission, hazards, full Area69 riding, story and performance. Forest/wheel/props/save checks also passed earlier in this closeout; later production changes only add hazard authority/contact guards. See [maintainer playtests](megapass-playtest.md) for the remaining natural routes, fragment classification, interruption cases and busy-world/audio matrix. The implementation handoff leaves those explicit rather than claiming exhaustive campaign acceptance.
+The final candidate reran Prison admission, hazards, full Area69 riding, story and performance. Forest/wheel/props/save checks also passed earlier in this closeout; later production changes only add hazard authority/contact guards. The remaining natural routes, fragment classification, interruption cases and busy-world/audio matrix went to the maintainer's playtest. The implementation handoff leaves those explicit rather than claiming exhaustive campaign acceptance.
 
 ## Recorded checks
 
@@ -145,7 +145,7 @@ The final candidate reran Prison admission, hazards, full Area69 riding, story a
 
 Fixed during 0.8.0 two-player testing: P2 loaded Neighborhood, logged `Authored enemy/door catalogue mismatch` and returned to the menu (P1 762 authored components, P2 754). The game's distance optimizer switches far pickups off shortly after a map loads. The catalogue's "never share pickups, NPCs, players or UI" exclusion used Unity's default parent lookup, which skips inactive objects, so an inactive pickup's `InteractListener` entered the catalogue. Whether it did depended on when each peer built its catalogue and where its player stood. The exclusion now includes inactive parents. Building both variants at the same moment on all 15 maps showed the only removed components are on `ItemPickup`/pickup objects (274 rows: ammo, health, weapons, keys and carried quest items such as levers and winches), plus mission-flag changes on enemy groups those listeners referenced. The earlier Prison 559/563 travel-test failure had the same cause; the default, Neighborhood, mission, combat and Prison state travel runs now pass. Each catalogue build writes `BepInEx/PBDMP/catalogue-<scene>.tsv` so two players can diff their catalogues.
 
-The [sync tracker](sync-progress.md) records feature-specific gaps. Historical [campaign counts](campaign-coverage.md) predate the latest mission adapters and are retained as a dated census.
+The [sync tracker](sync-progress.md) records feature-specific gaps.
 
 ## Explosion, urine, hit-effect and completion regressions
 
@@ -439,7 +439,7 @@ The native UI fixture verifies current software versions/build identifiers, boun
 
 ## Focused FPS and stall hardening — October 16, 2026
 
-The [brief performance report](../preformence_report.md) and [measurement method](performance.md) record the controlled before/after comparison. Initial timing build `7106890D0DCAD31A` drops from approximately 120 FPS offline to 71.3 FPS on connected P1, with 72 frames above 50 ms in 25 seconds. Final timing build `8C014EA539801E69` measures 117.9 FPS on P1 and 118.9 FPS on P2, with 0/1 frames above 50 ms. The fixed FPS, p99, stall and host-work budget check passes; an earlier fixed repeat still shows occasional outliers, so broad performance acceptance remains open.
+The [performance results and measurement method](performance.md#before-and-after-results) record the controlled before/after comparison. Initial timing build `7106890D0DCAD31A` drops from approximately 120 FPS offline to 71.3 FPS on connected P1, with 72 frames above 50 ms in 25 seconds. Final timing build `8C014EA539801E69` measures 117.9 FPS on P1 and 118.9 FPS on P2, with 0/1 frames above 50 ms. The fixed FPS, p99, stall and host-work budget check passes; an earlier fixed repeat still shows occasional outliers, so broad performance acceptance remains open.
 
 Microsoft runtime allocation traces identify repeated authored surface path/hash lookups and full actor/motion catalogue scans. Map-lifetime caches preserve the original native membership, actor identities and door-first motion ordering. The catalogue hash is unchanged. Framed application-byte counters are opt-in and tested; network framing/protocol version is unchanged. CPU/allocation savings do not imply lower bandwidth.
 

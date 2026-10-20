@@ -24,7 +24,7 @@ The connected host's shared-world work is 3.49 ms at p95, 8.78 ms at p99 and 108
 
 ## First hardening result
 
-The [brief before/after report](../preformence_report.md) records the final measurements. The fix caches authored urine-surface membership per map rather than rebuilding scene-root paths and hashes during every native rotation update. Authored scripted actors and ordered motion targets are also cached when the catalogue is built. Host authority, capture scheduling, motion ordering and catalogue compatibility hashes stay the same. Native checks compare cached membership, actor identities and motion ordering against the original queries on both games.
+The [before/after results](#before-and-after-results) below record the final measurements. The fix caches authored urine-surface membership per map rather than rebuilding scene-root paths and hashes during every native rotation update. Authored scripted actors and ordered motion targets are also cached when the catalogue is built. Host authority, capture scheduling, motion ordering and catalogue compatibility hashes stay the same. Native checks compare cached membership, actor identities and motion ordering against the original queries on both games.
 
 The final untraced Neighborhood sample reaches 117.9 FPS on P1 and 118.9 FPS on P2. P1 has no frames above 50 ms; P2 has one 50.6 ms frame. Both pass the fixed retained-FPS/frame-p99/stall criteria, and host world p95/max remain within 4/16 ms in this sample. A preceding fixed run still had rare large outliers, so these results do not establish the absence of intermittent stalls. The profiler estimates the targeted lookup at 442.2 → 0.4 MiB over separate 20-second traces, with total sampled managed allocation 835.7 → 454.2 MiB. The remaining allocation includes world-frame creation, physical-state serialization and enemy presentation.
 
@@ -71,3 +71,35 @@ Use untraced runs for before/after FPS comparisons. Short, private CPU/allocatio
 - Investigate the separate already-loaded-map Prison join failure observed during harness calibration. The completed baseline uses the successfully validated main-menu join flow.
 
 This first performance fix is validated in controlled idle scenarios. Broader active-world, combat and transport performance acceptance remains open; the sync score is unchanged.
+
+## Before and after results
+
+| Test / measurement | Before | After |
+| --- | ---: | ---: |
+| P1 FPS — one game offline | 120.0 | 120.0 |
+| P1 FPS — two games offline | 120.0 | 120.0 |
+| P1 FPS — hosting without P2 | 102.4 | 119.9 |
+| Connected FPS — P1 / P2 | 71.3 / 95.6 | 117.9 / 118.9 |
+| Frame p99 — P1 / P2 (ms) | 95.2 / 66.1 | 18.0 / 9.0 |
+| Longest frame — P1 / P2 (ms) | 124.2 / 81.8 | 25.8 / 50.6 |
+| Frames over 50 ms — P1 / P2 | 72 / 49 | 0 / 1 |
+| Frames over 100 ms — P1 / P2 | 14 / 0 | 0 / 0 |
+| Host sync work — p95 / max (ms) | 3.49 / 108.19 | 3.10 / 15.12 |
+| Main-thread allocation — P1 / P2 (MiB/s) | 49.4 / 30.9 | 22.3 / 2.3 |
+| Rotator lookup allocation — sampled over 20 s | ~442 MiB | ~0.4 MiB |
+| Total managed allocation — sampled over 20 s | ~836 MiB | ~454 MiB |
+| Traffic — P1 → P2 (KiB/s) | 65.8 | 81.0 |
+| Traffic — P2 → P1 (KiB/s) | 4.3 | 4.3 |
+| Area69 host world / sweep p95 (ms)* | 3.45 / 203.29 | 3.07 / 52.83 |
+| Native ownership / urine / late join / pause-input checks | Existing checks | Pass |
+| Avatar update — saw idle (mean / p95 ms)† | Not sampled | 0.104 / 0.106 |
+| Avatar update allocation† | Not sampled | 0 bytes / 1,000 updates |
+| Extra presentation payload / pose† | 0 bytes | 15 bytes |
+| Estimated extra traffic / sender† | 0 | ~0.29 KiB/s |
+| Managed network + reporting checks | 39 pass | 42 pass |
+
+Neighborhood idle tests: 25-second samples, eight-second warmup, frozen NPC AI, 1280×720, 120 FPS cap; both games on one PC. Before: `7106890D0DCAD31A`; after: `8C014EA539801E69`. Allocation/traffic comparisons include separate matching idle runs.
+
+Traffic measures framed application bytes, excluding TCP/IP, Steam overhead and retransmissions; more traffic can reflect faster state delivery. Profiler allocation totals are estimates. *Area69 before is the earlier recorded baseline; after is the retained-budget animation check on `C990AE9ED22FC33F`. Active-combat and broader campaign performance remain separate work.
+
+†Focused animation results on `C990AE9ED22FC33F`; avatar measurements exclude equip, rendering and world sync. Traffic increase is the 15-byte extension × nominal 20 Hz, excluding transport overhead. Earlier full-FPS comparisons above remain their original measured builds.

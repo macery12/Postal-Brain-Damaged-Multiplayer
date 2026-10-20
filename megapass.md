@@ -1,6 +1,6 @@
 # Campaign world consistency megapass
 
-**October 16, 2026 — implementation closeout.** The agreed world systems are implemented, with focused regressions for the closing fixes. Broad campaign traversal and the remaining edge-case matrix are handed to the maintainer for playtesting, per the updated testing preference. [Campaign playtest checklist](docs/megapass-playtest.md) records those cases without reopening an exhaustive automated testing phase.
+**October 16, 2026 — implementation closeout.** The agreed world systems are implemented, with focused regressions for the closing fixes. Broad campaign traversal and the remaining edge-case matrix are handed to the maintainer for playtesting, per the updated testing preference. The maintainer covered those cases in the October 18, 2026 two-PC playtest.
 
 Current source: **0.10.0 / protocol 11 / save schema 2** after the subsequent [weapon-animation pass](docs/weapon-animation-testing.md). The megapass evidence below refers to its recorded protocol-10 builds. Sync status continues to distinguish implemented behavior from unverified campaign cases. No commit or push is included in this closeout.
 
@@ -20,7 +20,7 @@ The remaining work is manual acceptance and the next performance phase. It is se
 | Native failure recovery | Save/transfer bounds, corruption and compatibility have managed evidence; abrupt native interruptions/missing targets remain manual. | T33; CoopSaveService.cs; WorldNativeCapture.cs |
 | Active-world performance | Prior connected-idle FPS fix retained. Busy combat/world and real transport load move to the optimization phase. | T34; docs/performance.md |
 | Audio/story/UI | Targeted native pause/story/input checks pass. Natural loop/audio/sequence combinations remain manual. | T15–T16, T35; StoryDiagnostics.cs |
-| Campaign traversal | Maintainer campaign playtest with meaningful saves/rejoins. Existing all-map census stays separately labeled. | T36; docs/megapass-playtest.md |
+| Campaign traversal | Maintainer campaign playtest with meaningful saves/rejoins. Existing all-map census stays separately labeled. | T36 |
 
 ## Closing fixes and source lookup
 

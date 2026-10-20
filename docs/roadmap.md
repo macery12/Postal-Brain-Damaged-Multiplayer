@@ -1,6 +1,6 @@
 # Roadmap and session rules
 
-Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (October 19, 2026). The megapass implementation closeout hands broad campaign acceptance to the [maintainer playtest checklist](megapass-playtest.md). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
+Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (October 19, 2026). The [sync tracker](sync-progress.md) is the detailed feature/status reference; [verification](verification.md) separates implemented behavior from acceptance evidence.
 
 PBDMP 1.0.0 is installed and packaged as build **960F3A0ADE93A2BB** (`artifacts/PBDMP-1.0.0.zip`); see the [1.0.0 release record](verification.md#100-release--october-19-2026). It includes Survival co-op for the three base arenas and the weapon-animation pass.
 

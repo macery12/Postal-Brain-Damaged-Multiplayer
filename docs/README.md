@@ -11,15 +11,13 @@ Start with the [project README](../README.md) for installation and play instruct
 | [Sync progress](sync-progress.md) | Individual shared/local feature status, development credit, accepted baseline and remaining gaps. |
 | [Performance baseline](performance.md) | Initial connected/disconnected FPS, stalls and repeatable budget checks. |
 | [Weapon animation checks](weapon-animation-testing.md) | Grip profiles, native animation reuse, multi-angle captures and connected presentation tests. |
-| [Megapass playtest](megapass-playtest.md) | Remaining natural campaign and edge-case checks for the maintainer. |
 | [Verification](verification.md) | Recorded checks, repeatable commands, troubleshooting and manual acceptance. |
 | [Co-op saves](co-op-saves.md) | Save controls, checkpoint restoration, personal progress and recovery. |
 | [Roadmap](roadmap.md) | Current session rules and remaining work. |
-| [Protocol](protocol.md) | Protocol 12 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
+| [Protocol](protocol.md) | Protocol 13 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
 | [Steam research](steam-research.md) | How PBDMP reaches the game's Steam client, callbacks, native layouts and single-account verification. |
 | [Contributor guidance](contributing.md) | Build/test expectations and publication hygiene. |
 | [Mission-trigger design](mission-trigger-sync-plan.md) | Accepted mission/exit rules, wall root cause and adapter limits. |
-| [Development status](development-progress.md) | Short implementation handoff. |
 
 ## Design and historical research
 
@@ -27,15 +25,12 @@ These notes preserve the findings and scope at the time of research. They may de
 
 | Document | Subject |
 | --- | --- |
-| [Initial research](research.md) | Loader choice and initial movement architecture. |
 | [Player model](player-model-research.md) | Runtime source assets and clean rig reconstruction. |
-| [Early gun presentation](gun-sync-research.md) | Original visual-only weapon milestone. |
 | [Animation and effects](animation-effects-research.md) | Native clips, binding and visual asset reuse. |
 | [Native UI](ui-theme-research.md) | Fonts, controls, dialog art and input ownership. |
 | [Campaign travel](session-travel-research.md) | Native level/life/save lifecycle findings. |
 | [Gun and door research](gun-door-research.md) | Native attack and interaction paths. |
 | [Enemy/combat research](enemy-combat-research.md) | Targeting, hit authority and encounter findings. |
 | [Shared-combat design](shared-combat-spec.md) | Accepted combat/resource ownership design. |
-| [Historical campaign census](campaign-coverage.md) | Dated component counts before the mission pass. |
 
 Native UI/model renders are in `images/`; they are diagnostic captures, not a full co-op gameplay recording. The multiplayer-panel capture is the 0.8.0 lobby panel from the runtime smoke test, which never shows the tester's Steam identity. Extracted game asset files and raw diagnostic reports are not distributed.
