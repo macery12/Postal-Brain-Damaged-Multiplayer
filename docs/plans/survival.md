@@ -250,7 +250,7 @@ Persistent Survival support, if later requested, requires a separate versioned s
 | --- | --- |
 | `Test-Travel.ps1 -SurvivalWaves` (Suburbs) | Pass, 25 checks (`.local/travel-20261016-201530`): INTRO state on P2; P1's start pickup begins run 1; P2 mirrors COMBAT and the countdown with zero local spawns; P1's native kill and P2's hit request both kill P1 enemies and score; with P2 parked on a spawn cluster every new spawn kept ≥ 8 m from P2 and the partner guard rejected spawns; an enemy nearer P2 targeted P2; P1 pause froze the timer on both; with P1 dead the timer kept running and enemies targeted P2; wave 1 resolved once into REST wave 2 (P2 mirrored, no P2 offers); a native offer started wave 2 of the same run; native `SpawnNextNpc` flying StarFuck/ClownElemental spawned at the native +4 m height and appeared on P2 within ~0.3 m; pooled wave-2 population matched; CLEANUP cleared into REST once and P2 replicas cleared. |
 | Regression | `-Survival` 29 checks, `-JoinInput -Level LEVEL_Horde_Suburbs` 10, campaign travel/respawn 54, campaign `-Saves` 42, managed 35 network + 8 reporting. All pass. |
-| `-Combat` (campaign) | Failed at "late join receives a personal copy of the host's pre-join loot ledger" on this build and on baseline `d511ea1`. Fixed after Phase 7: the fixture expected exactly one drop, but P1's ledger also correctly holds native drops made before hosting began. Now passes (28); see [verification](docs/verification.md#door-and-loot-fixture-fixes--october-18-2026). |
+| `-Combat` (campaign) | Failed at "late join receives a personal copy of the host's pre-join loot ledger" on this build and on baseline `d511ea1`. Fixed after Phase 7: the fixture expected exactly one drop, but P1's ledger also correctly holds native drops made before hosting began. Now passes (28); see [verification](../verification.md#door-and-loot-fixture-fixes--october-18-2026). |
 
 **Fixture labels:** wave 1 is synthetically lengthened by 60 s and ends by shortening the timer, so every observation fits one wave (natural wave timing was observed in Phase 0); enemies are removed with native `Npc.Kill` and players kept alive by restoring native hit points, except during the host-death step; P2's hits are synthetic native `Npc.Hit` calls on replicas.
 
@@ -398,7 +398,7 @@ P1's connected shared-world update: p95 0.77 ms, max 2.5 ms (campaign budgets 4 
 **Pre-existing failure (identical on baseline `d511ea1`, built in a temporary worktree and run on the same installation):**
 - `-ActorParts`: stops at "campaign includes scripted shoot-reactive human: FakeCitizen". With this build it first passes the MiniCovid checks, including the retired replica.
 
-`-Doors` and `-Combat` also failed here and on the baseline. Both were fixture defects, fixed after Phase 7; see [verification](docs/verification.md#door-and-loot-fixture-fixes--october-18-2026).
+`-Doors` and `-Combat` also failed here and on the baseline. Both were fixture defects, fixed after Phase 7; see [verification](../verification.md#door-and-loot-fixture-fixes--october-18-2026).
 
 **Open intermittent issue:** `-JoinInput -JoinFromLevel -Level LEVEL_Horde_Suburbs`, where P2 joins from its own loaded solo arena, failed in 3 of 8 runs during Phase 6. Shortly after the admission, one PC has a native `MENU` open. P1's native pause path (`GameManager.PauseGame`) was entered, which shared-pauses P2; in another run P2 kept a menu. The native caller was not identified. The campaign variant passed 3 of 3, and the main-menu join into an arena passes. Maintainer check: join from an already-loaded solo arena and watch for an unexpected pause menu.
 
@@ -413,8 +413,8 @@ P1's connected shared-world update: p95 0.77 ms, max 2.5 ms (campaign budgets 4 
 
 ## Phase 7 handoff (October 18, 2026)
 
-- Player documentation: README "Survival co-op" play section and sync row; package `INSTALL.txt` Survival lines; [verification](docs/verification.md) Survival commands and the two-player Survival checklist.
-- Reference documentation: [sync progress](docs/sync-progress.md) Survival rows (arena travel, pooling, performance, late join, reconnect); [protocol](docs/protocol.md) enemy-life retirement, part mismatch tolerance and early save-page replay; [performance](docs/performance.md) Survival comparison; [roadmap](docs/roadmap.md) scope; documentation index link.
+- Player documentation: README "Survival co-op" play section and sync row; package `INSTALL.txt` Survival lines; [verification](../verification.md) Survival commands and the two-player Survival checklist.
+- Reference documentation: [sync progress](../sync-progress.md) Survival rows (arena travel, pooling, performance, late join, reconnect); [protocol](../protocol.md) enemy-life retirement, part mismatch tolerance and early save-page replay; [performance](../performance.md) Survival comparison; [roadmap](../roadmap.md) scope; documentation index link.
 - Package and install: `scripts/Package.ps1` now runs in Windows PowerShell 5.1 (a full-path check replaces `Path.GetRelativePath`). Package `PBDMP-0.10.0.zip`, development build **41D7421713392F3B** (a copy is kept as `PBDMP-0.10.0-survival-41D7421713392F3B.zip`). The zip entries match the tested pair. Installed with `Install-Plugin.ps1` into the normal game folder while the game was closed: the installed DLLs and manifest hashes match the pair. The previously installed pair and zip are kept privately for rollback.
 - Not committed or pushed. The working tree's staged index was left as found.
 
@@ -436,4 +436,4 @@ P1's connected shared-world update: p95 0.77 ms, max 2.5 ms (campaign budgets 4 
 | Phase 7 documentation, package and handoff | Complete | Package/install build 41D7421713392F3B (`PBDMP.dll` 360F140AFC3F198F / `PBDMP.Network.dll` 71E8B7CD12EB7F5D). Not committed or pushed. |
 | Survival implementation | Complete | Remaining: maintainer natural two-PC playtest, the open join-from-loaded-arena pause, deferred work below. |
 
-Resume instruction for Claude: Survival co-op is complete for the three base arenas (Phases 0–7). Remaining work is the maintainer's natural two-PC playtest ([checklist](docs/verification.md#survival-two-player-checklist)), the open intermittent join-from-loaded-arena pause, and the deferred items below. Ask the owner before expanding scope.
+Resume instruction for Claude: Survival co-op is complete for the three base arenas (Phases 0–7). Remaining work is the maintainer's natural two-PC playtest ([checklist](../verification.md#survival-two-player-checklist)), the open intermittent join-from-loaded-arena pause, and the deferred items below. Ask the owner before expanding scope.

@@ -24,7 +24,7 @@ Maintainer checks still open (two Steam accounts):
 
 ## Survival co-op closeout — October 18, 2026
 
-Installed/exported **0.10.0 / protocol 12 / save schema 2**, build **41D7421713392F3B** (`PBDMP.dll` 360F140AFC3F198F, `PBDMP.Network.dll` 71E8B7CD12EB7F5D). The installed DLLs and the zip entries match the tested pair. The previous install and package are kept privately for rollback. No commit or push. Full evidence and limits are in the [Survival handoff](../survival.md#phase-6-handoff-october-18-2026).
+Installed/exported **0.10.0 / protocol 12 / save schema 2**, build **41D7421713392F3B** (`PBDMP.dll` 360F140AFC3F198F, `PBDMP.Network.dll` 71E8B7CD12EB7F5D). The installed DLLs and the zip entries match the tested pair. The previous install and package are kept privately for rollback. No commit or push. Full evidence and limits are in the [Survival handoff](plans/survival.md#phase-6-handoff-october-18-2026).
 
 | Check | Result |
 | --- | --- |
@@ -38,7 +38,7 @@ Fixture actions are native calls, not natural combat; the [Survival two-player c
 
 ## Identical players (shared items) — October 19, 2026
 
-Protocol 13, on an isolated test copy, not installed. See the [redesign plan](../coop-redesign.md#phase-12-handoff-october-19-2026).
+Protocol 13, on an isolated test copy, not installed. See the [redesign plan](plans/coop-redesign.md#phase-12-handoff-october-19-2026).
 
 | Check | Result |
 | --- | --- |
@@ -328,7 +328,7 @@ Three repeated strict Prison runs pass. The earlier intermittent Point Light (4)
 ./scripts/Test-Travel.ps1 -GameDir $GameDir -WorldRegression -Level LEVEL_AD_Prison
 ```
 
-These are targeted native fixtures. They do not establish full natural campaign-route, specialist hazard or failure-recovery acceptance. The remaining list in `megapass.md` remains authoritative. Raw failing/passing logs and asset-audit reports stay ignored.
+These are targeted native fixtures. They do not establish full natural campaign-route, specialist hazard or failure-recovery acceptance. The remaining list in `docs/plans/megapass.md` remains authoritative. Raw failing/passing logs and asset-audit reports stay ignored.
 
 The authored-catalogue failure was reproduced from an affected progressed save. Seven detached native corpse pieces had become independent roots without a clone suffix or pool source, and were admitted as map props when rebuilding. Recording safe authored physical components at scene load keeps the original map catalogue across deaths, restoration and rehosting, while retaining legitimate unsaved swing bones. Scene membership is released on unload and never sent over the network.
 
@@ -349,7 +349,7 @@ The strict Hospital urine/live/late-join fixture now passes. Native rotation/fil
 | Area69 machinery/rider regression | Live and restored rider drift/alive samples, shared pause, native mover/rotater/elevator disk restoration, future endpoints and single completion callbacks. Natural full-route obstruction coverage remains separate. |
 | Refreshed campaign catalogue | All 15 base maps pass separate-process discovery and bounded-state serialization on the final build. This is catalogue coverage, not natural route completion. |
 
-Managed acceptance: **31 scenarios passed**. Release compilation: **zero warnings/errors**. The native tests are targeted regressions, not natural completion of every campaign route. The outstanding matrix in [megapass.md](../megapass.md) remains authoritative, including the separately recorded Prison light-only mismatch.
+Managed acceptance: **31 scenarios passed**. Release compilation: **zero warnings/errors**. The native tests are targeted regressions, not natural completion of every campaign route. The outstanding matrix in [megapass.md](plans/megapass.md) remains authoritative, including the separately recorded Prison light-only mismatch.
 
 ```powershell
 ./scripts/Test-Travel.ps1 -GameDir $GameDir -Presentation Posters -Level LEVEL_AD_Neighborhood

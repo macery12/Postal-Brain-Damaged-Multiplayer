@@ -316,7 +316,7 @@ Native facts come from the recovered ISIL of the reference build. Runtime facts 
 
 **Docs**: README (Play together, saves, version), `co-op-saves.md` (the new controls, team inventory row, world format), roadmap (current behavior, milestones 0.10 and 1.0), protocol, Steam research, sync rows, development status, and the verification release record and commands.
 
-**Checks**: everything in the [1.0.0 release record](docs/verification.md#100-release--october-19-2026), run on the final DLL pair:
+**Checks**: everything in the [1.0.0 release record](../verification.md#100-release--october-19-2026), run on the final DLL pair:
 - 18 campaign and 21 Survival two-process fixtures;
 - runtime smoke, `-CoopMenu`, the Steam probe and the managed tests.
 

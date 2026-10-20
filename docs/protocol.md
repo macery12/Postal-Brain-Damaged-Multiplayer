@@ -121,7 +121,7 @@ Adapters resolve known authored keys and fields; payloads cannot request arbitra
 
 Interaction retries retain their original request ID. P1 caches the committed result, so retransmission cannot plant another TNT charge or consume another key. Personal recovery records wait while the requester has an unresolved item reservation.
 
-Schema-1 files can be inspected by the storage reader, but the 0.10 loader refuses restoration when the older format lacks required world state. Original files and backups remain untouched. The [megapass](../megapass.md) and [tracker](sync-progress.md) distinguish these development adapters from completed runtime acceptance.
+Schema-1 files can be inspected by the storage reader, but the 0.10 loader refuses restoration when the older format lacks required world state. Original files and backups remain untouched. The [megapass](plans/megapass.md) and [tracker](sync-progress.md) distinguish these development adapters from completed runtime acceptance.
 
 ## World/presentation follow-up (protocol 10)
 

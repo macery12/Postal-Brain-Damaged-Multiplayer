@@ -19,7 +19,7 @@ PBDMP 1.0.0 is installed and packaged as build **960F3A0ADE93A2BB** (`artifacts/
 
 ## Identical and personal systems
 
-In the campaign, weapons, keys and mission items are one team inventory owned by P1. A pickup of any of them exists once, and both players receive it. A key door uses the key for both. See [the redesign plan](../coop-redesign.md).
+In the campaign, weapons, keys and mission items are one team inventory owned by P1. A pickup of any of them exists once, and both players receive it. A key door uses the key for both. See [the redesign plan](plans/coop-redesign.md).
 
 Health, armor/shields, ammo, consumables and powerup types/durations remain personal. Collecting one of those pickups does not remove the partner's copy, and host-selected enemy drops receive separate collectible copies. Survival keeps every resource personal. Personal systems do not count as unfinished synchronization.
 
@@ -41,7 +41,7 @@ Host-owned co-op saves now provide named manual slots, one quicksave and three r
 
 ## Outside the current scope
 
-Survival co-op for the three base arenas is implemented (see the [Survival handoff](../survival.md)); its natural two-PC playtest list is in [verification](verification.md#survival-two-player-checklist). DLC/custom Survival arenas, persistent Survival saves, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
+Survival co-op for the three base arenas is implemented (see the [Survival handoff](plans/survival.md)); its natural two-PC playtest list is in [verification](verification.md#survival-two-player-checklist). DLC/custom Survival arenas, persistent Survival saves, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
 
 ## Historical milestones
 

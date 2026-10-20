@@ -446,7 +446,7 @@ See [co-op saves](co-op-saves.md) for controls and exact partner/resource rules.
 
 ## Survival
 
-Survival (native HORDE) co-op is implemented for the three base arenas; see the [Survival plan and handoff](../survival.md) for evidence and limits. These rows are tracked separately and **do not count toward the campaign progress score**. Automated native fixtures cover every row below on Suburbs, Ufo and VIP Zone, with direct native calls standing in for natural combat; the remaining natural two-PC checks are in the [Survival checklist](verification.md#survival-two-player-checklist).
+Survival (native HORDE) co-op is implemented for the three base arenas; see the [Survival plan and handoff](plans/survival.md) for evidence and limits. These rows are tracked separately and **do not count toward the campaign progress score**. Automated native fixtures cover every row below on Suburbs, Ufo and VIP Zone, with direct native calls standing in for natural combat; the remaining natural two-PC checks are in the [Survival checklist](verification.md#survival-two-player-checklist).
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
@@ -475,7 +475,7 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see the 
 
 ## Shared items
 
-Campaign only (Survival keeps every resource personal). Protocol 13. Plan: [redesign plan](../coop-redesign.md).
+Campaign only (Survival keeps every resource personal). Protocol 13. Plan: [redesign plan](plans/coop-redesign.md).
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |
@@ -545,7 +545,7 @@ The actor pass includes ordinary NPCs, pedestrians, flyers, bosses, runtime-spaw
 
 ## Evidence and practical limits
 
-- Current protocol 10 passes **33 managed network acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](../megapass.md); historical timings below do not establish performance for the expanded playtest.
+- Current protocol 10 passes **33 managed network acceptance scenarios**, including bounded carrier references and large streamed world baselines over TCP/message carriers. Current focused native evidence and the remaining acceptance matrix are recorded in the [megapass checkpoint](plans/megapass.md); historical timings below do not establish performance for the expanded playtest.
 
 - Urine regressions use two native processes in Neighborhood, Prison, Hospital and ComicCon: either-player electrical-box/tank activation, catalogued garage surface/collision and tutorial-trigger state (including native portal bits and exact host hint retirement), fractional fill and linked motion/scale, toilet overflow/flush, fireball extinguishing and disconnect/rejoin restoration. The subsequent house-wall regression is fixed by a dedicated destruction adapter; native tests now check the actual renderer, collider and matching player-controller passage before and after joining again. An exposed native boss weak spot also accepts P2's frame-timed urine damage through the existing actor-hit authority path.
 - All 15 campaign maps pass discovery and bounded serialization with the new urine/progression catalogue. This does not establish natural completion of every urine puzzle, rail ride, rocket sequence or boss fight. An earlier urine-only VIP fixture stopped in a native shared pause before its action. The later focused machinery fixture passes native launch/rollback/continuation; natural progression remains manual acceptance work.

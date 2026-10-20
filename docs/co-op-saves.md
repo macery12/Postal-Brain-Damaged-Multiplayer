@@ -64,7 +64,7 @@ Solo save/profile writes and leaderboard uploads remain isolated during multipla
 
 ## World format
 
-Save schema 3 builds on the [world megapass](../megapass.md) records. Typed records add remaining machinery delays/motion, partial scenery damage, physical prop lifetimes and motion, current arena ordering, native cooldowns and mechanical timeline phases. Personal player records also retain an optional authored platform reference and relative feet position. Restoration uses the restored platform pose before safe-position validation and rebuilding rider contacts. Personal pickups and non-ammo resources retain the rules above.
+Save schema 3 builds on the [world megapass](plans/megapass.md) records. Typed records add remaining machinery delays/motion, partial scenery damage, physical prop lifetimes and motion, current arena ordering, native cooldowns and mechanical timeline phases. Personal player records also retain an optional authored platform reference and relative feet position. Restoration uses the restored platform pose before safe-position validation and rebuilding rider contacts. Personal pickups and non-ammo resources retain the rules above.
 
 Joining captures the host's current world, including changes made since loading a save. Baselines up to the disk limit stream through bounded chunks; incomplete restoration never releases gameplay. Saving also waits for a native prop-spawn batch or unresolved item reservation to finish.
 

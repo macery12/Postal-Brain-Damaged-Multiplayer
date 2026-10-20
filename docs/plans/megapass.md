@@ -2,7 +2,7 @@
 
 **October 16, 2026 — implementation closeout.** The agreed world systems are implemented, with focused regressions for the closing fixes. Broad campaign traversal and the remaining edge-case matrix are handed to the maintainer for playtesting, per the updated testing preference. The maintainer covered those cases in the October 18, 2026 two-PC playtest.
 
-Current source: **0.10.0 / protocol 11 / save schema 2** after the subsequent [weapon-animation pass](docs/weapon-animation-testing.md). The megapass evidence below refers to its recorded protocol-10 builds. Sync status continues to distinguish implemented behavior from unverified campaign cases. No commit or push is included in this closeout.
+Current source: **0.10.0 / protocol 11 / save schema 2** after the subsequent [weapon-animation pass](../weapon-animation-testing.md). The megapass evidence below refers to its recorded protocol-10 builds. Sync status continues to distinguish implemented behavior from unverified campaign cases. No commit or push is included in this closeout.
 
 ## Current remaining work
 
@@ -24,9 +24,9 @@ The remaining work is manual acceptance and the next performance phase. It is se
 
 ## Closing fixes and source lookup
 
-- **Already-loaded-map join:** P2 uses the native same-map restart path, and newer admission metadata can reuse an unfinished identical map load. This fixes the reproduced Prison falling-platform missing-reference disconnect without skipping world records. [SessionLifecycle.cs](src/PBDMP.Plugin/SessionLifecycle.cs), [ClientTravelPolicy.cs](src/PBDMP.Network/ClientTravelPolicy.cs), [JoinInputDiagnostics.cs](src/PBDMP.Plugin/JoinInputDiagnostics.cs).
-- **Runtime hazards:** pooled paw attacks and damage-trigger ticks belong to P1 even without an authored catalogue key. Shared holds suppress damage. Before a native damage tick, P2's existing contact is checked against current transforms; departed/dead contacts are removed. Native eligibility is retained, and genuine overlap is a positive control. [WorldHazards.cs](src/PBDMP.Plugin/WorldHazards.cs), [SharedMissionPatches.cs](src/PBDMP.Plugin/SharedMissionPatches.cs), [WorldSceneryPatches.cs](src/PBDMP.Plugin/WorldSceneryPatches.cs), [HazardDiagnostics.cs](src/PBDMP.Plugin/HazardDiagnostics.cs).
-- **Bridge/wheel checks:** the existing machinery test now covers Forest bridge geometry/state and Backyard's real root driver with both cart-door references. [MechanismDiagnostics.cs](src/PBDMP.Plugin/MechanismDiagnostics.cs).
+- **Already-loaded-map join:** P2 uses the native same-map restart path, and newer admission metadata can reuse an unfinished identical map load. This fixes the reproduced Prison falling-platform missing-reference disconnect without skipping world records. [SessionLifecycle.cs](../../src/PBDMP.Plugin/SessionLifecycle.cs), [ClientTravelPolicy.cs](../../src/PBDMP.Network/ClientTravelPolicy.cs), [JoinInputDiagnostics.cs](../../src/PBDMP.Plugin/JoinInputDiagnostics.cs).
+- **Runtime hazards:** pooled paw attacks and damage-trigger ticks belong to P1 even without an authored catalogue key. Shared holds suppress damage. Before a native damage tick, P2's existing contact is checked against current transforms; departed/dead contacts are removed. Native eligibility is retained, and genuine overlap is a positive control. [WorldHazards.cs](../../src/PBDMP.Plugin/WorldHazards.cs), [SharedMissionPatches.cs](../../src/PBDMP.Plugin/SharedMissionPatches.cs), [WorldSceneryPatches.cs](../../src/PBDMP.Plugin/WorldSceneryPatches.cs), [HazardDiagnostics.cs](../../src/PBDMP.Plugin/HazardDiagnostics.cs).
+- **Bridge/wheel checks:** the existing machinery test now covers Forest bridge geometry/state and Backyard's real root driver with both cart-door references. [MechanismDiagnostics.cs](../../src/PBDMP.Plugin/MechanismDiagnostics.cs).
 
 The native hazard regression failed before the fix on P2 local duplicate damage and separately on stale-contact extra damage. Its positive control verifies that the fix does not make P2 immune. The full restored-elevator survival latch remains enabled; no tolerance or death check was removed.
 
@@ -121,26 +121,26 @@ Anchors describe the inspected 0.9.0 working tree and may move. Method names are
 
 | Ref | File and entry points | Purpose |
 | --- | --- | --- |
-| R01 | [WorldMissionCatalogue.cs](src/PBDMP.Plugin/WorldMissionCatalogue.cs#L20): BuildMissionTargets, MissionTypes, MissionBreakKeys, MissionAudit | Discovery, dependencies, exclusions and contacts. |
-| R02 | [SharedWorld.cs](src/PBDMP.Plugin/SharedWorld.cs#L281): CaptureState, Send, ApplyDoorState | Complete/delta sweeps, snapshots, transform application and bounded backlog. |
-| R03 | [SharedEncounters.cs](src/PBDMP.Plugin/SharedEncounters.cs#L17): EncounterFields, SendEncounter, ApplyEncounter | Generic field boundary and client controller suppression. |
-| R04 | [SharedMissionState.cs](src/PBDMP.Plugin/SharedMissionState.cs#L14): SendMissionArrays, StopMissionController | Boolean pages, coroutine/tween cancellation, director pause. |
-| R05 | [SharedMissions.cs](src/PBDMP.Plugin/SharedMissions.cs#L13): ClientMissionHit, ApplyMissionFall, SendMissionBreak, ApplyMissionState; [SharedMissionPatches.cs](src/PBDMP.Plugin/SharedMissionPatches.cs) | Requests, persistent structure and native authority hooks. |
-| R06 | [CoopSaveService.cs](src/PBDMP.Plugin/CoopSaveService.cs#L186): TickCore, Safe, CaptureWorld, RestoreGuestNative, StartRestore, RestoreWorld; [NativeSaveBridge.cs](src/PBDMP.Plugin/NativeSaveBridge.cs#L17) | Current/loaded baseline, native serializers, hold/readiness and restore order. |
-| R07 | [CoopSave.cs](src/PBDMP.Network/CoopSave.cs#L33): Validate, Read, Write; [SaveProtocol.cs](src/PBDMP.Network/SaveProtocol.cs#L7): SaveAssembler | Disk/schema/checksum/backups and transfer bounds. |
-| R08 | [WorldCatalogue.cs](src/PBDMP.Plugin/WorldCatalogue.cs#L137): Build, SafeMotion, Add, PathOf, TransformKey | Authored identity, inactive-parent exclusions, manifest and listing. |
-| R09 | [SharedWorldPersistence.cs](src/PBDMP.Plugin/SharedWorldPersistence.cs#L32): CapturePersistent, ReservePersistentIds, RestorePersistent; [SharedLoot.cs](src/PBDMP.Plugin/SharedLoot.cs) | Durable adapter integration, ID reservation, personal drop ledger. |
-| R10 | [SessionLifecycle.cs](src/PBDMP.Plugin/SessionLifecycle.cs#L166); [SharedMissionExits.cs](src/PBDMP.Plugin/SharedMissionExits.cs); [SharedMissionCompletion.cs](src/PBDMP.Plugin/SharedMissionCompletion.cs) | Connect/readiness, occupancy, endings and results. |
-| R11 | [SharedProjectiles.cs](src/PBDMP.Plugin/SharedProjectiles.cs); [SharedWorldFire.cs](src/PBDMP.Plugin/SharedWorldFire.cs); [SharedExplosions.cs](src/PBDMP.Plugin/SharedExplosions.cs#L75) | Host attack reconstruction/fire and existing IL2CPP nullable-rotation fix. |
-| R12 | [WorldUrineCatalogue.cs](src/PBDMP.Plugin/WorldUrineCatalogue.cs); [SharedUrinePatches.cs](src/PBDMP.Plugin/SharedUrinePatches.cs); [SharedUrineRails.cs](src/PBDMP.Plugin/SharedUrineRails.cs) | Existing barrel/burnable/fuse/rail paths; preserve instead of duplicating. |
-| R13 | [CampaignAudit.cs](src/PBDMP.Plugin/CampaignAudit.cs#L15); [WorldRegressionDiagnostics.cs](src/PBDMP.Plugin/WorldRegressionDiagnostics.cs); [MissionDiagnostics.cs](src/PBDMP.Plugin/MissionDiagnostics.cs); [SaveDiagnostics.cs](src/PBDMP.Plugin/SaveDiagnostics.cs) | Census/discovery and native fixtures. |
-| R14 | [WorldProtocol.cs](src/PBDMP.Network/WorldProtocol.cs#L5); [CoopSession.cs](src/PBDMP.Network/CoopSession.cs); [tests/Program.cs](tests/PBDMP.Network.Tests/Program.cs#L6) | Direction rules, bounded records/queues, transport/save acceptance. |
-| R15 | [SyncPerformanceDiagnostics.cs](src/PBDMP.Plugin/SyncPerformanceDiagnostics.cs); [Test-Travel.ps1](scripts/Test-Travel.ps1); [Test-Runtime.ps1](scripts/Test-Runtime.ps1) | Timing, input/UI regressions and existing flags. |
-| R16 | [sync-progress.md](docs/sync-progress.md), [co-op-saves.md](docs/co-op-saves.md), [verification.md](docs/verification.md), [earlier mission plan](docs/mission-trigger-sync-plan.md) | Current rules/evidence and historical context. |
+| R01 | [WorldMissionCatalogue.cs](../../src/PBDMP.Plugin/WorldMissionCatalogue.cs#L20): BuildMissionTargets, MissionTypes, MissionBreakKeys, MissionAudit | Discovery, dependencies, exclusions and contacts. |
+| R02 | [SharedWorld.cs](../../src/PBDMP.Plugin/SharedWorld.cs#L281): CaptureState, Send, ApplyDoorState | Complete/delta sweeps, snapshots, transform application and bounded backlog. |
+| R03 | [SharedEncounters.cs](../../src/PBDMP.Plugin/SharedEncounters.cs#L17): EncounterFields, SendEncounter, ApplyEncounter | Generic field boundary and client controller suppression. |
+| R04 | [SharedMissionState.cs](../../src/PBDMP.Plugin/SharedMissionState.cs#L14): SendMissionArrays, StopMissionController | Boolean pages, coroutine/tween cancellation, director pause. |
+| R05 | [SharedMissions.cs](../../src/PBDMP.Plugin/SharedMissions.cs#L13): ClientMissionHit, ApplyMissionFall, SendMissionBreak, ApplyMissionState; [SharedMissionPatches.cs](../../src/PBDMP.Plugin/SharedMissionPatches.cs) | Requests, persistent structure and native authority hooks. |
+| R06 | [CoopSaveService.cs](../../src/PBDMP.Plugin/CoopSaveService.cs#L186): TickCore, Safe, CaptureWorld, RestoreGuestNative, StartRestore, RestoreWorld; [NativeSaveBridge.cs](../../src/PBDMP.Plugin/NativeSaveBridge.cs#L17) | Current/loaded baseline, native serializers, hold/readiness and restore order. |
+| R07 | [CoopSave.cs](../../src/PBDMP.Network/CoopSave.cs#L33): Validate, Read, Write; [SaveProtocol.cs](../../src/PBDMP.Network/SaveProtocol.cs#L7): SaveAssembler | Disk/schema/checksum/backups and transfer bounds. |
+| R08 | [WorldCatalogue.cs](../../src/PBDMP.Plugin/WorldCatalogue.cs#L137): Build, SafeMotion, Add, PathOf, TransformKey | Authored identity, inactive-parent exclusions, manifest and listing. |
+| R09 | [SharedWorldPersistence.cs](../../src/PBDMP.Plugin/SharedWorldPersistence.cs#L32): CapturePersistent, ReservePersistentIds, RestorePersistent; [SharedLoot.cs](../../src/PBDMP.Plugin/SharedLoot.cs) | Durable adapter integration, ID reservation, personal drop ledger. |
+| R10 | [SessionLifecycle.cs](../../src/PBDMP.Plugin/SessionLifecycle.cs#L166); [SharedMissionExits.cs](../../src/PBDMP.Plugin/SharedMissionExits.cs); [SharedMissionCompletion.cs](../../src/PBDMP.Plugin/SharedMissionCompletion.cs) | Connect/readiness, occupancy, endings and results. |
+| R11 | [SharedProjectiles.cs](../../src/PBDMP.Plugin/SharedProjectiles.cs); [SharedWorldFire.cs](../../src/PBDMP.Plugin/SharedWorldFire.cs); [SharedExplosions.cs](../../src/PBDMP.Plugin/SharedExplosions.cs#L75) | Host attack reconstruction/fire and existing IL2CPP nullable-rotation fix. |
+| R12 | [WorldUrineCatalogue.cs](../../src/PBDMP.Plugin/WorldUrineCatalogue.cs); [SharedUrinePatches.cs](../../src/PBDMP.Plugin/SharedUrinePatches.cs); [SharedUrineRails.cs](../../src/PBDMP.Plugin/SharedUrineRails.cs) | Existing barrel/burnable/fuse/rail paths; preserve instead of duplicating. |
+| R13 | [CampaignAudit.cs](../../src/PBDMP.Plugin/CampaignAudit.cs#L15); [WorldRegressionDiagnostics.cs](../../src/PBDMP.Plugin/WorldRegressionDiagnostics.cs); [MissionDiagnostics.cs](../../src/PBDMP.Plugin/MissionDiagnostics.cs); [SaveDiagnostics.cs](../../src/PBDMP.Plugin/SaveDiagnostics.cs) | Census/discovery and native fixtures. |
+| R14 | [WorldProtocol.cs](../../src/PBDMP.Network/WorldProtocol.cs#L5); [CoopSession.cs](../../src/PBDMP.Network/CoopSession.cs); [tests/Program.cs](../../tests/PBDMP.Network.Tests/Program.cs#L6) | Direction rules, bounded records/queues, transport/save acceptance. |
+| R15 | [SyncPerformanceDiagnostics.cs](../../src/PBDMP.Plugin/SyncPerformanceDiagnostics.cs); [Test-Travel.ps1](../../scripts/Test-Travel.ps1); [Test-Runtime.ps1](../../scripts/Test-Runtime.ps1) | Timing, input/UI regressions and existing flags. |
+| R16 | [sync-progress.md](../sync-progress.md), [co-op-saves.md](../co-op-saves.md), [verification.md](../verification.md), [earlier mission plan](../mission-trigger-sync-plan.md) | Current rules/evidence and historical context. |
 
 ## Native reference index
 
-**&lt;Decompiled&gt;** means reader-owned research output, defined in the [README placeholders](README.md#path-placeholders). The paths below are lookup references, not repository dependencies or broken links. No game binaries, dumps, raw logs or workstation paths belong in the repository.
+**&lt;Decompiled&gt;** means reader-owned research output, defined in the [README placeholders](../../README.md#path-placeholders). The paths below are lookup references, not repository dependencies or broken links. No game binaries, dumps, raw logs or workstation paths belong in the repository.
 
 C# prefix: **&lt;Decompiled&gt;/CSharp/Assembly-CSharp/Hyperstrange/PBD/**.
 
@@ -355,20 +355,20 @@ Still required: complete the all-map matrix; focused motion/riding/hazard/fuse/s
 
 | File | Entry points / purpose |
 | --- | --- |
-| [WorldNativeCapture.cs](src/PBDMP.Plugin/WorldNativeCapture.cs) | `TickNativeJoin`, `CaptureCurrentBaseline`, `SendBaseline`, `ReceiveBaseline`, `DrainTransfers`. |
-| [WorldSceneryCatalogue.cs](src/PBDMP.Plugin/WorldSceneryCatalogue.cs) | Authored scenery, fragment bodies, spawner/prefab references, mechanism and secret discovery. |
-| [WorldScenery.cs](src/PBDMP.Plugin/WorldScenery.cs) | Typed scenery capture/application, physical lifetimes and validated P2 requests. |
-| [WorldFragments.cs](src/PBDMP.Plugin/WorldFragments.cs) | Gameplay fragment pose, collision, velocity and sleep state. |
-| [WorldMechanisms.cs](src/PBDMP.Plugin/WorldMechanisms.cs) | Barrel/fall/scale clocks, platform carry, rider rebasing and player force/shake effects. |
-| [WorldGateFuses.cs](src/PBDMP.Plugin/WorldGateFuses.cs) | Native interaction commit followed by a durable TNT countdown. |
-| [WorldMechanismAudio.cs](src/PBDMP.Plugin/WorldMechanismAudio.cs) | Machinery loops, restored playback position and owned pause/resume. |
-| [WorldSequences.cs](src/PBDMP.Plugin/WorldSequences.cs), [WorldSequenceAudit.cs](src/PBDMP.Plugin/WorldSequenceAudit.cs) | Passive timeline phase/presentation and actual bindings/signals; host continuation guards. |
-| [SessionStories.cs](src/PBDMP.Plugin/SessionStories.cs), [StoryDiagnostics.cs](src/PBDMP.Plugin/StoryDiagnostics.cs) | Shared native video menus, admission and skip/credits regressions. |
-| [WorldSecrets.cs](src/PBDMP.Plugin/WorldSecrets.cs) | Shared discovery once, personal native notices. |
-| [WorldPropPush.cs](src/PBDMP.Plugin/WorldPropPush.cs) | Local contacts become validated host body impulses. |
-| [WorldInteractionLedger.cs](src/PBDMP.Plugin/WorldInteractionLedger.cs) | Request/result deduplication and confirmed retry semantics. |
-| [SceneryDiagnostics.cs](src/PBDMP.Plugin/SceneryDiagnostics.cs) | Authored scenery actions, partial damage, restoration and current-world rejoin fixtures. |
-| [Test-WorldCampaign.ps1](scripts/Test-WorldCampaign.ps1) | Fresh-process catalogue/snapshot audits with optional per-map peer/input checks. |
+| [WorldNativeCapture.cs](../../src/PBDMP.Plugin/WorldNativeCapture.cs) | `TickNativeJoin`, `CaptureCurrentBaseline`, `SendBaseline`, `ReceiveBaseline`, `DrainTransfers`. |
+| [WorldSceneryCatalogue.cs](../../src/PBDMP.Plugin/WorldSceneryCatalogue.cs) | Authored scenery, fragment bodies, spawner/prefab references, mechanism and secret discovery. |
+| [WorldScenery.cs](../../src/PBDMP.Plugin/WorldScenery.cs) | Typed scenery capture/application, physical lifetimes and validated P2 requests. |
+| [WorldFragments.cs](../../src/PBDMP.Plugin/WorldFragments.cs) | Gameplay fragment pose, collision, velocity and sleep state. |
+| [WorldMechanisms.cs](../../src/PBDMP.Plugin/WorldMechanisms.cs) | Barrel/fall/scale clocks, platform carry, rider rebasing and player force/shake effects. |
+| [WorldGateFuses.cs](../../src/PBDMP.Plugin/WorldGateFuses.cs) | Native interaction commit followed by a durable TNT countdown. |
+| [WorldMechanismAudio.cs](../../src/PBDMP.Plugin/WorldMechanismAudio.cs) | Machinery loops, restored playback position and owned pause/resume. |
+| [WorldSequences.cs](../../src/PBDMP.Plugin/WorldSequences.cs), [WorldSequenceAudit.cs](../../src/PBDMP.Plugin/WorldSequenceAudit.cs) | Passive timeline phase/presentation and actual bindings/signals; host continuation guards. |
+| [SessionStories.cs](../../src/PBDMP.Plugin/SessionStories.cs), [StoryDiagnostics.cs](../../src/PBDMP.Plugin/StoryDiagnostics.cs) | Shared native video menus, admission and skip/credits regressions. |
+| [WorldSecrets.cs](../../src/PBDMP.Plugin/WorldSecrets.cs) | Shared discovery once, personal native notices. |
+| [WorldPropPush.cs](../../src/PBDMP.Plugin/WorldPropPush.cs) | Local contacts become validated host body impulses. |
+| [WorldInteractionLedger.cs](../../src/PBDMP.Plugin/WorldInteractionLedger.cs) | Request/result deduplication and confirmed retry semantics. |
+| [SceneryDiagnostics.cs](../../src/PBDMP.Plugin/SceneryDiagnostics.cs) | Authored scenery actions, partial damage, restoration and current-world rejoin fixtures. |
+| [Test-WorldCampaign.ps1](../../scripts/Test-WorldCampaign.ps1) | Fresh-process catalogue/snapshot audits with optional per-map peer/input checks. |
 
 The optional particle audit now accepts additional reader-owned serialized files. The expanded allowlist was checked against `sharedassets0.assets`, `sharedassets15.assets` and `level15`; no previously accepted source was removed. Reproduce with `Audit-VisualParticles.py --game-dir <GameDir> --additional-asset sharedassets15.assets --additional-asset level15` in a Python environment containing UnityPy. The generated allowlist contains names only; raw audit output stays in ignored `.local` storage.
 
@@ -387,7 +387,7 @@ The full megapass is still unfinished. Additional implemented adapters are being
 - Train `-Mechanisms` coverage includes the authored sleeping-car timeline and its animated bindings, plus multi-step rotation where present. It has not yet passed its focused native run.
 - Native diagnostics now allow asynchronous teardown to settle and reject relevant Unity/native callback exceptions before accepting pass markers. Temporary diagnosis traces are removed after each resolved loop; retain the final source scan.
 
-Additional lookups: [SessionTutorials.cs](src/PBDMP.Plugin/SessionTutorials.cs), [WorldBaseline.cs](src/PBDMP.Network/WorldBaseline.cs), [WorldSpawnerCapture.cs](src/PBDMP.Plugin/WorldSpawnerCapture.cs), [WorldCannon.cs](src/PBDMP.Plugin/WorldCannon.cs), [WorldScriptedActions.cs](src/PBDMP.Plugin/WorldScriptedActions.cs), [WorldRockets.cs](src/PBDMP.Plugin/WorldRockets.cs), [MechanismDiagnostics.cs](src/PBDMP.Plugin/MechanismDiagnostics.cs), and [PropDiagnostics.cs](src/PBDMP.Plugin/PropDiagnostics.cs).
+Additional lookups: [SessionTutorials.cs](../../src/PBDMP.Plugin/SessionTutorials.cs), [WorldBaseline.cs](../../src/PBDMP.Network/WorldBaseline.cs), [WorldSpawnerCapture.cs](../../src/PBDMP.Plugin/WorldSpawnerCapture.cs), [WorldCannon.cs](../../src/PBDMP.Plugin/WorldCannon.cs), [WorldScriptedActions.cs](../../src/PBDMP.Plugin/WorldScriptedActions.cs), [WorldRockets.cs](../../src/PBDMP.Plugin/WorldRockets.cs), [MechanismDiagnostics.cs](../../src/PBDMP.Plugin/MechanismDiagnostics.cs), and [PropDiagnostics.cs](../../src/PBDMP.Plugin/PropDiagnostics.cs).
 
 Native research references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/Contraptions/{Elevator,Rotater,FallingPlatform,PhysicalObjectSpawner,Cannon,Teleporter,RocketSequence}.cs`, `Hyperstrange/PBD/PlayerComponents/PlayerTutorialComponent.cs`, and `Hyperstrange/Base/{LocalRotation,GameEvent}.cs`. The matching native ISIL dumps establish callback order, optional helper assumptions, timing and remaining-motion behavior; keep recovered game data out of the repository.
 
@@ -400,7 +400,7 @@ Native research references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PB
 - The train pose/continuation regression revealed that a stopped director can reset its reported time while retaining a later pose. Completed phase tracking and a stricter peak-playback assertion are under validation. Earlier stop-state-only results are not sufficient timeline acceptance.
 - All 26 managed network/save scenarios were rerun successfully, including large TCP/message-carrier baselines and compatibility refusal. No final package or sync-score increase has been made.
 
-Additional lookups: [WorldArena.cs](src/PBDMP.Plugin/WorldArena.cs), [ArenaDiagnostics.cs](src/PBDMP.Plugin/ArenaDiagnostics.cs). Native references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/Contraptions/{CovidArenaController,CovidArenaSegment,CovidArenaBase,AntiCovidSyringeController,AntiCovidSyringe}.cs`, `Hyperstrange/PBD/GravityChanger.cs`, and `Hyperstrange/Base/Cooldown.cs`, with matching ISIL bodies. Native update registration handles remain local.
+Additional lookups: [WorldArena.cs](../../src/PBDMP.Plugin/WorldArena.cs), [ArenaDiagnostics.cs](../../src/PBDMP.Plugin/ArenaDiagnostics.cs). Native references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/Contraptions/{CovidArenaController,CovidArenaSegment,CovidArenaBase,AntiCovidSyringeController,AntiCovidSyringe}.cs`, `Hyperstrange/PBD/GravityChanger.cs`, and `Hyperstrange/Base/Cooldown.cs`, with matching ISIL bodies. Native update registration handles remain local.
 
 
 ### Focused validation and remaining work
@@ -416,7 +416,7 @@ The pass is still in development; there is no final 0.10 package or completed ca
 
 Outstanding: finish rider and TNT-gate regressions; cannon, teleporter, secret and specialised hazard/trigger checks; destruction eligibility/collision/fragment and queued-chain cases; fresh-process save/rejoin/rollback and failure recovery for the expanded world families; natural campaign routes; performance/audio/UI/existing-feature regressions; final granular documentation and matching installed/package hashes. The public milestone score remains unchanged. No commit or push has been performed.
 
-Rider lookups: [WorldCarriers.cs](src/PBDMP.Plugin/WorldCarriers.cs), [PlayerCarrier.cs](src/PBDMP.Network/PlayerCarrier.cs), [WorldSceneryCatalogue.cs](src/PBDMP.Plugin/WorldSceneryCatalogue.cs), [WorldMechanisms.cs](src/PBDMP.Plugin/WorldMechanisms.cs), and the native references `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/MovingPlatformTrigger.cs` and `PlayerComponents/PlayerMovementComponent.cs` with matching ISIL bodies.
+Rider lookups: [WorldCarriers.cs](../../src/PBDMP.Plugin/WorldCarriers.cs), [PlayerCarrier.cs](../../src/PBDMP.Network/PlayerCarrier.cs), [WorldSceneryCatalogue.cs](../../src/PBDMP.Plugin/WorldSceneryCatalogue.cs), [WorldMechanisms.cs](../../src/PBDMP.Plugin/WorldMechanisms.cs), and the native references `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/MovingPlatformTrigger.cs` and `PlayerComponents/PlayerMovementComponent.cs` with matching ISIL bodies.
 
 
 ### Area69 rider regression resolved
@@ -459,9 +459,9 @@ The reports do not advance the milestone score. No commit or push is authorized.
 
 ### Save/input follow-up evidence — October 15
 
-- Replayed a preserved progressed autosave: the original path had GAMEPLAY maps enabled and time running but `CancelInput` still true. Native ISIL confirms `PlayerSpawnPoint.Load` calls `Player.OnLevelStart`; the missing matching `OnLevelStartReady` was the input/view blocker. [NativeSaveBridge](src/PBDMP.Plugin/NativeSaveBridge.cs) now completes the pair while preserving tutorial and session-owned barriers.
+- Replayed a preserved progressed autosave: the original path had GAMEPLAY maps enabled and time running but `CancelInput` still true. Native ISIL confirms `PlayerSpawnPoint.Load` calls `Player.OnLevelStart`; the missing matching `OnLevelStartReady` was the input/view blocker. [NativeSaveBridge](../../src/PBDMP.Plugin/NativeSaveBridge.cs) now completes the pair while preserving tutorial and session-owned barriers.
 - Both native peers pass live manual load, checkpoint rollback, timer rejection of repeated checkpoint/autosave calls, three-slot rotation/backup, personal pickups/drops, completed-map results and hold-overlay release. A progressed-save replay also verifies actual P2 displacement and view rotation from real keyboard/mouse input after focus round trips. Native overlays were inspected in rendered frames.
-- [AutosaveClock](src/PBDMP.Network/AutosaveClock.cs) measures active gameplay only; [CoopSaveService](src/PBDMP.Plugin/CoopSaveService.cs) applies the 5–10 minute host setting and queues a single due capture. Managed acceptance now has 29 passing scenarios, including timer pause/reset/no-catch-up and native fill endpoint normalization.
+- [AutosaveClock](../../src/PBDMP.Network/AutosaveClock.cs) measures active gameplay only; [CoopSaveService](../../src/PBDMP.Plugin/CoopSaveService.cs) applies the 5–10 minute host setting and queues a single due capture. Managed acceptance now has 29 passing scenarios, including timer pause/reset/no-catch-up and native fill endpoint normalization.
 - Warning review: missing remote pickup geometry now reports once per avatar instead of flooding every weapon switch. It does not fabricate a missing model. Existing IL2CPP diagnostic-signature warnings, native FMOD MusicOffset warnings and stale-target DOTween warnings remain visible rather than being globally suppressed. Runtime catalogue drift is a separate compatibility issue, retained for investigation; incompatible files remain preserved/refused rather than partially loaded.
 - Regression fixture correction: a dynamically appended scene-root checkpoint had different peer paths once local rendering pools diverged. The test fixture now anchors under an authored checkpoint at a fixed child index. This changes diagnostics, not network authority validation.
 
@@ -485,14 +485,14 @@ This completes the focused reported-issue work, not the whole megapass. The outs
 
 | Lookup | Purpose |
 | --- | --- |
-| [WorldAuthoredProps.cs](src/PBDMP.Plugin/WorldAuthoredProps.cs), [WorldSceneryCatalogue.cs](src/PBDMP.Plugin/WorldSceneryCatalogue.cs) | Scene authorship and corpse/runtime exclusion. |
-| [WorldBodyPresentation.cs](src/PBDMP.Plugin/WorldBodyPresentation.cs), [WorldScriptedActions.cs](src/PBDMP.Plugin/WorldScriptedActions.cs) | Replica interpolation and native-writer ownership. |
-| [WorldPosters.cs](src/PBDMP.Plugin/WorldPosters.cs) | Poster authority, shared counts, silent restoration and old history union. |
-| [WorldTriggerHints.cs](src/PBDMP.Plugin/WorldTriggerHints.cs), [SharedUrine.cs](src/PBDMP.Plugin/SharedUrine.cs) | Exact hint retirement and portal surface bits. |
-| [SessionPauseMenu.cs](src/PBDMP.Plugin/SessionPauseMenu.cs), [Protocol.cs](src/PBDMP.Network/Protocol.cs) | Host-pause ownership and protocol-10 metadata. |
-| [SharedExplosions.cs](src/PBDMP.Plugin/SharedExplosions.cs) | Native impact asset relay and echo suppression. |
-| [ReportedPresentationDiagnostics.cs](src/PBDMP.Plugin/ReportedPresentationDiagnostics.cs), [BloodPresentationDiagnostics.cs](src/PBDMP.Plugin/BloodPresentationDiagnostics.cs) | Poster/pause/native-burst regressions. |
-| [SavedPlaytestDiagnostics.cs](src/PBDMP.Plugin/SavedPlaytestDiagnostics.cs), [CoopSave.cs](src/PBDMP.Network/CoopSave.cs) | Exact progressed-save replay, compatible recovery and protected backups. |
+| [WorldAuthoredProps.cs](../../src/PBDMP.Plugin/WorldAuthoredProps.cs), [WorldSceneryCatalogue.cs](../../src/PBDMP.Plugin/WorldSceneryCatalogue.cs) | Scene authorship and corpse/runtime exclusion. |
+| [WorldBodyPresentation.cs](../../src/PBDMP.Plugin/WorldBodyPresentation.cs), [WorldScriptedActions.cs](../../src/PBDMP.Plugin/WorldScriptedActions.cs) | Replica interpolation and native-writer ownership. |
+| [WorldPosters.cs](../../src/PBDMP.Plugin/WorldPosters.cs) | Poster authority, shared counts, silent restoration and old history union. |
+| [WorldTriggerHints.cs](../../src/PBDMP.Plugin/WorldTriggerHints.cs), [SharedUrine.cs](../../src/PBDMP.Plugin/SharedUrine.cs) | Exact hint retirement and portal surface bits. |
+| [SessionPauseMenu.cs](../../src/PBDMP.Plugin/SessionPauseMenu.cs), [Protocol.cs](../../src/PBDMP.Network/Protocol.cs) | Host-pause ownership and protocol-10 metadata. |
+| [SharedExplosions.cs](../../src/PBDMP.Plugin/SharedExplosions.cs) | Native impact asset relay and echo suppression. |
+| [ReportedPresentationDiagnostics.cs](../../src/PBDMP.Plugin/ReportedPresentationDiagnostics.cs), [BloodPresentationDiagnostics.cs](../../src/PBDMP.Plugin/BloodPresentationDiagnostics.cs) | Poster/pause/native-burst regressions. |
+| [SavedPlaytestDiagnostics.cs](../../src/PBDMP.Plugin/SavedPlaytestDiagnostics.cs), [CoopSave.cs](../../src/PBDMP.Network/CoopSave.cs) | Exact progressed-save replay, compatible recovery and protected backups. |
 
 Native research references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PBD/{SolidManager,ParticleController,NpcRagdoll,CodexController,CodexId}.cs`, `Contraptions/{Pickup,CodexPickup,Trigger,PlayerTriggerNotificationComponent,Toggler,PhysicalObject,PissFillListenerMovingObject,PissFillListenerScalingObject}.cs`, `Hyperstrange/Base/Extension_GameObject.cs`, and their matching native ISIL dumps. Recovered game sources/assets remain outside the repository.
 
@@ -500,4 +500,4 @@ Native research references: `<Decompiled>/CSharp/Assembly-CSharp/Hyperstrange/PB
 
 The Area69 native machinery/rider check passes again after the host-side hit surface follows validated platform state in LateUpdate, avoiding a frame of stale placement after native elevator animation. The final client deck correction is retained during pause; travel/restoration rebase instead of applying a saved journey as movement. Native hazards remain active. The test samples actual restored motion under a finite deadline and preserves its original alive/drift/phase assertions. This closes the focused regression, not all natural rides, obstruction cases or the overall acceptance gate.
 
-Lookup: [RemoteActor.cs](src/PBDMP.Plugin/RemoteActor.cs), [WorldCarriers.cs](src/PBDMP.Plugin/WorldCarriers.cs), [WorldMechanisms.cs](src/PBDMP.Plugin/WorldMechanisms.cs), [MechanismDiagnostics.cs](src/PBDMP.Plugin/MechanismDiagnostics.cs). Temporary collision and carrier traces have been removed from source.
+Lookup: [RemoteActor.cs](../../src/PBDMP.Plugin/RemoteActor.cs), [WorldCarriers.cs](../../src/PBDMP.Plugin/WorldCarriers.cs), [WorldMechanisms.cs](../../src/PBDMP.Plugin/WorldMechanisms.cs), [MechanismDiagnostics.cs](../../src/PBDMP.Plugin/MechanismDiagnostics.cs). Temporary collision and carrier traces have been removed from source.
