@@ -150,7 +150,9 @@ public sealed partial class MultiplayerBehaviour : MonoBehaviour
             _view.Hud.Set(Badge(snapshot));
             var hold=_saves?.HoldCaption??"";
             if(hold.Length==0 && _lifecycle is {} holdLife && holdLife.State.Action!=TravelAction.Menu &&
-                (!holdLife.NativeReady || snapshot.Connected && !holdLife.State.Released || holdLife.IsClient && (!holdLife.WorldReady || !holdLife.PersonalReady))) hold="Loading...";
+                (snapshot.Connected && !holdLife.State.Released || holdLife.IsClient && (!holdLife.WorldReady || !holdLife.PersonalReady))) hold="Loading...";
+            // The game's own loading screen, cutscene and continue prompt already show progress until the map is ready.
+            if(hold=="Loading..." && _lifecycle is {NativeReady:false} nativeLoad && nativeLoad.State.Action!=TravelAction.Menu) hold="";
             if(hold.Length==0 && _lifecycle is {IsClient:true,AdmissionWaiting:true}) hold="Waiting for P1's next Survival wave...";
             if(_view.Prompt.Open) hold="";
             var hostPause=hold.Length==0 && _lifecycle?.HostPauseNotice==true;

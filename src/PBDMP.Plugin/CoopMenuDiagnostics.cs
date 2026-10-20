@@ -15,6 +15,10 @@ public sealed partial class MultiplayerBehaviour
     private string? _coopCampaignBefore;
     private string _coopCampaign = "", _coopLevel = "";
     private int _coopWrites;
+    private Vector3 _coopCameraMain;
+    private float _coopCameraAway;
+    private bool _coopLoadingOverNative;
+    private static Vector3 MenuCameraPosition => MenuManager.SceneComponent._cameraTransform.position;
     private static bool CoopMenuTestEnabled => Environment.GetEnvironmentVariable("PBDMP_COOP_MENU_TEST") == "1";
     private static Transform Group => MenuManager.MainCanvas.transform.Find("MainCanvasGroup");
     private static bool Shown(string menu) => Group.Find(menu) is { } t && t.gameObject.activeInHierarchy && t.GetComponent<CanvasGroup>() is { } g && g.alpha > 0.5f;
@@ -95,6 +99,7 @@ public sealed partial class MultiplayerBehaviour
         if (_coopMenuStep >= 22 && _lifecycle is { NativeReady: false } gate && gate.State.Action != PBDMP.Network.TravelAction.Menu) gate.AutoContinue();
         if (_coopMenuStep >= 22 && _lifecycle is { NativeReady: true, LocalTutorialActive: true } && Player.Instance != null)
             Player.Instance.GetComponent<Hyperstrange.PBD.PlayerComponents.PlayerTutorialComponent>().OnUseDown();
+        if (_lifecycle is { NativeReady: false } loading && loading.State.Action != PBDMP.Network.TravelAction.Menu && _view!.Hud.HoldText == "Loading...") _coopLoadingOverNative = true;
         if (Time.unscaledTime < _coopMenuAt) return;
         switch (_coopMenuStep)
         {
@@ -102,6 +107,7 @@ public sealed partial class MultiplayerBehaviour
                 SeedCoopCampaigns(); OpenCoopMenu(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 1; break;
             case 1:
                 SmokeAssert(Shown("MENU_PBDMP_Multiplayer") && !Shown("MENU_Main"), "Multiplayer opens the native-style co-op menu in place of the main menu");
+                _coopCameraMain = MenuCameraPosition;
                 SmokeAssert(_coopMenu!.NewGame.LabelText.text == "New co-op game" && _coopMenu.Back.LabelText.text == "Back", "co-op menu shows its own labels in the main menu's lettering");
                 SmokeAssert(_coopMenu.Continue.interactable, "Continue co-op is available once a campaign exists");
                 SmokeAssert(_coopMenu.PreviewTitleForTest == CampaignName("LEVEL_AD_Prison") && _coopMenu.PreviewTitleRendersForTest, "the Continue preview names the newest campaign by its map in the game's header lettering");
@@ -110,6 +116,9 @@ public sealed partial class MultiplayerBehaviour
             case 10:
                 SmokeAssert(Shown("MENU_PBDMP_CoopLoad") && _coopLoad!.CampaignCount == 2 && _coopLoad.SaveCount == 3, "Load co-op game lists both campaigns and the newest campaign's three saves");
                 SmokeAssert(_coopLoad!.SelectedCampaign?.Level == "LEVEL_AD_Prison" && _coopLoad.SelectedSave?.Slot == "quick", "the newest campaign and its newest save are selected first");
+                _coopCameraAway = Vector3.Distance(MenuCameraPosition, _coopCameraMain);
+                Plugin.Logger.LogInfo($"PBDMP SMOKE: Load co-op game moves the title camera {_coopCameraAway:F2} m from the main shot.");
+                SmokeAssert(_coopCameraAway > 0.5f, "Load co-op game moves the title camera to the game's load-screen shot");
                 Shot("coop-load.png");
                 _coopLoad.DeleteButton.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1f; _coopMenuStep = 11; break;
             case 11:
@@ -123,6 +132,7 @@ public sealed partial class MultiplayerBehaviour
                 MenuManager.Close(); _coopMenuAt = Time.unscaledTime + 1.2f; _coopMenuStep = 13; break;
             case 13:
                 SmokeAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from Load co-op game returns to the co-op menu");
+                SmokeAssert(Vector3.Distance(MenuCameraPosition, _coopCameraMain) < 0.1f * _coopCameraAway, "Back returns the title camera to the main menu's wide shot");
                 // Join a friend runs the real Steam friend scan when Steam is up; it never joins or hosts here.
                 _coopMenu!.JoinFriend.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 17; break;
             case 17:
@@ -169,6 +179,8 @@ public sealed partial class MultiplayerBehaviour
                 MenuManager.Close(); ResetSession(); _coopMenuAt = Time.unscaledTime + 1.5f; _coopMenuStep = 16; break;
             case 16:
                 SmokeAssert(Shown("MENU_PBDMP_Multiplayer") && _session == null, "Back from Survival returns to the co-op menu");
+                SmokeAssert(Vector3.Distance(MenuCameraPosition, _coopCameraMain) < 0.1f * _coopCameraAway, "Back from Survival returns the title camera to the wide shot");
+                Shot("coop-menu-after-survival.png");
                 // End to end: a new co-op game from the real level select, a real save, then Continue co-op.
                 _coopMenu!.NewGame.onClick.Invoke(); _coopMenuAt = Time.unscaledTime + 2f; _coopMenuStep = 20; break;
             case 20:
@@ -184,6 +196,7 @@ public sealed partial class MultiplayerBehaviour
                 Group.Find("PROMPT_Difficulty/OverlayImage/Background/BUTTON_Confirm").GetComponent<Hyperstrange.PBD.UI.Components.MainHyperButton>().onClick.Invoke();
                 _coopMenuAt = Time.unscaledTime + 3f; _coopMenuStep = 23; break;
             case 23 when _lifecycle is { NativeReady: true } life && life.State.Action != PBDMP.Network.TravelAction.Menu && _world?.Active == true && Player.Instance != null && Player.Instance.IsAlive:
+                SmokeAssert(!_coopLoadingOverNative, "no Loading... banner over the game's own loading screen, cutscene or continue prompt");
                 _coopCampaign = _saves!.Campaign;
                 SmokeAssert(_coopCampaign.Length == 32 && _coopCampaign != CoopSaveService.DiagnosticCampaign, "the new co-op game starts its own campaign");
                 _coopLevel = LevelManager.CurrentLevel!.name;

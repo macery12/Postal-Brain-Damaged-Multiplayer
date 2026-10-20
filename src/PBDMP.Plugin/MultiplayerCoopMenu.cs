@@ -105,7 +105,8 @@ public sealed partial class MultiplayerBehaviour
     private void TickAfterHost()
     {
         if (_afterHost == null) return;
-        if (_session == null) { _afterHost = null; return; }
+        // A Steam host has no session until Steam has created the lobby; a failed or cancelled host drops the step.
+        if (_session == null) { if (_steam?.Phase != LobbyPhase.Creating) _afterHost = null; return; }
         if (_saves == null || _lifecycle == null || _lifecycle.IsClient) return;
         var step = _afterHost; _afterHost = null; step();
     }
@@ -215,10 +216,22 @@ internal static class CoopMenuPatches
         h.Patch(AccessTools.Method(typeof(MainMenu), nameof(MainMenu.Enable)), postfix: new(typeof(CoopMenuPatches), nameof(MainMenuShown)));
         h.Patch(AccessTools.Method(typeof(MenuManager), nameof(MenuManager.Open)), prefix: new(typeof(CoopMenuPatches), nameof(Open)));
         h.Patch(AccessTools.Method(typeof(PauseMenu), nameof(PauseMenu.Enable)), postfix: new(typeof(CoopMenuPatches), nameof(PauseShown)));
+        h.Patch(AccessTools.Method(typeof(Menu), nameof(Menu.Enable)), postfix: new(typeof(CoopMenuPatches), nameof(MenuShown)));
     }
     private static bool StartLevel(LevelSelectionMenu __instance) => MultiplayerBehaviour.Instance?.BeforeStartLevel(__instance) != false;
     private static void MainMenuShown() => MultiplayerBehaviour.LeftCoopLevelSelect();
     private static bool Open(Menu window) => MultiplayerBehaviour.Instance?.RoutePauseMenu(window) != true;
+    // PBDMP's copies replace the native menus' own logic, which also moved the title scene's camera: the
+    // Multiplayer menu uses the main menu's wide shot, and co-op Load and Join a friend the load screen's.
+    private static void MenuShown(Menu __instance)
+    {
+        var name = __instance.gameObject.name;
+        if (name is not ("MENU_PBDMP_Multiplayer" or "MENU_PBDMP_CoopLoad" or "MENU_PBDMP_CoopJoin")) return;
+        if (Player.Instance != null && Player.Instance.isActiveAndEnabled) return; // in a level: the title scene is not shown
+        if (MenuManager.SceneComponent is not { } scene || !scene.gameObject.activeInHierarchy) return;
+        if (name == "MENU_PBDMP_Multiplayer") { MenuManager.SetScene(true); scene.MoveToMain(); }
+        else scene.MoveToLoad();
+    }
     // In a co-op level the pause menu's Save and Load open P1's co-op screens; the game's own state for them
     // (single-player saving allowed, single-player saves present) does not apply. P2 cannot save or load.
     private static void PauseShown(PauseMenu __instance)

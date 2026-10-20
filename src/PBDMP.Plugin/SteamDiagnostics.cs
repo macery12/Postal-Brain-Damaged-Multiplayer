@@ -24,7 +24,7 @@ public sealed partial class MultiplayerBehaviour
         if (_steamStep == 0)
         {
             if (!_buttonVisibleLogged) return;
-            _steamDeadline = Time.unscaledTime + 120f; _steamStep = 1;
+            _steamDeadline = Time.unscaledTime + 150f; _steamStep = 1;
         }
         if (Time.unscaledTime > _steamDeadline) throw new TimeoutException($"Steam probe step {_steamStep} timed out. {_steam?.Unavailable}");
         if (Time.unscaledTime < _steamNext) return;
@@ -170,6 +170,20 @@ public sealed partial class MultiplayerBehaviour
                 break;
             case 25:
                 SteamAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from Join a friend returns to the co-op menu");
+                // One press from offline: Survival co-op waits for Steam to create the lobby, then opens the arena menu.
+                ResetSession();
+                _coopMenu!.Survival.onClick.Invoke();
+                _steamStep = 26;
+                break;
+            case 26:
+                if (!Shown("MENU_Horde")) return;
+                SteamAssert(steam.Phase == LobbyPhase.Hosting && _steamSession && _session?.Snapshot.Role == SessionRole.Host,
+                    "one Survival co-op press hosts a Steam lobby and opens the game's Survival menu");
+                MenuManager.Close();
+                _steamNext = Time.unscaledTime + 1.2f; _steamStep = 27;
+                break;
+            case 27:
+                SteamAssert(Shown("MENU_PBDMP_Multiplayer"), "Back from the Survival menu returns to the co-op menu");
                 MenuManager.Close();
                 _steamNext = Time.unscaledTime + 1f; _steamStep = 30;
                 break;

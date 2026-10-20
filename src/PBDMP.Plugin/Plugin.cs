@@ -13,7 +13,7 @@ namespace PBDMP.Plugin;
 [BepInPlugin("pbdmp.multiplayer", "PBDMP", Version)]
 public sealed class Plugin : BasePlugin
 {
-    internal const string Version = "1.0.0";
+    internal const string Version = "1.0.1";
     internal static ManualLogSource Logger = null!;
     internal static string Fingerprint = "";
     internal static string BuildId = "";
