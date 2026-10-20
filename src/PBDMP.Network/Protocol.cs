@@ -20,12 +20,11 @@ public sealed record TravelState(uint Epoch, TravelAction Action, string Level, 
     bool HostReady, bool Paused, bool Released, bool Joining, JoinLoadout? Loadout = null, string StoryVideo = "", float StoryTime = 0, bool StoryWaiting = false, bool StoryEnding = false, bool HostMenuPaused = false,
     bool AdmissionWaiting = false);
 public sealed record ClientReady(uint Epoch, bool Ready);
-public sealed record Packet(MessageKind Kind, int Version = Protocol.Version, string Text = "", PlayerPose? Pose = null,
+public sealed record Packet(MessageKind Kind, string Version = ModVersion.Value, string Text = "", PlayerPose? Pose = null,
     TravelState? Travel = null, ClientReady? Ready = null, WorldFrame? World = null, SavePage? Save = null);
 
 public static class Protocol
 {
-    public const int Version = 13;
     public const int MaxFrameBytes = 8192;
     public const int MaxInventoryItems = 64;
     private static readonly UTF8Encoding Utf8 = new(false, true);
@@ -45,7 +44,8 @@ public static class Protocol
                 break;
             case MessageKind.Hello:
             case MessageKind.Welcome:
-                writer.Write(packet.Version);
+                ValidateModVersion(packet.Version);
+                WriteText(writer, packet.Version);
                 WriteText(writer, packet.Text);
                 break;
             case MessageKind.Reject:
@@ -103,7 +103,7 @@ public static class Protocol
         {
             MessageKind.Save => new(kind, Save: SaveProtocol.Read(reader)),
             MessageKind.World => new Packet(kind, World: WorldProtocol.Read(reader)),
-            MessageKind.Hello or MessageKind.Welcome => new Packet(kind, reader.ReadInt32(), ReadText(reader)),
+            MessageKind.Hello or MessageKind.Welcome => ReadHandshake(reader, kind),
             MessageKind.Reject => new Packet(kind, Text: ReadText(reader)),
             MessageKind.Pose => new Packet(kind, Pose: new PlayerPose(ReadText(reader), ReadReady(reader),
                 reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
@@ -116,6 +116,20 @@ public static class Protocol
         if (packet.Pose != null) Validate(packet.Pose);
         if (packet.Travel != null) Validate(packet.Travel);
         return packet;
+    }
+
+    private static Packet ReadHandshake(BinaryReader reader, MessageKind kind)
+    {
+        var version = ReadText(reader);
+        ValidateModVersion(version);
+        return new(kind, version, ReadText(reader));
+    }
+
+    internal static void ValidateModVersion(string version)
+    {
+        if (string.IsNullOrEmpty(version) || version.Length > 64 ||
+            version.Any(c => !(c is >= '0' and <= '9' or >= 'A' and <= 'Z' or >= 'a' and <= 'z' or '.' or '-' or '+')))
+            throw new InvalidDataException("Invalid PBDMP version.");
     }
 
     private static PlayerAnimation ReadAnimation(BinaryReader reader) => new((PlayerMotion)reader.ReadByte(),(PlayerActions)reader.ReadUInt16(),reader.ReadUInt32(),reader.ReadSingle(),reader.ReadSingle());

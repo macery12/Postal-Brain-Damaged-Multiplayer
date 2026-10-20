@@ -1,6 +1,6 @@
 # Protocol
 
-PBDMP 1.0.0 carries protocol 13 over either of two links, with P1 hosting and P2 joining. Protocol versions and build fingerprints must match. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
+PBDMP 1.0.2 uses its mod release version as the only connection compatibility version, with P1 hosting and P2 joining. Mod versions and file fingerprints must match; there is no separately numbered network protocol. See `src/PBDMP.Network/Protocol.cs`, `WorldProtocol.cs` and `CoopSession.cs` for the authoritative byte layout and validation, and `src/PBDMP.Plugin/Plugin.cs` for fingerprint generation.
 
 ## Carriers
 
@@ -9,9 +9,11 @@ PBDMP 1.0.0 carries protocol 13 over either of two links, with P1 hosting and P2
 | Steam P2P | P1's two-slot Steam lobby; P2 dials the lobby owner with `ConnectP2P` on virtual port 0. | Relayed and encrypted by Steam; the host admits only lobby members. Each protocol frame travels as one reliable Steam message. 2 MB send buffer, 512 KB/s send rate, 60-second connect allowance. Details: [Steam research](steam-research.md). |
 | Direct TCP | IPv4 address and port (default `7777`). | Unencrypted and unauthenticated; intended for a trusted LAN or a deliberately forwarded port. |
 
-`CoopSession` sees both as an ordered reliable byte stream (`IPeerConnection`), so framing, deadlines and queues below are identical. Steam lobbies additionally advertise `pbdmp_version`, `pbdmp_proto` and `pbdmp_build` (the first 16 hex characters of SHA-256 over the fingerprint) so a joiner can report a mismatch before dialling. They also advertise `pbdmp_level` (the host's level asset), `pbdmp_mode` (`menu`, `story` or `survival`) and `pbdmp_players` for friends' Join a friend lists; the handshake below remains the authoritative check.
+`CoopSession` sees both as an ordered reliable byte stream (`IPeerConnection`), so framing, deadlines and queues below are identical. Steam lobbies advertise `pbdmp_version` and `pbdmp_build` (the first 16 hex characters of SHA-256 over the fingerprint) so a joiner can report a mismatch before dialling. They also advertise `pbdmp_level` (the host's level asset), `pbdmp_mode` (`menu`, `story` or `survival`) and `pbdmp_players` for friends' Join a friend lists; the handshake below remains the authoritative check.
 
 ## Compatibility and framing
+
+The release version comes from `Version` in [Directory.Build.props](../Directory.Build.props). The build generates `ModVersion.Value` for the shared handshake and plugin metadata, and applies the same version to both DLLs. Every distributed update gets a new mod version. Save schema [SaveSchema.Current](../src/PBDMP.Network/SaveSchema.cs) is independent and changes only when the disk format requires it; game builds and mod DLL hashes are automatic file identities, not additional version counters.
 
 The fingerprint is `SHA256(GameAssembly.dll):SHA256(global-metadata.dat):BuildId`. `BuildId` is SHA256 of the concatenated hexadecimal SHA256 strings of `PBDMP.dll` and `PBDMP.Network.dll`. This rejects differing mod rebuilds as well as game-code/metadata differences; it does not hash every game asset. Both DLLs must be distributed as one matching pair.
 
@@ -19,14 +21,16 @@ Each frame has an int32 little-endian payload length, followed by 1–8192 paylo
 
 | Message | Kind | Direction | Payload overview |
 | --- | ---: | --- | --- |
-| Hello | 1 | P2 → P1 | int32 protocol version and fingerprint text. |
-| Welcome | 2 | P1 → P2 | int32 protocol version and fingerprint text. |
+| Hello | 1 | P2 → P1 | Mod release version text and fingerprint text. |
+| Welcome | 2 | P1 → P2 | Mod release version text and fingerprint text. |
 | Pose | 3 | Both | Level key, readiness, feet position, yaw/height, weapon GUID, pitch, visual shot sequence, alive flag, life generation, travel epoch, optional moving-platform reference and bounded presentation state. |
 | Reject | 4 | P1 → P2 | Reason, including host loading failure/session closure feedback. |
 | Travel | 5 | P1 → P2 | Epoch, Menu/Load/Restart action, level GUID, difficulty, host-ready/paused/released/joining flags and optional join loadout. |
 | Ready | 6 | P2 → P1 | Travel epoch and readiness. |
 | World | 7 | By world kind | Typed shared-state, presentation or client-request frame described below. |
 | Save | 8 | By save command | Bounded persistence control/data pages described below. |
+
+Handshake versions are 1–64 ASCII letters, digits, dots, hyphens or plus signs and must match exactly before gameplay exchange starts. Both strings use bounded UTF-8 encoding. Earlier releases' integer-version handshakes are incompatible and fail closed; Steam rejects their release version before dialling.
 
 Pose and lifecycle updates are sent on a 50 ms loop (nominal 20 Hz). Old poses are replaced rather than accumulated. The pose shot sequence is a presentation signal; authoritative attacks use world frames. The optional platform reference travels atomically with its pose: a strict presence flag, a 64-character hexadecimal authored transform key and three finite local feet coordinates, each bounded to ±256. The Unity adapter resolves only registered platform volumes and bounds the correction against the reported world position. This prevents network delay from placing a rider below a moving lift on P1.
 
@@ -91,7 +95,7 @@ Player resource values/collection remain personal. P1 owns enemies, shared hit r
 
 Save queues hold 1,024 pages in each transport direction; the adapter retains at most 2,048 pending pages. Each send cycle includes at most 32 save pages alongside regular traffic. Epoch changes discard stale restoration work; pages for a *later* epoch that reach P2 before it adopts that travel epoch (P1 can begin a join baseline within a frame of a Survival REST admission) are kept, at most 4,096, and replayed once P2 adopts it, instead of being dropped and stalling the join. Loading waits for native baseline acknowledgement, the shared-world snapshot and personal readiness; P2 cannot promote its own state to shared authority.
 
-Disk schema 2 is independent of wire epochs. The envelope is eight ASCII bytes `PBDMPS01`, int32 JSON byte length, 32 SHA-256 bytes and bounded UTF-8 JSON, up to 32 MiB. `CoopSaveStore` validates data-only records, schema, scalar bounds and permitted durable world kinds. The plugin checks game hashes, supported content and the authored catalogue before native loading. Atomic replacement retains a known-good `.bak`; corrupt primary files cannot replace a valid backup.
+Disk schema 3 is independent of the mod release and wire epochs. The envelope is eight ASCII bytes `PBDMPS01`, int32 JSON byte length, 32 SHA-256 bytes and bounded UTF-8 JSON, up to 32 MiB. `CoopSaveStore` validates data-only records, schema, scalar bounds and permitted durable world kinds. The plugin checks game hashes, supported content and the authored catalogue before native loading. Atomic replacement retains a known-good `.bak`; corrupt primary files cannot replace a valid backup.
 
 [Co-op save behavior](co-op-saves.md) specifies host control, personal-resource resets, partner assignment and recovery.
 
@@ -121,7 +125,7 @@ Adapters resolve known authored keys and fields; payloads cannot request arbitra
 
 Interaction retries retain their original request ID. P1 caches the committed result, so retransmission cannot plant another TNT charge or consume another key. Personal recovery records wait while the requester has an unresolved item reservation.
 
-Schema-1 files can be inspected by the storage reader, but the 0.10 loader refuses restoration when the older format lacks required world state. Original files and backups remain untouched. The [tracker](sync-progress.md) distinguishes these development adapters from completed runtime acceptance.
+Campaign saves from schemas 1 and 2 are refused because they lack required world/player state. Original files and backups remain untouched. The [tracker](sync-progress.md) distinguishes these development adapters from completed runtime acceptance.
 
 ## World/presentation follow-up (protocol 10)
 

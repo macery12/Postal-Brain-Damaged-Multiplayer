@@ -4,11 +4,13 @@
 
 **October 16, 2026 — megapass implementation closeout.** Reproduced loaded-map join and runtime/stale-contact hazard bugs are fixed. Focused bridge, wheel/door, rider, scenery/prop and save checks pass. Remaining natural campaign and edge-case acceptance went to the maintainer's playtest. Those cases retain partial markers where appropriate.
 
-Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3** (protocol 13 adds the shared-item and team-inventory frames). The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
+Current source: **PBDMP 1.0.2 / save schema 3**. Exact mod release matching replaces the separately numbered network protocol. The [animation check guide](weapon-animation-testing.md) describes the focused presentation pass. Both players need matching plugin and network DLLs. [Verification](verification.md) records exact evidence; older build/timing references below are historical.
 
 **Development coverage: 95% (20 / 21 points). Last accepted milestone baseline: 95% (20 / 21).** The two-PC Steam playtest accepts the general world trigger and active-session restoration milestones. [Scoring details](#progress-score).
 
 ## Current stopping point
+
+**Versioning handoff — October 20, 2026:** Complete: exact release matching for both carriers, one generated release version for both DLLs, and one internal disk schema shared by campaign saves and Survival records. Build/package 1.0.2 passes 43 managed network scenarios and eight reporting checks, including original Survival-record preservation and same-schema campaign files from a previous mod release. No implementation work remains in progress. Pending: focused two-account Steam join/mismatch acceptance for this build; existing native/two-PC acceptance below predates the change. See [versioning verification](verification.md#versioning-simplification--october-20-2026).
 
 The focused weapon/animation pass is installed: explicit weapon grips (including the saw and dual variants), supporting hand poses, movement/action metadata, native clip blending, grounded crouch feet and pause-safe animation clocks. All 621 exact-build captures, connected equip/action checks and retained performance budgets pass. First-person internal mechanism parity and player-death presentation remain separate polish; see [animation checks](weapon-animation-testing.md).
 
@@ -35,7 +37,7 @@ Personal systems appear in a separate **Intentionally local** table. Those are d
 | Steam player cards | | | ✅ | Multiplayer UI displays connected player names and avatars. |
 | Host by IP/port | | | ✅ | P1 creates the two-player session. |
 | Join by IP/port | | | ✅ | P2 connects directly to the host by IP and port. |
-| Game/mod compatibility checks | | | ✅ | Both players must use matching game and exact mod builds. |
+| Game/mod compatibility checks | | | ✅ | Both players must use the same mod release, game files and exact mod builds. There is no separate protocol version. |
 | Reconnect | | | ✅ | A returning client receives current supported state. |
 | Peer timeout | | | ✅ | Lost connections end waiting instead of leaving the session stuck. |
 | P2 disconnect | | | ✅ | P1 continues playing. |
@@ -452,7 +454,7 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see [ver
 | --- | :---: | :---: | :---: | --- |
 | Arena selection | | | ✅ | P1 keeps the native Survival button/menu; P2's are blocked. Base arenas only (Suburbs, Ufo, VipZone); DLC/custom refused. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Arena travel | | | ✅ | Hosting inside an arena, lobby start, load barriers, retry, campaign↔Survival transitions and P1 leaving pass natively on all three arenas. |
-| Host-owned waves | | | ✅ | P1's native controller alone simulates; P2's start, ticks and enemy registration are inert. P2 mirrors P1's phase/wave/timer/score from a validated protocol-12 frame. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
+| Host-owned waves | | | ✅ | P1's native controller alone simulates; P2's start, ticks and enemy registration are inert. P2 mirrors P1's phase/wave/timer/score from a validated Survival state frame. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Shared enemies and targeting | | | ✅ | P1's pooled Horde enemies replicate; both players' hits kill and score once on P1. Enemies start on the nearer living player, native hits retarget, and enemies leave a dead player for the living partner. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Spawn safety (both players) | | | ✅ | Native 8 m rule plus the same distance from living P2; a rejected spawn stays on native cooldown and another is retried later. |
 | Enemy pooling/cleanup | | | ✅ | 15-wave soak with 300+ pooled respawns: each enemy life gets a new id, P2 destroys a replica once P1 retires that life, and every managed ledger stays bounded by P1's live pool. Native flying spawns appear on P2; replicas clear with CLEANUP/REST. Natural unreachable-enemy cleanup and summons were not exercised. |
@@ -466,7 +468,7 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see [ver
 | Spectator view | | | ✅ | PBDMP-owned chase view of the living partner with a Waiting for next wave notice. Dead players cannot collect or use anything and are not targeted. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
 | Team wipe and results | | | ✅ | When no admitted participant is alive, P1 ends the run once through the native end. Both native results screens show P1's exact score, kills, waves, time and best weapon; P2's retry/menu buttons are disabled and P1 alone retries or leaves. |
 | Retry | | | ✅ | Same-arena retry, including P1's native results-screen retry after a wipe, resets both arenas to INTRO wave 1; P2's own retry is refused. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
-| Local co-op records | | | ✅ | Each PC keeps its own copy of the same team result (best per arena and difficulty, last 20 runs) keyed by P1's run ID, separate from solo metadata. The native results and HUD best line show the co-op best. Atomic writes; an unreadable file is set aside; a failed write is non-fatal. Records never resume a run. |
+| Local co-op records | | | ✅ | Each PC keeps its own copy of the same team result (best per arena and difficulty, last 20 runs) keyed by P1's run ID, separate from solo metadata. The native results and HUD best line show the co-op best. Atomic writes; an unreadable file is set aside; a failed write is non-fatal. Records never resume a run. As of 1.0.2 they use the shared save schema; managed checks preserve original version-1 records and migrate on the next new result. |
 | Late join | | | ✅ | A P2 joining during COMBAT/CLEANUP, the countdown or results waits (P1 keeps playing) and is admitted at the next INTRO/REST, including P1's retry from results: P1's weapons/ammo, full health, zero armor, placed beside P1, P1's current offers and its own resources, no historical enemies. A waiting P2 is not a participant or an extra life. P2 leaving mid-admission releases P1 and leaves no input barrier on P2. |
 | Reconnect / dead identity | | | ✅ | P1 keeps a participant's death by Steam/Direct IP identity. Rejoining after a combat death admits it at the next REST; a death during REST holds the rejoin until the following REST. P2 leaving during the countdown lets P1 continue alone; the last living player leaving ends the run once. Exercised over Direct IP; a Steam reconnect is a maintainer check. |
 | Shared pause | | | ✅ | P1 pause freezes the run timer on both players; modal input cleanup passes. Confirmed in the maintainer's two-PC Steam playtest (October 18, 2026). |
@@ -475,7 +477,7 @@ Survival (native HORDE) co-op is implemented for the three base arenas; see [ver
 
 ## Shared items
 
-Campaign only (Survival keeps every resource personal). Protocol 13.
+Campaign only (Survival keeps every resource personal).
 
 | Feature | Planned | Partially synced | Synced | Comments |
 | --- | :---: | :---: | :---: | --- |

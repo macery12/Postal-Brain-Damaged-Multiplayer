@@ -13,7 +13,7 @@ Start with the [project README](../README.md) for installation and play instruct
 | [Verification](verification.md) | Recorded checks, repeatable commands, troubleshooting and manual acceptance. |
 | [Co-op saves](co-op-saves.md) | Save controls, checkpoint restoration, personal progress and recovery. |
 | [Roadmap](roadmap.md) | Current session rules and remaining work. |
-| [Protocol](protocol.md) | Protocol 13 carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
+| [Protocol](protocol.md) | Network carriers (Steam P2P, TCP), framing, authority, snapshots and bounds. |
 | [Steam research](steam-research.md) | How PBDMP reaches the game's Steam client, callbacks, native layouts and single-account verification. |
 | [Contributor guidance](contributing.md) | Build/test expectations and publication hygiene. |
 | [Mission-trigger design](mission-trigger-sync-plan.md) | Accepted mission/exit rules, wall root cause and adapter limits. |

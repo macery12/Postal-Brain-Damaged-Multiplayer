@@ -8,7 +8,7 @@ public sealed record SurvivalResult(string RunId, string Arena, int Difficulty, 
 
 public sealed record SurvivalRecordFile(int Version, SurvivalResult[] Best, SurvivalResult[] Recent)
 {
-    public static readonly SurvivalRecordFile Empty = new(SurvivalRecordStore.Version, Array.Empty<SurvivalResult>(), Array.Empty<SurvivalResult>());
+    public static readonly SurvivalRecordFile Empty = new(SaveSchema.Current, Array.Empty<SurvivalResult>(), Array.Empty<SurvivalResult>());
 }
 
 public readonly record struct RecordOutcome(bool Added, bool NewBest, SurvivalResult? PreviousBest);
@@ -18,7 +18,7 @@ public readonly record struct RecordOutcome(bool Added, bool NewBest, SurvivalRe
 // file atomically; an unreadable file is set aside once and the store starts empty.
 public sealed class SurvivalRecordStore
 {
-    public const int Version = 1, MaxRecent = 20, MaxBest = 64, MaxBytes = 256 * 1024;
+    public const int MaxRecent = 20, MaxBest = 64, MaxBytes = 256 * 1024;
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly string _path;
     public bool RecoveredCorruption { get; private set; }
@@ -34,7 +34,9 @@ public sealed class SurvivalRecordStore
             if (bytes.Length > MaxBytes) throw new InvalidDataException("Survival records exceed the supported size.");
             var file = JsonSerializer.Deserialize<SurvivalRecordFile>(bytes) ?? throw new InvalidDataException("Empty Survival records.");
             Validate(file);
-            return file;
+            // Original records used Version 1 with the same fields. Normalize in memory;
+            // only a subsequent result write updates the disk file to the shared schema.
+            return file with { Version = SaveSchema.Current };
         }
         catch (Exception e) when (e is IOException or InvalidDataException or JsonException or ArgumentException or NullReferenceException)
         {
@@ -59,7 +61,7 @@ public sealed class SurvivalRecordStore
         var best = newBest ? file.Best.Where(r => r.Arena != result.Arena || r.Difficulty != result.Difficulty).Append(result).ToArray() : file.Best;
         if (best.Length > MaxBest) throw new InvalidDataException("Too many Survival record categories.");
         var recent = new[] { result }.Concat(file.Recent).Take(MaxRecent).ToArray();
-        Write(new(Version, best, recent));
+        Write(new(SaveSchema.Current, best, recent));
         return new(true, newBest, previous);
     }
 
@@ -84,7 +86,7 @@ public sealed class SurvivalRecordStore
 
     private static void Validate(SurvivalRecordFile file)
     {
-        if (file.Version != Version || file.Best == null || file.Recent == null || file.Best.Length > MaxBest || file.Recent.Length > MaxRecent ||
+        if ((file.Version != SaveSchema.Current && file.Version != 1) || file.Best == null || file.Recent == null || file.Best.Length > MaxBest || file.Recent.Length > MaxRecent ||
             file.Best.GroupBy(r => (r?.Arena, r?.Difficulty)).Any(g => g.Count() > 1))
             throw new InvalidDataException("Invalid Survival records file.");
         foreach (var result in file.Best.Concat(file.Recent)) Validate(result);

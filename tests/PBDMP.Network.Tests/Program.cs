@@ -4,6 +4,35 @@ using PBDMP.Network;
 
 Environment.SetEnvironmentVariable("PBDMP_PERF_BASELINE","1");
 var passed = 0;
+await Test("release handshake carries bounded mod versions and safely rejects legacy layouts", () =>
+{
+    static void Text(BinaryWriter writer, string value)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+        writer.Write((ushort)bytes.Length); writer.Write(bytes);
+    }
+    var assembly = typeof(CoopSession).Assembly;
+    Check(assembly.GetName().Version == new Version(ModVersion.Value + ".0"));
+    foreach (var kind in new[] { MessageKind.Hello, MessageKind.Welcome })
+    {
+        var packet = new Packet(kind, Text: "game:mod");
+        Check(Protocol.Decode(Protocol.Encode(packet)) == packet && packet.Version == ModVersion.Value);
+        foreach (var version in new[] { "", "bad\nversion", new string('a', 65), "é" })
+        {
+            Throws(() => Protocol.Encode(packet with { Version = version }));
+            using var data = new MemoryStream();
+            using var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, true);
+            writer.Write((byte)kind); Text(writer, version); Text(writer, "game:mod");
+            Throws(() => Protocol.Decode(data.ToArray()));
+        }
+        // Previous releases sent int32 protocol 13 before the fingerprint.
+        using var legacy = new MemoryStream();
+        using var oldWriter = new BinaryWriter(legacy, System.Text.Encoding.UTF8, true);
+        oldWriter.Write((byte)kind); oldWriter.Write(13); Text(oldWriter, new string('A', 194));
+        Throws(() => Protocol.Decode(legacy.ToArray()));
+    }
+    return Task.CompletedTask;
+});
 await Test("player presentation snapshots roundtrip bounded actions without changing combat",()=>
 {
     var animation=new PlayerAnimation(PlayerMotion.Sliding,PlayerActions.Melee|PlayerActions.Loop|PlayerActions.Alternate,42,.75f,.5f);
@@ -71,11 +100,11 @@ await Test("shared item and team inventory frames are bounded, exact and directi
 
 await Test("Join a friend reads a host's lobby advert and Steam's launch join request",()=>
 {
-    var advert=new LobbyAdvert("1.0.0","13","build","LEVEL_AD_Prison",LobbyAdvert.ModeStory,1);
-    Check(advert.Problem("1.0.0",13,"build")==null && !advert.Full);
-    Check(advert.Problem("1.0.1",13,"build")=="Different PBDMP version (1.0.0)" && advert.Problem("1.0.0",12,"build")=="Different PBDMP version (1.0.0)");
-    Check(advert.Problem("1.0.0",13,"other")=="Different PBDMP files" && (advert with {Players=2}).Problem("1.0.0",13,"build")=="Full");
-    Check((advert with {Version=""}).Problem("1.0.0",13,"build")=="Not a PBDMP game");
+    var advert=new LobbyAdvert("1.0.0","build","LEVEL_AD_Prison",LobbyAdvert.ModeStory,1);
+    Check(advert.Problem("1.0.0","build")==null && !advert.Full);
+    Check(advert.Problem("1.0.1","build")=="Different PBDMP version (1.0.0)");
+    Check(advert.Problem("1.0.0","other")=="Different PBDMP files" && (advert with {Players=2}).Problem("1.0.0","build")=="Full");
+    Check((advert with {Version=""}).Problem("1.0.0","build")=="Not a PBDMP game");
     Check(LobbyAdvert.ParsePlayers("2")==2 && LobbyAdvert.ParsePlayers("")==1 && LobbyAdvert.ParsePlayers("-3")==1 && LobbyAdvert.ParsePlayers("99")==16);
     Check(LobbyAdvert.LaunchLobby(new[]{"game.exe","-screen-fullscreen","0","+connect_lobby","109775241234567890"})==109775241234567890UL);
     Check(LobbyAdvert.LaunchLobby(new[]{"game.exe","+connect_lobby"})==0 && LobbyAdvert.LaunchLobby(new[]{"+connect_lobby","x1"})==0 && LobbyAdvert.LaunchLobby(Array.Empty<string>())==0);
@@ -166,6 +195,16 @@ await Test("local co-op Survival records keep per-arena bests, bounded recent re
         store.Record(Run(4,100,"other",1));store.Record(Run(5,50,"arena",2));
         var reloaded=new SurvivalRecordStore(path).Load();
         Check(reloaded.Best.Length==3 && reloaded.Best.Single(r=>r.Arena=="arena" && r.Difficulty==1).RunId==3.ToString("x32"));
+        Check(reloaded.Version==SaveSchema.Current);
+        var legacy=System.Text.Json.JsonSerializer.Serialize(reloaded with {Version=1});
+        File.WriteAllText(path,legacy,new System.Text.UTF8Encoding(false));
+        var upgraded=new SurvivalRecordStore(path);
+        Check(System.Text.Json.JsonSerializer.Serialize(upgraded.Load())==System.Text.Json.JsonSerializer.Serialize(reloaded) && !upgraded.RecoveredCorruption);
+        Check(File.ReadAllText(path,System.Text.Encoding.UTF8)==legacy); // reads preserve existing files
+        Check(!upgraded.Record(Run(3,800)).Added);
+        upgraded.Record(Run(6,900));
+        Check(upgraded.Load().Version==SaveSchema.Current && upgraded.Best("arena",1)!.Score==900);
+        Check(System.Text.Json.JsonSerializer.Deserialize<SurvivalRecordFile>(File.ReadAllText(path,System.Text.Encoding.UTF8))!.Version==SaveSchema.Current);
         for(var i=10;i<40;i++) store.Record(Run(i,10));
         Check(store.Load().Recent.Length==SurvivalRecordStore.MaxRecent && store.Load().Recent[0].RunId==39.ToString("x32"));
         Throws(()=>store.Record(Run(41,-1)));Throws(()=>store.Record(Run(42,1) with {RunId=""}));Throws(()=>store.Record(Run(43,1) with {Arena=""}));
@@ -291,10 +330,11 @@ await Test("co-op save atomic replacement, corruption recovery and strict format
     try
     {
         var store=new CoopSaveStore(folder);
-        CoopSave Example()=>new() {Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="manual-test",Name="First",Level="level",Mod="test",
+        CoopSave Example()=>new() {Game=new string('A',64)+":"+new string('B',64),Catalogue=new string('C',64),Slot="manual-test",Name="First",Level="level",Mod="1.0.0",
             Host=new("direct:"+Guid.NewGuid().ToString("N"),"level",new() {{"_saveData","{}"}},new[]{"a:pickup-one"}),Native=new() {{"world",new() {{"state","true"}}}},
             World=new[]{new WorldFrame(WorldKind.MissionState,1,1,Key:"wall",Flags:1)}};
         var save=Example();store.Write(save);Check(store.Read(save.Slot).Save.Name=="First");
+        Check(store.Read(save.Slot).Save.Mod=="1.0.0" && save.Mod!=ModVersion.Value && save.Schema==SaveSchema.Current);
         save.Name="Second";store.Write(save);Check(store.Read(save.Slot).Save.Name=="Second" && !store.Read(save.Slot).Recovered);
         var file=Path.Combine(folder,save.Slot+".pbdmp");File.WriteAllText(file,"interrupted or corrupt");
         var recovered=store.Read(save.Slot);Check(recovered.Recovered && recovered.Save.Name=="First");
@@ -681,7 +721,7 @@ await Test("bidirectional poses, level change, full host, leave, rejoin, host st
     host.Dispose();
     await Until(() => !rejoin.Snapshot.Connected);
 });
-await Test("game and protocol version mismatches rejected", async () =>
+await Test("game/build fingerprints and exact mod release mismatches rejected", async () =>
 {
     var port = FreePort();
     using var host = new CoopSession("game-a");
@@ -689,10 +729,25 @@ await Test("game and protocol version mismatches rejected", async () =>
     using var wrongGame = new CoopSession("game-b");
     wrongGame.StartJoin(IPAddress.Loopback, port);
     await Until(() => wrongGame.Snapshot.Status.Contains("Game or PBDMP build mismatch"));
-    using var wrongVersion = new CoopSession("game-a", 1); // Previous 0.1 wire format.
+    using var wrongVersion = new CoopSession("game-a", "0.0.0-test");
     wrongVersion.StartJoin(IPAddress.Loopback, port);
-    await Until(() => wrongVersion.Snapshot.Status.Contains("protocol version mismatch"));
+    await Until(() => wrongVersion.Snapshot.Status.Contains($"the host runs PBDMP {ModVersion.Value}; you run 0.0.0-test"));
     Check(!host.Snapshot.Connected);
+});
+await Test("client rejects a different release in Welcome before accepting gameplay", async () =>
+{
+    var port = FreePort();
+    using var listener = new TcpListener(IPAddress.Loopback, port);
+    listener.Start();
+    using var client = new CoopSession("same-files");
+    client.StartJoin(IPAddress.Loopback, port);
+    using var peer = await listener.AcceptTcpClientAsync();
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var hello = await Protocol.ReadAsync(peer.GetStream(), deadline.Token);
+    Check(hello.Version == ModVersion.Value);
+    await Protocol.WriteAsync(peer.GetStream(), new(MessageKind.Welcome, "0.0.0-test", "same-files"), deadline.Token);
+    await Until(() => client.Snapshot.Status.Contains($"the host runs PBDMP 0.0.0-test; you run {ModVersion.Value}"));
+    Check(!client.Snapshot.Connected && client.Snapshot.RemotePose == null);
 });
 await Test("occupied host port and refused join report errors", async () =>
 {
@@ -806,7 +861,7 @@ await Test("large snapshots survive a bounded message carrier", async () =>
     }
     Check(blocked && received.Select(f=>f.Sequence).SequenceEqual(Enumerable.Range(1,total).Select(i=>(ulong)i)));
 });
-await Test("build mismatch, refused dial and slow dial report errors over a message carrier", async () =>
+await Test("release/build mismatch, refused dial and slow dial report errors over a message carrier", async () =>
 {
     using var listener = new LoopbackListener();
     using var host = new CoopSession("game-a");
@@ -814,6 +869,9 @@ await Test("build mismatch, refused dial and slow dial report errors over a mess
     using var wrongGame = new CoopSession("game-b");
     wrongGame.StartJoin(listener.ConnectAsync, "Connecting", 5);
     await Until(() => wrongGame.Snapshot.Status.Contains("Game or PBDMP build mismatch"));
+    using var wrongVersion = new CoopSession("game-a", "0.0.0-test");
+    wrongVersion.StartJoin(listener.ConnectAsync, "Connecting", 5);
+    await Until(() => wrongVersion.Snapshot.Status.Contains($"the host runs PBDMP {ModVersion.Value}; you run 0.0.0-test"));
     using var refused = new CoopSession("game-a");
     refused.StartJoin(_ => Task.FromException<IPeerConnection>(new IOException("Host is not reachable.")), "Connecting", 5);
     await Until(() => refused.Snapshot.Status == "Join failed: Host is not reachable.");

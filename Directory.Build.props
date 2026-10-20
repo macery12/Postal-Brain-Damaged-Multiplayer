@@ -4,6 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Deterministic>true</Deterministic>
+    <!-- The single release version for the plugin, network assembly and handshake. -->
+    <Version>1.0.2</Version>
     <GameDir Condition="'$(GameDir)' == ''">$(MSBuildThisFileDirectory)..\Game</GameDir>
   </PropertyGroup>
 </Project>

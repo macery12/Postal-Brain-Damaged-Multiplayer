@@ -19,7 +19,7 @@ internal static class IssueReport
     {
         "PBDMP version: " + Plugin.Version,
         "PBDMP build: " + Plugin.BuildId[..Math.Min(16, Plugin.BuildId.Length)],
-        "Protocol: " + Protocol.Version,
+        "Save schema: " + CoopSaveStore.Schema,
         "Game version (reported by game): " + Read(() => Application.version),
         "Game compatibility ID (binary hash, not release version): " + Read(GameCompatibilityId),
         "Unity: " + Read(() => Application.unityVersion),

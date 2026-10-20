@@ -37,7 +37,7 @@ public sealed record CampaignListing(string Id, string Level, int Difficulty, Da
 /// <summary>Bounded data-only files, atomic replacement and a previous known-good generation.</summary>
 public sealed class CoopSaveStore
 {
-    public const int Schema = 3, MaxPlayers = 8, MaxThumbnailBytes = 2 * 1024 * 1024;
+    public const int Schema = SaveSchema.Current, MaxPlayers = 8, MaxThumbnailBytes = 2 * 1024 * 1024;
     public const int MaxBytes = 32 * 1024 * 1024;
     private static readonly byte[] Png = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("PBDMPS01");

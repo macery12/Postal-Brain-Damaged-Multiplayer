@@ -53,7 +53,9 @@ Saves are grouped into **co-op campaigns**. A campaign is one continuous run of 
 - a small `.info` sidecar (name, level, time, difficulty and the names of everyone who has played), so listings never parse whole worlds;
 - a `.png` thumbnail rendered from P1's camera at the game's own 160×90 size.
 
-Save schema 3 stores one personal record per player who has joined. Saves from older development builds (schemas 1 and 2) are refused with a clear message and left untouched.
+Save schema 3 stores one personal record per player who has joined. The internal [SaveSchema.Current](../src/PBDMP.Network/SaveSchema.cs) is independent of mod releases and game builds; changing the mod release alone does not invalidate saves. The creating mod version is recorded for diagnostics, while loading validates schema, game and catalogue compatibility. Saves from older development builds (schemas 1 and 2) are refused with a clear message and left untouched.
+
+Local co-op Survival records use the same internal schema counter. Original record files marked `Version: 1` retain their supported layout: reading preserves the file and results, and the next new result writes the current schema. Records remain separate from campaign saves and solo metadata.
 
 Each slot uses a `.pbdmp` file with a schema version, game/catalogue compatibility data and SHA-256 checksum. Writes flush a temporary file and atomically replace the slot; `.bak` retains its previous valid generation. Interrupted temporary files are ignored. If the primary is damaged, loading tries the valid backup and reports recovery. A catalogue-incompatible primary can also recover the previous backup only when its schema, game build, map and catalogue all match. This loads that older recovery point, reports the choice, and leaves the primary and backup unchanged. If no compatible backup exists, loading refuses instead of inventing missing state. Resaving after recovery does not promote the incompatible same-map primary over the usable backup. Keep backups before manually moving or deleting save files.
 

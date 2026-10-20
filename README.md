@@ -2,7 +2,7 @@
 
 Play **POSTAL: Brain Damaged** together. PBDMP adds two-player co-op to the campaign and the base Survival arenas, letting you team up with a Steam friend over the internet or with someone on your LAN.
 
-Built for BepInEx 6 IL2CPP. **Current version: 1.0.1** (protocol 13, save schema 3).
+Built for BepInEx 6 IL2CPP. **Current version: 1.0.2**. Both players need the same mod release and files. Internal save schema: 3.
 
 ## Sync progress
 

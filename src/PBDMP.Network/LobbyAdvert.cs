@@ -3,7 +3,7 @@ using System.Globalization;
 namespace PBDMP.Network;
 
 /// <summary>What a PBDMP host advertises in its Steam lobby data, as a friend's copy reads it.</summary>
-public sealed record LobbyAdvert(string Version, string Protocol, string Build, string Level, string Mode, int Players)
+public sealed record LobbyAdvert(string Version, string Build, string Level, string Mode, int Players)
 {
     public const int Capacity = 2;
     public const string ModeMenu = "menu", ModeStory = "story", ModeSurvival = "survival";
@@ -11,9 +11,9 @@ public sealed record LobbyAdvert(string Version, string Protocol, string Build, 
     public bool Full => Players >= Capacity;
 
     /// <summary>A short reason this copy cannot join the advertised game, or null when it can.</summary>
-    public string? Problem(string version, int protocol, string build) =>
+    public string? Problem(string version, string build) =>
         Version.Length == 0 ? "Not a PBDMP game" :
-        Version != version || Protocol != protocol.ToString(CultureInfo.InvariantCulture) ? "Different PBDMP version (" + Version + ")" :
+        Version != version ? "Different PBDMP version (" + Version + ")" :
         Build != build ? "Different PBDMP files" :
         Full ? "Full" : null;
 

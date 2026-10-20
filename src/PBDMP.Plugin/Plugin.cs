@@ -13,7 +13,7 @@ namespace PBDMP.Plugin;
 [BepInPlugin("pbdmp.multiplayer", "PBDMP", Version)]
 public sealed class Plugin : BasePlugin
 {
-    internal const string Version = "1.0.1";
+    internal const string Version = ModVersion.Value;
     internal static ManualLogSource Logger = null!;
     internal static string Fingerprint = "";
     internal static string BuildId = "";
@@ -80,7 +80,7 @@ public sealed class Plugin : BasePlugin
             Environment.GetEnvironmentVariable("PBDMP_TEST_DISABLE_MESH_GUARD") != "1")
             new Harmony("pbdmp.multiplayer.solid-materials").PatchAll(typeof(UnreadableMeshGuard));
         AddComponent<MultiplayerBehaviour>();
-        Log.LogInfo($"PBDMP {Version} build {BuildId[..16]} loaded (wire {Protocol.Version}). Host-owned world and combat, identical weapons/keys/items, personal resources, host-owned co-op saves.");
+        Log.LogInfo($"PBDMP {Version} build {BuildId[..16]} loaded. Host-owned world and combat, identical weapons/keys/items, personal resources, host-owned co-op saves.");
     }
 
     private static string Hash(string path)

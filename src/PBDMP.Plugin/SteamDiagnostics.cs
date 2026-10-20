@@ -122,7 +122,7 @@ public sealed partial class MultiplayerBehaviour
             {
                 if (steam.LobbyDataUpdates <= _probeUpdates) return;
                 var own = steam.Describe(steam.LocalId, steam.Lobby);
-                SteamAssert(own?.Advert is { Mode: LobbyAdvert.ModeMenu, Players: 1 } advert && advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) == null,
+                SteamAssert(own?.Advert is { Mode: LobbyAdvert.ModeMenu, Players: 1 } advert && advert.Problem(Plugin.Version, Plugin.LobbyBuild) == null,
                     "lobby data arrives through the tap's LobbyDataUpdate and reads as a compatible PBDMP game");
                 SteamAssert(SteamNative.AppId == 1359980u, "the friend scan matches friends' games against this app id");
                 var hosting = steam.FriendsHosting();

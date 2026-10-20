@@ -1,6 +1,21 @@
 # Verification and troubleshooting
 
-Current release: **PBDMP 1.0.0 / protocol 13 / save schema 3**; see the 1.0.0 release record below. Earlier sections are historical. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+Current source: **PBDMP 1.0.2 / save schema 3**, with no separate network protocol version. The 1.0.0 release record below is historical. This page summarizes recorded development checks and how to repeat them. Raw logs, private install manifests and generated test output are excluded from the repository. The maintainer has verified two-PC play; the automated results below provide additional regression coverage.
+
+## Versioning simplification — October 20, 2026
+
+Built and packaged **1.0.2 / save schema 3**, build **E784999820EE6337** (`PBDMP.dll` 17EEE8C0C737C146, `PBDMP.Network.dll` 9B7A988CF41C629B). There is no independently maintained network protocol number. `artifacts/PBDMP-1.0.2.zip` contains the built pair; the normal installation and its manifest were not changed.
+
+| Check | Current-run result |
+| --- | --- |
+| Compilation | `./scripts/Build.ps1 -GameDir $GameDir -SkipTests`: zero warnings/errors, using the selected installation's real BepInEx core/interop. |
+| Network/storage | `dotnet run --project tests/PBDMP.Network.Tests/PBDMP.Network.Tests.csproj -c Release --no-restore`: **43 scenarios pass**. Same-release connection/rejoin and differing-release rejection run over TCP and a synthetic message carrier; a differing Welcome is refused client-side. Malformed and old integer handshakes are rejected. Campaign schema 3 remains readable with an earlier creating-mod version. Original Survival records survive reads and duplicate results, then migrate to the shared schema on a new result. |
+| Reporting | `dotnet run --project tests/PBDMP.Reporting.Tests/PBDMP.Reporting.Tests.csproj -c Release --no-restore`: **8 checks pass**. The plugin compiles the software prefill with save schema replacing the protocol number. |
+| Package | `./scripts/Package.ps1`: 1.0.2 package built; both DLL release versions and package identity verified. |
+
+The restricted build environment needed process-local `APPDATA`, `DOTNET_CLI_HOME` and `NUGET_PACKAGES` under `<RepoDir>/.local`. The final restore/build used `NuGetAudit=false` because the vulnerability service was unreachable; no vulnerability audit result is claimed. The first managed run caught a BOM in the new synthetic legacy-record input; the fixture now writes UTF-8 without a BOM and the corrected run passes.
+
+These results do not establish native UI/Steam behavior on the new DLL pair. Pending: two-account Steam same-release join and differing-release rejection, plus a native save/record smoke check. Earlier gameplay matrices remain historical; no broad native matrix was reopened for the versioning-only change.
 
 ## 1.0.0 release — October 19, 2026
 

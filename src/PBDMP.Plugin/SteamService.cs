@@ -15,7 +15,7 @@ internal sealed record FriendHost(ulong Friend, ulong Lobby, string Name, LobbyA
 /// <summary>Main-thread Steam lobby and identity state. Reads the callback tap; never pumps Steam itself.</summary>
 internal sealed class SteamService : IDisposable
 {
-    internal const string VersionKey = "pbdmp_version", ProtocolKey = "pbdmp_proto", BuildKey = "pbdmp_build",
+    internal const string VersionKey = "pbdmp_version", BuildKey = "pbdmp_build",
         LevelKey = "pbdmp_level", ModeKey = "pbdmp_mode", PlayersKey = "pbdmp_players";
     private readonly Action _hosted;
     private readonly Action<ulong> _entered;
@@ -90,7 +90,6 @@ internal sealed class SteamService : IDisposable
                 { Leave(); _failed($"Steam could not create a lobby (result {result})."); return; }
                 Lobby = lobby; Phase = LobbyPhase.Hosting;
                 SteamNative.SetLobbyData(lobby, VersionKey, Plugin.Version);
-                SteamNative.SetLobbyData(lobby, ProtocolKey, Protocol.Version.ToString());
                 SteamNative.SetLobbyData(lobby, BuildKey, Plugin.LobbyBuild);
                 Plugin.Logger.LogInfo("Steam lobby created" + (InviteOnly ? " (invite only)." : " (friends only)."));
                 _hosted();
@@ -220,7 +219,7 @@ internal sealed class SteamService : IDisposable
     {
         var version = SteamNative.GetLobbyData(lobby, VersionKey);
         if (version.Length == 0) return null;
-        return new(version, SteamNative.GetLobbyData(lobby, ProtocolKey), SteamNative.GetLobbyData(lobby, BuildKey),
+        return new(version, SteamNative.GetLobbyData(lobby, BuildKey),
             SteamNative.GetLobbyData(lobby, LevelKey), SteamNative.GetLobbyData(lobby, ModeKey), LobbyAdvert.ParsePlayers(SteamNative.GetLobbyData(lobby, PlayersKey)));
     }
 
@@ -266,10 +265,9 @@ internal sealed class SteamService : IDisposable
     private static string? Mismatch(ulong lobby)
     {
         var version = SteamNative.GetLobbyData(lobby, VersionKey);
-        var protocol = SteamNative.GetLobbyData(lobby, ProtocolKey);
         if (version.Length == 0) return "That Steam lobby was not created by PBDMP.";
-        if (version != Plugin.Version || protocol != Protocol.Version.ToString())
-            return $"Version mismatch: the host runs PBDMP {version} (protocol {protocol}); you run {Plugin.Version} (protocol {Protocol.Version}).";
+        if (version != Plugin.Version)
+            return $"Version mismatch: the host runs PBDMP {version}; you run {Plugin.Version}.";
         if (SteamNative.GetLobbyData(lobby, BuildKey) != Plugin.LobbyBuild)
             return "Build mismatch: both players need the exact same PBDMP files and the same game version.";
         return null;

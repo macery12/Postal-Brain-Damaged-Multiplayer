@@ -97,7 +97,7 @@ internal sealed class NativeCoopJoinMenu
         try { hosts = TestHosts ?? _scan(); }
         catch (Exception error) { Plugin.Logger.LogWarning("Steam friends could not be listed: " + error.Message); hosts = Array.Empty<FriendHost>(); }
         var unavailable = TestHosts == null ? _unavailable() : "";
-        var rows = hosts.OrderBy(h => h.Advert == null || h.Advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) != null)
+        var rows = hosts.OrderBy(h => h.Advert == null || h.Advert.Problem(Plugin.Version, Plugin.LobbyBuild) != null)
             .ThenBy(h => h.Name, StringComparer.OrdinalIgnoreCase)
             .Select(h => (Host: h, Where: Where(h.Advert), Status: Status(h.Advert), Avatar: _avatar(h.Friend))).ToList();
         var signature = unavailable + "\n" + string.Join("\n", rows.Select(r => $"{r.Host.Lobby}|{r.Host.Name}|{r.Where}|{r.Status}|{r.Avatar != null}"));
@@ -145,18 +145,18 @@ internal sealed class NativeCoopJoinMenu
     };
 
     internal static string Status(LobbyAdvert? advert) => advert == null ? "" :
-        advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) ?? $"{advert.Players} of {LobbyAdvert.Capacity} players";
+        advert.Problem(Plugin.Version, Plugin.LobbyBuild) ?? $"{advert.Players} of {LobbyAdvert.Capacity} players";
 
     internal void Select(FriendHost? host)
     {
         Selected = host;
         foreach (var (button, listed) in _entries) { if (listed.Lobby == host?.Lobby) button.SetChecked(); else button.SetInteractable(); }
-        NativeUiKit.SetButtonState(JoinButton, host?.Advert is { } advert && advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) == null);
+        NativeUiKit.SetButtonState(JoinButton, host?.Advert is { } advert && advert.Problem(Plugin.Version, Plugin.LobbyBuild) == null);
     }
 
     private void JoinSelected()
     {
-        if (Selected is not { Advert: { } advert } host || advert.Problem(Plugin.Version, Protocol.Version, Plugin.LobbyBuild) != null) return;
+        if (Selected is not { Advert: { } advert } host || advert.Problem(Plugin.Version, Plugin.LobbyBuild) != null) return;
         _join(host);
     }
 

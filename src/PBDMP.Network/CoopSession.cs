@@ -11,7 +11,7 @@ public sealed class CoopSession : IDisposable
 {
     private readonly object _gate = new();
     private readonly string _gameFingerprint;
-    private readonly int _protocolVersion;
+    private readonly string _modVersion;
     private readonly CancellationTokenSource _stop = new();
     private IPeerListener? _listener;
     private IPeerConnection? _peer;
@@ -66,10 +66,11 @@ public sealed class CoopSession : IDisposable
         }
     }
 
-    public CoopSession(string gameFingerprint, int protocolVersion = Protocol.Version)
+    public CoopSession(string gameFingerprint, string modVersion = ModVersion.Value)
     {
+        Protocol.ValidateModVersion(modVersion);
         _gameFingerprint = gameFingerprint;
-        _protocolVersion = protocolVersion;
+        _modVersion = modVersion;
     }
 
     public SessionSnapshot Snapshot { get { lock (_gate) return _snapshot; } }
@@ -189,7 +190,7 @@ public sealed class CoopSession : IDisposable
                             client.Dispose();
                             continue;
                         }
-                        await Protocol.WriteAsync(stream, new(MessageKind.Welcome, _protocolVersion, _gameFingerprint), deadline.Token).ConfigureAwait(false);
+                        await Protocol.WriteAsync(stream, new(MessageKind.Welcome, _modVersion, _gameFingerprint), deadline.Token).ConfigureAwait(false);
                         lock (_gate)
                         {
                             if (stop.IsCancellationRequested) { client.Dispose(); return; }
@@ -219,7 +220,7 @@ public sealed class CoopSession : IDisposable
             using (var deadline = Deadline(stop, 5))
             {
                 var stream = client.Stream;
-                await Protocol.WriteAsync(stream, new(MessageKind.Hello, _protocolVersion, _gameFingerprint), deadline.Token).ConfigureAwait(false);
+                await Protocol.WriteAsync(stream, new(MessageKind.Hello, _modVersion, _gameFingerprint), deadline.Token).ConfigureAwait(false);
                 var welcome = await Protocol.ReadAsync(stream, deadline.Token).ConfigureAwait(false);
                 if (welcome.Kind == MessageKind.Reject) throw new InvalidDataException(welcome.Text);
                 var error = CheckHello(welcome, MessageKind.Welcome);
@@ -244,7 +245,10 @@ public sealed class CoopSession : IDisposable
     private string? CheckHello(Packet packet, MessageKind expected)
     {
         if (packet.Kind != expected) return "Expected handshake.";
-        if (packet.Version != _protocolVersion) return "PBDMP protocol version mismatch.";
+        if (!string.Equals(packet.Version, _modVersion, StringComparison.Ordinal))
+            return expected == MessageKind.Hello
+                ? $"Version mismatch: the host runs PBDMP {_modVersion}; you run {packet.Version}."
+                : $"Version mismatch: the host runs PBDMP {packet.Version}; you run {_modVersion}.";
         if (!string.Equals(packet.Text, _gameFingerprint, StringComparison.Ordinal)) return "Game or PBDMP build mismatch. Both players need the same game and mod DLLs.";
         return null;
     }

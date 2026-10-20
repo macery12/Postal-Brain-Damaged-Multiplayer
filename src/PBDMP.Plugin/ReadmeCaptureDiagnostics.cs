@@ -138,7 +138,7 @@ public sealed partial class MultiplayerBehaviour
                 Player.Instance.Teleport(pickup.transform.position + Vector3.up * .1f, Player.Instance.transform.rotation);
                 pickup.Interact(Player.Instance); break;
             case "friend":
-                _coopJoin!.TestHosts = new[] { new FriendHost(0, 1, "Friend", new LobbyAdvert(Plugin.Version, Protocol.Version.ToString(), Plugin.LobbyBuild, "LEVEL_AD_Neighborhood", LobbyAdvert.ModeStory, 1)) };
+                _coopJoin!.TestHosts = new[] { new FriendHost(0, 1, "Friend", new LobbyAdvert(Plugin.Version, Plugin.LobbyBuild, "LEVEL_AD_Neighborhood", LobbyAdvert.ModeStory, 1)) };
                 _coopMenu!.JoinFriend.onClick.Invoke(); break;
             case "inspect":
                 var lines = Object.FindObjectsOfType<Npc>().Where(n => n.IsAlive && n.gameObject.activeInHierarchy).Take(1000).Select(n => $"NPC {n.GetInstanceID()} {n.name} {n.Transform.position}")
