@@ -5,7 +5,7 @@ PBDMP is a Windows/BepInEx IL2CPP mod. Use the repository checkout as the source
 ## Read on demand
 
 - **Native research, raw ISIL addresses, empty decompiled methods, or runtime testing:** read `docs/agent-research-and-testing.md` before drawing behavioral conclusions or launching fixtures.
-- **Survival work:** read `docs/plans/survival.md` for approved rules, native references and phase gates. Update its Pending / In progress / Complete handoff as work advances.
+- **Survival work:** read the Survival rows of `docs/sync-progress.md` and the Survival commands and checklist in `docs/verification.md`. Update its Pending / In progress / Complete handoff as work advances.
 - **Weapon presentation:** read `docs/weapon-animation-testing.md` for evidence, limitations and focused fixtures.
 - **Synchronization changes:** read `docs/protocol.md` and relevant rows of `docs/sync-progress.md`; preserve host authority, epoch/life identities, personal resources and bounded snapshots.
 - **Save changes:** read `docs/co-op-saves.md`; retain solo/co-op isolation and compatible campaign files.

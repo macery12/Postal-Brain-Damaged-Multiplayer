@@ -19,7 +19,7 @@ PBDMP 1.0.0 is installed and packaged as build **960F3A0ADE93A2BB** (`artifacts/
 
 ## Identical and personal systems
 
-In the campaign, weapons, keys and mission items are one team inventory owned by P1. A pickup of any of them exists once, and both players receive it. A key door uses the key for both. See [the redesign plan](plans/coop-redesign.md).
+In the campaign, weapons, keys and mission items are one team inventory owned by P1. A pickup of any of them exists once, and both players receive it. A key door uses the key for both.
 
 Health, armor/shields, ammo, consumables and powerup types/durations remain personal. Collecting one of those pickups does not remove the partner's copy, and host-selected enemy drops receive separate collectible copies. Survival keeps every resource personal. Personal systems do not count as unfinished synchronization.
 
@@ -35,13 +35,14 @@ Health, armor/shields, ammo, consumables and powerup types/durations remain pers
 | Checkpoint coverage | Exercise additional natural campaign checkpoint and machinery sequences. | Native world restoration plus durable multiplayer adapters are implemented. |
 | Solo-save import | Explicit conversion into a new co-op slot. | Co-op persistence is implemented; solo slots are never implicitly imported. |
 | Transport evaluation | Measure real LAN and Steam-relay latency, loss and snapshot pressure; consider unreliable pose messages on Steam. | Retain bounded queues and main-thread capture budgets. |
+| Survival join from a loaded arena | Intermittent: when P2 joins from its own loaded solo arena (`-JoinInput -JoinFromLevel -Level LEVEL_Horde_Suburbs`), one PC can be left in a native pause shortly after admission (3 of 8 runs during Survival hardening; passed in the 1.0 run). | Find the pausing source before changing admission. |
 | Steam joining | Two-account check of Join a friend and of `+connect_lobby` (both implemented in 1.0.0, one-account checks pass). Invite/Join Game joining, rejoining and the build-mismatch check passed in the October 18, 2026 playtest. | Both players keep the strict exact-build check. |
 
 Host-owned co-op saves now provide named manual slots, one quicksave and three rotating autosaves. Either player can activate a supported checkpoint; only P1 can restore it. Ordinary deaths still respawn independently. Native solo save/profile writes remain blocked during multiplayer and return after session cleanup. See [co-op saves](co-op-saves.md).
 
 ## Outside the current scope
 
-Survival co-op for the three base arenas is implemented (see the [Survival handoff](plans/survival.md)); its natural two-PC playtest list is in [verification](verification.md#survival-two-player-checklist). DLC/custom Survival arenas, persistent Survival saves, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
+Survival co-op for the three base arenas is implemented; its natural two-PC playtest list is in [verification](verification.md#survival-two-player-checklist). DLC/custom Survival arenas, persistent Survival saves (they would need their own versioned snapshot of wave, timers, score, combo, spawn budgets, live actors and offers: `HordeModeController` has no native save support), Survival balance options, a per-player scoreboard, custom maps, DLC-specific content, more than two players, public matchmaking/lobby browsing, dedicated servers and host migration need separate design and validation. Steam sessions use Steam's relay and NAT traversal; Direct IP sessions remain unauthenticated and unencrypted and should not be exposed to untrusted networks.
 
 ## Historical milestones
 

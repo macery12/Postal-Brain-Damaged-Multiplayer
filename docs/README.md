@@ -6,7 +6,6 @@ Start with the [project README](../README.md) for installation and play instruct
 
 | Document | Purpose |
 | --- | --- |
-| [Survival co-op plan and handoff](plans/survival.md) | Approved Survival rules, native research, phase evidence, limitations and remaining manual checks. |
 | [Agent research and testing](agent-research-and-testing.md) | Decompiled declarations vs native behavior, ISIL address resolution and isolated runtime checks. |
 | [Sync progress](sync-progress.md) | Individual shared/local feature status, development credit, accepted baseline and remaining gaps. |
 | [Performance baseline](performance.md) | Initial connected/disconnected FPS, stalls and repeatable budget checks. |

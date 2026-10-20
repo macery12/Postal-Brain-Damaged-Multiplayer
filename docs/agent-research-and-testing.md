@@ -62,7 +62,7 @@ Inspect Name/Signature and confirm the declaration's RVA. Multiple names may sha
 
 A C# placeholder is not a native no-op. Actual native `ret` can establish a no-op for that binary. `PlayerWeapon.ForceAttack()` was a native no-op here; pistol/shotgun fixtures used `PlayAttackAnimation(ANIM_SHOOT)`, whereas the saw needed native press/release flow.
 
-Survival warning: `SetHordeModeState` has gameplay side effects; `Begin` starts combat and pickup spawning. Calling these on P2 merely to update its HUD can create duplicate authority. `docs/plans/survival.md` contains the approved rules and additional source references.
+Survival warning: `SetHordeModeState` has gameplay side effects; `Begin` starts combat and pickup spawning. Calling these on P2 merely to update its HUD can create duplicate authority.
 
 ## Focused testing workflow
 
